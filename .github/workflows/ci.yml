@@ -1,0 +1,21 @@
+name: Verificações
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: code/backend/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.0
+          cache: npm
+          cache-dependency-path: code/backend/api/package-lock.json
+      - run: npm ci
+      - run: npm run check
