@@ -1,6 +1,6 @@
 # Projeto Amadeus: plano de desenvolvimento
 
-**Versão 2.1 | 2 de outubro de 2026 | Status: projeto revisado, implementação e benchmarks pendentes**
+**Versão 2.3 | 3 de outubro de 2026 | Status: fases 0 e 1 implementadas em código; aceite operacional da fase 1 pendente**
 
 ## 1. Objetivo e decisões aprovadas
 
@@ -78,7 +78,7 @@ Gemini Live deixa de ser um caminho concorrente de implementação obrigatória.
 | Transporte | REST para recursos; WebSocket para chamada, áudio e eventos |
 | Persistência | SQLite + Drizzle; migrações; arquivos locais |
 | Tarefas de memória | Tabela persistente de jobs, worker, tentativas limitadas e recuperação no reinício |
-| Serviços de áudio | Python; faster-whisper como candidato de STT; Chatterbox como candidato de TTS |
+| Serviços de áudio | Python; faster-whisper como candidato de STT; Qwen3-TTS Base 1.7B selecionado provisoriamente para TTS após avaliação auditiva |
 | Interface | React + Vite + TypeScript; AudioWorklet; VAD no cliente |
 | Avatar | Live2D; mapeamento de expressões e movimentos versionado |
 | Desktop | Tauri; Windows como primeiro alvo de validação |
@@ -174,15 +174,19 @@ Cada segmento falado recebe metadados internos validados:
 
 Esses campos pertencem ao contrato da Amadeus, não são parâmetros nativos prometidos pelo Chatterbox. A voz nunca deve ler nomes de emoções, JSON, raciocínio interno ou instruções de atuação.
 
-### 5.3 Como o Chatterbox será dirigido
+### 5.3 Seleção e direção do TTS
 
-Selecionar uma referência vocal original ou de uma pessoa que autorizou o uso, com gravação limpa em pt-BR. Fixar identidade, versão e perfil. Comparar Chatterbox Multilingual e variante pt-BR quando disponíveis no ambiente. [S8]
+Selecionar uma referência vocal original ou de uma pessoa que autorizou o uso, com gravação limpa em pt-BR. Fixar identidade, versão e perfil.
+
+**Decisão de 03/10/2026:** o usuário aprovou provisoriamente a qualidade das duas amostras do Qwen3-TTS Base 1.7B geradas com `amadeus.wav` e sua transcrição como contexto. Essa qualidade é suficiente para prosseguir na etapa atual. Chatterbox Multilingual e sua variante pt-BR foram reprovados para esta referência por artificialidade, pronúncia e distância vocal. O aceite abrange a qualidade vocal isolada. O adaptador Qwen foi integrado ao serviço TTS e validado com o modelo real em CUDA, incluindo autenticação HTTP e saída PCM mono de 16 kHz. O ambiente local está configurado para Qwen, com aplicação no processo habitual após reiniciá-lo no ambiente Python correspondente. Nos testes de integração, a primeira frase levou aproximadamente 10,2 s (incluindo 3,1 s de preparação da referência), e uma segunda frase, diferente, levou 5,8 s com contexto reutilizado. Após otimização com CUDA Graphs, reutilização do filtro de tokens e aquecimento prévio da referência, o benchmark local com três frases e três sementes reduziu a mediana do TTS de 7.18 s para 1.82 s na RTX 4060. Esses nove testes por modo não incluem STT, Gemini ou reprodução. A meta de latência ponta a ponta e o benchmark de 100 turnos permanecem pendentes.
+
+**Refinamento na fase 2:** ajustes adicionais de timbre, prosódia, entonação, naturalidade em pt-BR e expressividade ficam para Persona e atuação, com RF-034, RF-035, RF-044, RNF-017 e RNF-018. Preservar a referência e a configuração aceitas como comparação antes de experimentar mudanças.
 
 Criar presets por escuta, combinando apenas controles disponíveis na versão instalada:
 
 - Redação e pontuação naturais; frases com contexto suficiente para conservar prosódia.
 - Pausas entre segmentos controladas pelo reprodutor, sem inserir instruções faladas.
-- Parâmetros como exaggeration e cfg_weight, se suportados pelo adaptador, ajustados dentro de faixas testadas.
+- Controles suportados pelo motor selecionado, ajustados dentro de faixas testadas. `exaggeration` e `cfg_weight` foram usados nas avaliações do Chatterbox e não são presumidos como controles do Qwen3-TTS Base.
 - Referências expressivas da mesma voz como experimento opcional; manter apenas se preservarem identidade e melhorarem a atuação.
 
 Não existe correspondência garantida entre exaggeration e uma emoção específica. O parâmetro pode alterar intensidade e ritmo, sem produzir sarcasmo ou constrangimento. Não enviar tags como [laugh] sem comprovar suporte na variante em português. [S8]
@@ -329,7 +333,7 @@ Não fixar datas antes dos testes de áudio, da disponibilidade do rig Live2D e 
 | --- | --- | --- |
 | 0. Fundação | Monorepo, contratos, health, SQLite, autenticação básica, configuração, capacidades e logs | API e cliente mínimo executam; acesso indevido rejeitado |
 | 1. Voz personalizada de ponta a ponta | Serviço Python, referência vocal, STT, LLM, TTS, VAD, interrupção, reprodução confirmada e medição | Chamada funciona; perfil vocal preservado; baseline de latência/cotas/VRAM documentado |
-| 2. Persona e atuação | Prompt, estado expressivo, segmentos, presets vocais e conjunto de avaliação | 30 cenários; gate de voz sem avatar; escolha justificada de TTS/LLM |
+| 2. Persona e atuação | Prompt, estado expressivo, segmentos, presets vocais, refinamento de timbre/prosódia/naturalidade da voz provisória e conjunto de avaliação | 30 cenários; gate de voz sem avatar; escolha justificada de TTS/LLM |
 | 3. Memória e recuperação | Checkpoints, jobs duráveis, origem/correção/exclusão de fatos, políticas de envio, retomada | Reinício recupera trabalhos; memória correta e exclusão efetiva |
 | 4. Texto e imagens | Upload, EXIF, mensagens durante chamadas, validação multimodal | Imagem e texto recebem resposta coerente e entram no histórico |
 | 5. Live2D e interface completa | Arte/rig, atuação sincronizada, legendas, histórico, fatos e configurações | Avatar Live2D final funciona com voz, emoção e interrupção |
@@ -406,3 +410,14 @@ Consultadas em 02/10/2026. Ofertas, modelos, cotas e termos podem mudar. As esco
 - [S8 - Chatterbox: modelos, exemplos e parâmetros](https://github.com/resemble-ai/chatterbox)
 - [S9 - faster-whisper: transcrição e integrações](https://github.com/SYSTRAN/faster-whisper)
 - [S10 - Gemini Live: capacidades de referência](https://ai.google.dev/gemini-api/docs/live-api)
+
+
+## Registro da implementação da fase 1
+
+Foram implementados o pipeline de chamadas, STT/TTS locais, adaptador Gemini, perfil de voz com SHA-256, entrada de texto, interrupção, confirmação de reprodução, histórico e métricas. Há um cliente técnico de áudio sem interface visual. O Gemini entrega texto por SSE a uma fila limitada de frases, permitindo iniciar TTS antes do fim da geração. STT trabalha por fala e TTS por segmento; o adaptador genérico HTTP mantém a alternativa com geração completa.
+
+O aceite operacional permanece pendente: teste real com chave Gemini válida ainda não executado, identidade vocal original ainda não criada, pesos dos motores ainda não instalados/testados e medições reais de 100 turnos/30 interrupções ainda não executadas. Os testes usam serviços controlados e não atestam qualidade vocal, AEC ou metas no hardware.
+
+As dubladoras citadas pelo usuário são referências artísticas para uma voz própria. Os nove MP3 locais fornecidos foram analisados por medidas acústicas preliminares, com limitações de música, múltiplos falantes e atuação. Não houve avaliação auditiva de timbre nem uso dessas gravações para clonagem. A proposta inicial está em `code/backend/assets/voice-profiles/design.json`.
+
+Não foram adiados novos itens de escopo. Personalidade/expressão aprofundadas permanecem na fase 2; processamento de memória/retomada na fase 3; interface, Live2D e desktop nas fases já previstas. Consulte [protocolo da fase 1](../websocket/phase-1.md).

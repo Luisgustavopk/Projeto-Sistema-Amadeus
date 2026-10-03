@@ -1,6 +1,9 @@
 # Frontend
 
-Área reservada ao cliente React, ao avatar Live2D e ao aplicativo desktop Tauri. A interface será discutida antes da implementação: não há telas, aplicação web ou prévia nesta estrutura inicial.
+Área do cliente, do avatar Live2D e do aplicativo desktop Tauri. A interface definitiva será discutida nas fases previstas.
+
+- `voice-test/`: interface local temporária para testar a fase 1.
+- `call-client/`: cliente independente de HTTP/WebSocket e Web Audio.
 
 - `assets/avatar/`: espaço para os recursos do Live2D.
 - `desktop/`: espaço para o empacotamento Tauri.

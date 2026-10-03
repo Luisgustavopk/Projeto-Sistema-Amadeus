@@ -1,6 +1,6 @@
 # Projeto Amadeus
 
-Estrutura inicial do projeto. A documentação está em `docs/` e o código em `code/`.
+Backend das fases 0 e 1 do projeto. A documentação está em `docs/` e o código em `code/`.
 
 ## Organização
 
@@ -11,12 +11,12 @@ amadeus/
 │   ├── decisions/             # Decisões de arquitetura
 │   └── websocket/             # Proposta do protocolo de voz
 ├── code/                      # Código do projeto
-│   ├── frontend/              # Reservado; interface ainda a definir
+│   ├── frontend/              # Cliente técnico sem interface; produto a definir
 │   │   ├── desktop/           # Futuro empacotamento Tauri
 │   │   └── assets/avatar/     # Futuros recursos Live2D
 │   └── backend/
 │       ├── api/               # API, ferramentas, dependências e dados locais
-│       ├── services/          # Futuros serviços STT e TTS
+│       ├── services/          # Serviços locais STT e TTS
 │       ├── assets/            # Persona e perfis de voz
 │       └── evals/             # Futuras avaliações
 └── .github/workflows/         # Verificações automatizadas
@@ -30,7 +30,7 @@ Dentro da API, `src/bootstrap/` monta as dependências e o servidor; `src/config
 
 As rotas ficam em `http/routes/` e `realtime/routes/`, com seus contratos em subpastas `schemas/`. As exceções são agrupadas por assunto em `domain/errors/`; `http/errors/` transforma essas exceções em respostas HTTP. `http/observability/` separa métricas de logs. No WebSocket, `realtime/controllers/` adapta a requisição, `realtime/protocol/` define o contrato e `realtime/session/` coordena leitura de mensagens, estado, timers e transporte.
 
-Em `application/`, os módulos `conversations/`, `calls/`, `providers/` e `diagnostics/` implementam os casos de uso. `runtime/activity-gate.ts` coordena chamadas e execuções com as mudanças de configuração. As interfaces em `ports/` mantêm a aplicação independente dos repositórios SQLite. Os controllers recebem serviços específicos, e somente `bootstrap/` monta as implementações concretas.
+Em `application/`, os módulos `conversations/`, `calls/`, `providers/`, `diagnostics/` e `voice/` implementam os casos de uso. `runtime/activity-gate.ts` coordena chamadas e execuções com as mudanças de configuração. As interfaces em `ports/` mantêm a aplicação independente dos repositórios SQLite. Os controllers recebem serviços específicos, e somente `bootstrap/` monta as implementações concretas.
 
 ## Separação entre frontend e backend
 
@@ -40,9 +40,9 @@ Cada camada mantém seu código e suas dependências. O backend define e valida 
 
 A fase 0 inclui autenticação por token, isolamento por proprietário, diagnóstico protegido, configuração persistente dos adaptadores, consumo e orçamento, política de envio de dados, OpenAPI e negociação do protocolo de voz por tickets temporários. A fundação usa SQLite, testes e CI.
 
-O frontend está reservado. Não há interface implementada ou prévia web. Voz personalizada, Live2D e aplicativo desktop permanecem no escopo e serão implementados nas fases previstas, após as definições necessárias.
+A fase 1 implementa o pipeline STT → LLM → TTS, referência de voz com integridade, interrupção, reprodução confirmada e persistência. O frontend contém apenas um módulo técnico de chamadas, sem interface ou prévia web. Live2D e desktop permanecem nas fases previstas. O aceite com voz original e modelos reais depende da chave Gemini, da gravação autorizada e de benchmarks no dispositivo.
 
-Os adaptadores `disabled` e `http-json` estão implementados. O segundo comunica-se com serviços que seguem o contrato de `/v1/providers/protocol`; as integrações específicas de modelos e o processamento de áudio serão implementados na fase 1. O transporte atual desse adaptador é JSON completo, sem streaming nativo. A disponibilidade do serviço e suas capacidades declaradas são informadas separadamente das funcionalidades completas da Amadeus.
+Os adaptadores `disabled`, `http-json` e `gemini` estão implementados. O segundo comunica-se com serviços que seguem o contrato de `/v1/providers/protocol`; os serviços Python implementam STT e TTS; o adaptador Gemini usa o endpoint oficial e o modelo configurado. O adaptador HTTP usa JSON completo. O Gemini oferece SSE, permitindo sintetizar frases antes do fim da resposta. A disponibilidade do serviço e suas capacidades declaradas são informadas separadamente das funcionalidades completas da Amadeus.
 
 HTTP é permitido em loopback. Para expor a API na rede, configure `TLS_CERT_FILE`, `TLS_KEY_FILE` e origens HTTPS em `ALLOWED_ORIGINS`. O servidor inicia com HTTPS/WSS; certificados e chaves locais ficam fora do Git. Sem uma origem configurada, clientes de navegador são bloqueados.
 
@@ -94,3 +94,18 @@ O token está em `.env` e não deve ser enviado ao Git ou incluído no frontend.
 - [Requisitos editáveis](docs/project/Requisitos_API_Amadeus_v2.md)
 
 Nenhuma licença de distribuição foi escolhida.
+
+## Operação da fase 1
+
+Consulte [serviços locais](code/backend/services/README.md), [cliente técnico](code/frontend/call-client/README.md) e [protocolo 1.1](docs/websocket/phase-1.md).
+
+1. Crie sua chave no [Google AI Studio](https://aistudio.google.com/api-keys), configure `GEMINI_API_KEY` no backend e reinicie a API. Modelo confirmado: `gemini-3.8-flash`.
+2. Prepare os processos STT/TTS e seus segredos. Selecione limites diários explícitos; limites zero bloqueiam inferência.
+3. Configure os provedores em PUT `/v1/providers`: LLM `adapter:gemini`, `model:gemini-3.8-flash`, `apiKeyEnv:GEMINI_API_KEY`; STT/TTS `adapter:http-json`, endpoints `http://127.0.0.1:8001` / `8002`, apiKeyEnv correspondente ao serviço.
+4. Para os motores locais, selecione `dataPolicy:local-approved` somente quando esses processos realmente forem locais. Para conversar com Gemini usando dados pessoais, revise a política e configure `personal-approved`, `policyReviewedAt` e `policyReference`. O plano gratuito informa uso de dados para melhorar produtos na [tabela oficial](https://ai.google.dev/gemini-api/docs/pricing); não há aprovação automática.
+5. Coloque uma gravação original/autorizada WAV PCM16 de 3 a 30 s em `code/backend/assets/voice-profiles/references/`. Ative-a em PUT `/v1/voice/profile` com `{name,referenceFile,consentConfirmed:true}`. Não use os vídeos das dubladoras como prompt de clonagem: o objetivo é uma identidade própria.
+6. Confira capacidades, saúde e uso nas rotas protegidas. O cliente negocia 1.1; a fundação 1.0 continua disponível.
+
+Os testes não dependem de uma chave real nem de pesos de IA. Os orçamentos da API são proteções locais, não uma confirmação da cota atual do Google. Para STT/TTS, a estimativa inclui bytes de áudio/texto e não equivale a tokens cobrados por um provedor.
+
+Use uma única instância da API por banco SQLite: na inicialização, chamadas que permaneceram abertas são marcadas como desconectadas e recebem uma tarefa de memória pendente. O processamento dessas tarefas pertence à fase 3.
