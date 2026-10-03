@@ -1,3 +1,4 @@
+import { providerAttempts } from './fallback.ts';
 import type { ProviderConfigurationRepository } from '../../ports/provider-configuration-repository.ts';
 import type { ProviderUsageRepository } from '../../ports/provider-usage-repository.ts';
 import type { ProviderFactory } from '../../ports/provider.ts';
@@ -34,10 +35,14 @@ export function createProviderQueries(
       const config = await configuration.get(ownerId);
 
       return Promise.all(
-        (['llm', 'stt', 'tts'] as const).map(async (role) => ({
-          role,
-          ...(await usage.usage(ownerId, role, config[role])),
-        })),
+        (['llm', 'stt', 'tts'] as const).flatMap((role) =>
+          providerAttempts(role, config[role]).map(async (attempt, index) => ({
+            role,
+            model: attempt.model ?? null,
+            isFallback: index > 0,
+            ...(await usage.usage(ownerId, role, attempt)),
+          })),
+        ),
       );
     },
   };

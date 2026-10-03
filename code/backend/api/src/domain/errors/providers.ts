@@ -14,6 +14,14 @@ export class ProviderUnavailableError extends ApplicationError {
   }
 }
 
+export class ProviderTemporarilyUnavailableError extends ApplicationError {
+  constructor(
+    message = 'O provedor está temporariamente indisponível. Tente novamente mais tarde.',
+  ) {
+    super('PROVIDER_TEMPORARILY_UNAVAILABLE', message);
+  }
+}
+
 export class ProviderInvalidError extends ApplicationError {
   constructor(message = 'Resposta inválida do adaptador.') {
     super('PROVIDER_INVALID', message);

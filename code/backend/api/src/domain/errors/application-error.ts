@@ -1,6 +1,7 @@
 export type ErrorCode =
   | 'QUOTA_EXCEEDED'
   | 'PROVIDER_UNAVAILABLE'
+  | 'PROVIDER_TEMPORARILY_UNAVAILABLE'
   | 'PROVIDER_INVALID'
   | 'PROVIDER_CONFIGURATION'
   | 'PROVIDER_DISABLED'
@@ -13,7 +14,10 @@ export type ErrorCode =
   | 'INVALID_PROVIDER_INPUT'
   | 'DATA_POLICY_BLOCKED'
   | 'DATABASE_UNAVAILABLE'
-  | 'RATE_LIMITED';
+  | 'RATE_LIMITED'
+  | 'NO_SPEECH_DETECTED'
+  | 'VOICE_INPUT_INVALID'
+  | 'VOICE_NOT_READY';
 
 export class ApplicationError extends Error {
   readonly code: ErrorCode;

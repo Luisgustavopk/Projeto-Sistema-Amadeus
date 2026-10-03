@@ -12,7 +12,14 @@ export type ConversationHttpServices = {
   conversations: ReturnType<typeof createConversationService>;
   tickets: Pick<TicketService, 'issue'>;
 };
+export type VoiceHttpServices = {
+  voiceProfiles: import('../application/voice/profiles.ts').VoiceProfiles;
+};
 export type SystemHttpServices = {
+  voiceCapabilities: ReturnType<
+    typeof import('../application/voice/capabilities.ts').createVoiceCapabilities
+  >;
+  voiceMetrics: import('../application/voice/metrics.ts').VoiceMetrics;
   health: ReturnType<typeof createHealthService>;
   providers: Pick<ProviderServices, 'describe'>;
   metrics: HttpMetrics;
@@ -22,4 +29,5 @@ export type SystemHttpServices = {
 
 export type HttpServices = ProviderHttpServices &
   ConversationHttpServices &
-  SystemHttpServices;
+  SystemHttpServices &
+  VoiceHttpServices;

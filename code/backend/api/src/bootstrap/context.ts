@@ -1,12 +1,21 @@
+import type { NotifyProviderFallback } from '../application/providers/fallback.ts';
 import type { Config } from '../config/index.ts';
 import type { AppOptions } from './options.ts';
+import { recoverInterruptedCalls } from '../adapters/database/recover-calls.ts';
 import { openDatabase } from '../adapters/database/index.ts';
 import { SqliteConversationRepository } from '../adapters/database/conversation-repository.ts';
 import { SqliteCallTicketRepository } from '../adapters/database/call-ticket-repository.ts';
 import { SqliteProviderConfigurationRepository } from '../adapters/database/provider-configuration-repository.ts';
 import { SqliteProviderUsageRepository } from '../adapters/database/provider-usage-repository.ts';
 import { createSqliteHealthProbe } from '../adapters/database/health-probe.ts';
-import { createProvider } from '../adapters/providers/http-json.ts';
+import { createProviderFactory } from '../adapters/providers/factory.ts';
+import { SqliteVoiceProfileRepository } from '../adapters/database/voice-profile-repository.ts';
+import { createSqliteCallHistory } from '../adapters/database/call-history-repository.ts';
+import { createVoiceReferenceInspector } from '../adapters/files/voice-reference-inspector.ts';
+import { createVoiceProfiles } from '../application/voice/profiles.ts';
+import { createVoiceMetrics } from '../application/voice/metrics.ts';
+import { createVoiceCapabilities } from '../application/voice/capabilities.ts';
+import { createVoiceSessions } from '../application/voice/sessions.ts';
 import { createProviderServices } from '../application/providers/index.ts';
 import { createConversationService } from '../application/conversations/create.ts';
 import { createTicketService } from '../application/calls/tickets.ts';
@@ -14,8 +23,13 @@ import { createCallAuthorization } from '../application/calls/authorization.ts';
 import { ActivityGate } from '../application/runtime/activity-gate.ts';
 import { createHealthService } from '../application/diagnostics/health.ts';
 
-export async function createContext(options: AppOptions, config: Config) {
+export async function createContext(
+  options: AppOptions,
+  config: Config,
+  onFallback?: NotifyProviderFallback,
+) {
   const database = options.database ?? (await openDatabase('file::memory:'));
+  await recoverInterruptedCalls(database.client);
   const conversationRepository = new SqliteConversationRepository(
     database.client,
   );
@@ -32,9 +46,12 @@ export async function createContext(options: AppOptions, config: Config) {
     configuration,
     usage,
     ownerId: config.OWNER_ID,
-    factory: (role, providerConfig) =>
-      createProvider(role, providerConfig, secrets),
-    gate: activity,
+    factory: createProviderFactory(secrets),
+    ...(onFallback ? { onFallback } : {}),
+    gate: {
+      beginConfiguration: () => activity.beginProviderConfiguration(),
+      beginExecution: () => activity.beginExecution(),
+    },
   });
   const conversations = createConversationService(
     conversationRepository,
@@ -60,10 +77,31 @@ export async function createContext(options: AppOptions, config: Config) {
     providers,
   );
 
+  const voiceProfiles = createVoiceProfiles(
+    new SqliteVoiceProfileRepository(database.client),
+    createVoiceReferenceInspector(config.VOICE_REFERENCE_DIRECTORY),
+    activity,
+    config.OWNER_ID,
+  );
+  const voiceMetrics = createVoiceMetrics();
+  const voiceCapabilities = createVoiceCapabilities(providers, voiceProfiles);
+  const voiceSessions = createVoiceSessions({
+    providers,
+    profiles: voiceProfiles,
+    history: createSqliteCallHistory(database.client),
+    gate: activity,
+    metrics: voiceMetrics,
+    ownerId: config.OWNER_ID,
+  });
+
   return {
     database,
     context: {
       providers,
+      voiceProfiles,
+      voiceMetrics,
+      voiceCapabilities,
+      voiceSessions,
       conversations,
       tickets,
       calls,

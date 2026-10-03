@@ -12,6 +12,7 @@
     "db:migrate": "node --env-file-if-exists=.env src/migrate.ts",
     "setup": "node scripts/setup.mjs",
     "check:api": "node --env-file-if-exists=.env scripts/check-api.mjs",
+    "check:tts": "node --env-file-if-exists=.env scripts/check-tts.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

@@ -17,13 +17,18 @@ export const CapabilitiesSchema = z.object({
   live2d: z.boolean(),
   desktop: z.boolean(),
   protocolVersion: z.literal('1.0'),
+  voiceProtocolVersion: z.literal('1.1'),
   foundationChannel: z.literal(true),
   providers: z.array(
     z.object({
       role: z.enum(['llm', 'stt', 'tts']),
-      adapter: z.enum(['disabled', 'http-json']),
+      adapter: z.enum(['disabled', 'http-json', 'gemini']),
       model: z.string().nullable(),
-      dataPolicy: z.enum(['synthetic-only', 'personal-approved']),
+      dataPolicy: z.enum([
+        'synthetic-only',
+        'personal-approved',
+        'local-approved',
+      ]),
       available: z.boolean(),
       capabilities: z.object({
         incrementalGeneration: z.boolean(),
@@ -33,8 +38,8 @@ export const CapabilitiesSchema = z.object({
         testedVoiceControls: z.array(z.string()),
       }),
       capabilitySource: z.literal('adapter-reported'),
-      transport: z.literal('buffered-json'),
-      nativeStreaming: z.literal(false),
+      transport: z.enum(['buffered-json', 'sse']),
+      nativeStreaming: z.boolean(),
     }),
   ),
 });

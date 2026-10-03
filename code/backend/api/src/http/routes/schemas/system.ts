@@ -35,6 +35,7 @@ export const metrics = {
         activeConnections: z.number(),
         uptimeSeconds: z.number(),
         residentMemoryBytes: z.number(),
+        voice: z.unknown(),
       }),
       ...errors,
     },

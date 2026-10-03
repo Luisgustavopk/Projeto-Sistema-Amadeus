@@ -26,6 +26,10 @@ export function createSessionState() {
 
       switch (event.type) {
         case 'session.start': {
+          if (event.protocolVersion !== '1.0') {
+            return rejectSession('VOICE_PROTOCOL_REQUIRED');
+          }
+
           if (ready) {
             return rejectSession('ALREADY_NEGOTIATED');
           }
@@ -45,6 +49,8 @@ export function createSessionState() {
           };
         }
 
+        default:
+          return rejectSession('VOICE_PROTOCOL_REQUIRED');
         case 'ping':
           return { event: { type: 'pong', id: event.id } };
         case 'session.end':

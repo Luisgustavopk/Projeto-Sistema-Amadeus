@@ -13,8 +13,10 @@ export function assertProviderCanExecute(
   }
 
   if (
-    dataClass === 'local-only' ||
-    (dataClass === 'personal' && config.dataPolicy !== 'personal-approved')
+    (dataClass === 'local-only' && config.dataPolicy !== 'local-approved') ||
+    (dataClass === 'personal' &&
+      config.dataPolicy !== 'personal-approved' &&
+      config.dataPolicy !== 'local-approved')
   ) {
     throw new DataPolicyBlockedError();
   }

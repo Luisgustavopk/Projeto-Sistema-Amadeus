@@ -23,9 +23,21 @@ export async function buildApp(options: AppOptions) {
   }
 
   const app = createServer(options);
-  const { database, context } = await createContext(options, config);
+  const { database, context } = await createContext(
+    options,
+    config,
+    (notice) => {
+      app.log.warn(
+        { event: 'provider.fallback', ...notice },
+        'Modelo principal indisponível; usando modelo reserva.',
+      );
+    },
+  );
 
-  app.addHook('onClose', async () => database.client.close());
+  app.addHook('onClose', async () => {
+    await context.voiceSessions.shutdown();
+    database.client.close();
+  });
   registerErrorHandlers(app);
   registerObservability(app, context.metrics);
 
@@ -36,7 +48,7 @@ export async function buildApp(options: AppOptions) {
     await registerOpenApi(app);
 
     registerHttpRoutes(app, context);
-    registerRealtimeRoutes(app, context.calls);
+    registerRealtimeRoutes(app, context.calls, context.voiceSessions);
 
     return app;
   } catch (error) {

@@ -1,3 +1,5 @@
+import type { VoiceSessions } from '../../application/voice/sessions.ts';
+import type { WebSocket } from 'ws';
 import { UpgradeRequiredError } from '../../domain/errors/calls.ts';
 import type { FastifyRequest } from 'fastify';
 import type { CallAuthorization } from '../../application/calls/authorization.ts';
@@ -8,7 +10,10 @@ type CallRequest = FastifyRequest<{
   Querystring: { ticket: string };
 }>;
 
-export function createCallController(calls: CallAuthorization) {
+export function createCallController(
+  calls: CallAuthorization,
+  sessions?: VoiceSessions,
+) {
   return {
     authorize: async (request: CallRequest) => {
       if (request.headers.upgrade?.toLowerCase() !== 'websocket') {
@@ -27,6 +32,7 @@ export function createCallController(calls: CallAuthorization) {
         release();
       }
     },
-    connect: attachCallSession,
+    connect: (socket: WebSocket, request: CallRequest) =>
+      attachCallSession(socket, sessions, request.params.id),
   };
 }

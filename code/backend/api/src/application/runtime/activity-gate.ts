@@ -37,6 +37,20 @@ export class ActivityGate
     });
   }
 
+  beginProviderConfiguration(): ReleaseActivity {
+    if (this.configuring || this.executions > 0) {
+      throw new ProviderBusyError(
+        'Aguarde o turno atual antes de trocar os adaptadores.',
+      );
+    }
+
+    this.configuring = true;
+
+    return this.once(() => {
+      this.configuring = false;
+    });
+  }
+
   beginExecution(): ReleaseActivity {
     this.assertNotConfiguring();
     this.executions++;
