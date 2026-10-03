@@ -1,0 +1,2 @@
+-e ..
+faster-whisper>=1.1,<2
