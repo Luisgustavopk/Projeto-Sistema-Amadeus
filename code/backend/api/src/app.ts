@@ -1,77 +1,47 @@
-import { timingSafeEqual } from 'node:crypto';
-import Fastify from 'fastify';
-import swagger from '@fastify/swagger';
-import {
-  serializerCompiler,
-  validatorCompiler,
-  jsonSchemaTransform,
-  type ZodTypeProvider,
-} from 'fastify-type-provider-zod';
-import {
-  HealthSchema,
-  CapabilitiesSchema,
-  ErrorSchema,
-} from './http/schemas.ts';
+import { loadConfig } from './config/index.ts';
+import type { AppOptions } from './bootstrap/options.ts';
+import { createServer } from './bootstrap/server.ts';
+import { createContext } from './bootstrap/context.ts';
+import { registerErrorHandlers } from './http/errors/index.ts';
+import { registerObservability } from './http/observability/index.ts';
+import { registerOpenApi } from './http/openapi.ts';
+import { protect } from './http/security/index.ts';
+import { registerHttpRoutes } from './http/routes/index.ts';
+import { registerWebSocket } from './realtime/plugin.ts';
+import { registerRealtimeRoutes } from './realtime/routes/index.ts';
 
-export async function buildApp(options: { token: string; logLevel?: string }) {
-  if (options.token.length < 32)
+export async function buildApp(options: AppOptions) {
+  if (options.token.length < 32) {
     throw new Error('Credencial de acesso inválida.');
-  const app = Fastify({
-    logger: options.logLevel
-      ? {
-          level: options.logLevel,
-          redact: ['req.headers.authorization', 'req.headers.cookie'],
-        }
-      : false,
-    bodyLimit: 64 * 1024,
-  }).withTypeProvider<ZodTypeProvider>();
-  app.setValidatorCompiler(validatorCompiler);
-  app.setSerializerCompiler(serializerCompiler);
-  await app.register(swagger, {
-    openapi: {
-      info: { title: 'Amadeus API', version: '0.1.0' },
-      components: {
-        securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer' } },
-      },
-    },
-    transform: jsonSchemaTransform,
-  });
-  app.get(
-    '/v1/health',
-    { schema: { response: { 200: HealthSchema } } },
-    async () => ({ status: 'ok' as const, service: 'amadeus-api' as const }),
-  );
-  await app.register(async (protectedApp) => {
-    protectedApp.addHook('onRequest', async (request, reply) => {
-      const actual = Buffer.from(request.headers.authorization ?? '');
-      const expected = Buffer.from(`Bearer ${options.token}`);
-      if (
-        actual.length !== expected.length ||
-        !timingSafeEqual(actual, expected)
-      ) {
-        return reply.code(401).send({ error: 'Acesso não autorizado.' });
-      }
-    });
-    protectedApp.get(
-      '/v1/capabilities',
-      {
-        schema: {
-          security: [{ bearerAuth: [] }],
-          response: { 200: CapabilitiesSchema, 401: ErrorSchema },
-        },
-      },
-      async () => ({
-        voice: false,
-        customVoice: false,
-        vision: false,
-        memory: false,
-        live2d: false,
-        desktop: false,
-      }),
-    );
-    protectedApp.get('/v1/openapi.json', { schema: { hide: true } }, async () =>
-      app.swagger(),
-    );
-  });
-  return app;
+  }
+
+  const config =
+    options.config ?? loadConfig({ API_ACCESS_TOKEN: options.token });
+
+  if (config.API_ACCESS_TOKEN !== options.token) {
+    throw new Error('A credencial de inicialização difere da configuração.');
+  }
+
+  const app = createServer(options);
+  const { database, context } = await createContext(options, config);
+
+  app.addHook('onClose', async () => database.client.close());
+  registerErrorHandlers(app);
+  registerObservability(app, context.metrics);
+
+  try {
+    // Register before security hooks so rejected upgrades close their raw socket.
+    await registerWebSocket(app);
+    protect(app, config);
+    await registerOpenApi(app);
+
+    registerHttpRoutes(app, context);
+    registerRealtimeRoutes(app, context.calls);
+
+    return app;
+  } catch (error) {
+    await app.close();
+
+    throw error;
+  }
 }

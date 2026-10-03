@@ -1,13 +1,16 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { buildApp } from './app.ts';
+import { buildApp } from '../../src/app.ts';
 
 const token = 'test-only-token-with-at-least-32-characters';
 const apps: Awaited<ReturnType<typeof buildApp>>[] = [];
+
 async function setup() {
   const app = await buildApp({ token });
   apps.push(app);
+
   return app;
 }
+
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
@@ -18,8 +21,13 @@ describe('acesso à API', () => {
       status: 'ok',
       service: 'amadeus-api',
     });
+
     for (const url of ['/v1/capabilities', '/v1/openapi.json']) {
-      expect((await app.inject(url)).statusCode).toBe(401);
+      const unauthorized = await app.inject(url);
+      expect(unauthorized.statusCode).toBe(401);
+      expect(unauthorized.headers['www-authenticate']).toBe(
+        'Bearer realm="amadeus"',
+      );
       expect(
         (await app.inject({ url, headers: { authorization: 'Bearer wrong' } }))
           .statusCode,
@@ -31,14 +39,22 @@ describe('acesso à API', () => {
     const headers = { authorization: `Bearer ${token}` };
     const result = await app.inject({ url: '/v1/capabilities', headers });
     expect(result.statusCode).toBe(200);
-    expect(Object.values(result.json())).toEqual([
-      false,
-      false,
-      false,
-      false,
-      false,
-      false,
-    ]);
+    expect(result.json()).toMatchObject({
+      voice: false,
+      customVoice: false,
+      vision: false,
+      memory: false,
+      live2d: false,
+      desktop: false,
+      foundationChannel: true,
+      protocolVersion: '1.0',
+    });
+    expect(result.json().providers).toHaveLength(3);
+    expect(
+      result
+        .json()
+        .providers.every((p: { available: boolean }) => !p.available),
+    ).toBe(true);
     const spec = (
       await app.inject({ url: '/v1/openapi.json', headers })
     ).json();

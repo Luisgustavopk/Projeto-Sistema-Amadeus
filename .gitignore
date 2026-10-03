@@ -15,4 +15,5 @@ __pycache__/
 target/
 models/
 recordings/
+certs/
 .DS_Store

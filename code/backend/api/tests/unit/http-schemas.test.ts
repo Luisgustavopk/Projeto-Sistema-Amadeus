@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HealthSchema, CapabilitiesSchema } from './schemas.ts';
+import { HealthSchema, CapabilitiesSchema } from '../../src/http/schemas.ts';
 
 describe('contratos públicos', () => {
   it('rejeita saúde diferente de uma resposta válida', () => {
