@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Amadeus · Teste de voz</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.mjs"></script>
+</head>
+<body>
+  <main>
+    <header><div><p class="eyebrow">AMADEUS / FASE 1</p><h1>Teste de voz</h1><p class="muted">Fale, ouça a resposta e acompanhe o tempo de cada turno.</p></div><span id="status" class="status" role="status">Desconectado</span></header>
+    <section class="panel" aria-labelledby="connection-title">
+      <h2 id="connection-title">Conexão local</h2>
+      <form id="connect-form">
+        <div class="fields"><label>Endereço da API<input id="api-url" type="url" value="http://127.0.0.1:3001" required></label><label>Token de acesso da API<input id="token" type="password" autocomplete="off" placeholder="API_ACCESS_TOKEN do .env" required></label></div>
+        <p class="hint">O token fica apenas nesta página enquanto ela estiver aberta. Os testes usam frases fictícias.</p>
+        <div class="actions"><button id="connect" type="submit">Conectar</button><button id="disconnect" type="button" class="secondary" disabled>Encerrar chamada</button><button id="inspect" type="button" class="secondary">Verificar serviços</button></div>
+      </form>
+      <div id="providers" class="providers" aria-live="polite">STT, Gemini e TTS precisam estar em execução.</div>
+      <p id="error" class="error" role="alert" hidden></p>
+    </section>
+    <section class="panel conversation-panel" aria-labelledby="conversation-title">
+      <div class="section-heading"><h2 id="conversation-title">Conversa</h2><span id="microphone-status" class="muted">Microfone desligado</span></div>
+      <div class="actions"><button id="microphone" disabled>Iniciar microfone</button><button id="interrupt" class="secondary" disabled>Interromper resposta</button></div>
+      <p class="hint">Use fones. Ao terminar sua frase, faça uma pausa: o envio é automático.</p>
+      <div id="conversation" class="conversation" role="log" aria-live="polite"><p class="empty">Conecte a API e inicie o microfone. A voz será reproduzida automaticamente.</p></div>
+      <form id="text-form" class="text-form"><label class="sr-only" for="text">Mensagem de teste</label><input id="text" maxlength="4000" placeholder="Ou envie uma pergunta por texto…" disabled required><button id="send" disabled>Enviar</button></form>
+    </section>
+    <section class="panel" aria-labelledby="timing-title">
+      <div class="section-heading"><h2 id="timing-title">Medições</h2><button id="export" class="secondary">Exportar JSON</button></div>
+      <div class="metrics"><div><span>Última resposta por voz</span><strong id="last-time">—</strong></div><div><span>Mediana · voz</span><strong id="median">—</strong></div><div><span>p95 · voz</span><strong id="p95">—</strong></div><div><span>Turnos / interrupções manuais</span><strong id="samples">0 / 0</strong></div></div>
+      <p class="hint">Tempo do fim da sua fala até o áudio agendado no navegador, incluindo VAD. Mensagens por texto não contam nessa métrica. Interrupção manual mede a parada local; observe também a interrupção automática por fala.</p>
+      <p id="baseline-status" class="muted">Coleta inicial: ensaio completo requer 100 turnos e 30 interrupções manuais.</p>
+      <details><summary>Eventos técnicos</summary><pre id="events"></pre></details>
+    </section>
+  </main>
+</body>
+</html>
