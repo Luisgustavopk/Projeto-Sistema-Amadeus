@@ -7,15 +7,19 @@ import * as schema from './schema.ts';
 export async function openDatabase(url: string) {
   const client = createClient({ url });
   const db = drizzle(client, { schema });
+
   try {
+    await client.execute('PRAGMA foreign_keys = ON');
     await migrate(db, {
       migrationsFolder: fileURLToPath(
         new URL('../../../drizzle/', import.meta.url),
       ),
     });
+
     return { client, db };
   } catch (error) {
     client.close();
+
     throw error;
   }
 }
