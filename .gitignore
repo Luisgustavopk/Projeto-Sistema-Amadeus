@@ -17,3 +17,20 @@ models/
 recordings/
 certs/
 .DS_Store
+
+# Speech environments, model caches and private voice references
+**/.venv*/
+**/__pycache__/
+**/*.egg-info/
+code/backend/assets/voice-profiles/references/*
+!code/backend/assets/voice-profiles/references/.gitkeep
+code/backend/assets/voice-profiles/candidates/
+code/backend/assets/voice-profiles/comparisons/
+code/backend/assets/voice-profiles/reference-research/
+code/backend/assets/voice-profiles/**/*.json
+code/backend/assets/voice-profiles/voice-direction-*.md
+**/.model-cache/
+
+**/.pytest_cache/
+
+**/.ruff_cache/
