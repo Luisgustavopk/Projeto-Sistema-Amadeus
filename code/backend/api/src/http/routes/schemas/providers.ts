@@ -6,6 +6,7 @@ const usageSchema = z.object({
   role: z.enum(['llm', 'stt', 'tts']),
   model: z.string().nullable().optional(),
   isFallback: z.boolean().optional(),
+  isLocal: z.boolean().optional(),
   day: z.string(),
   requests: z.number(),
   budgetTokens: z.number(),

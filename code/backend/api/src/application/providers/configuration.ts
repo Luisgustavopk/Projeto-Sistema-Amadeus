@@ -5,7 +5,7 @@ import {
 import type { ProviderConfigurationRepository } from '../../ports/provider-configuration-repository.ts';
 import type { ProviderFactory } from '../../ports/provider.ts';
 import type { ConfigurationGate } from '../../ports/activity-gate.ts';
-import { providerAttempts } from './fallback.ts';
+import { configuredProviderAttempts } from './routing.ts';
 
 export function createProviderConfiguration(
   repository: ProviderConfigurationRepository,
@@ -21,7 +21,10 @@ export function createProviderConfiguration(
         const config = ProvidersSchema.parse(input);
 
         for (const role of ['llm', 'stt', 'tts'] as const) {
-          for (const attempt of providerAttempts(role, config[role])) {
+          for (const attempt of configuredProviderAttempts(
+            role,
+            config[role],
+          )) {
             factory(role, attempt);
           }
         }

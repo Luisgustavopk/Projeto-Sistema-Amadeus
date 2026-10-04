@@ -25,6 +25,7 @@ export const CapabilitiesSchema = z.object({
       adapter: z.enum([
         'disabled',
         'http-json',
+        'openai-local',
         'gemini',
         'groq',
         'cloudflare-ai',
@@ -35,6 +36,15 @@ export const CapabilitiesSchema = z.object({
         'personal-approved',
         'local-approved',
       ]),
+      local: z
+        .object({
+          adapter: z.literal('openai-local'),
+          model: z.string(),
+          dataPolicy: z.literal('local-approved'),
+          available: z.boolean(),
+          capabilities: z.unknown(),
+        })
+        .optional(),
       fallbacks: z.array(
         z.object({
           adapter: z.enum(['gemini', 'groq', 'cloudflare-ai']),

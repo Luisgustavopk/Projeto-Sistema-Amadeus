@@ -60,3 +60,50 @@ Ferramentas: `npm run eval:persona` valida os 30 cenários; acrescente `-- --run
 A cota local de um LLM elegível pode direcionar o turno ao próximo provedor da cadeia; cada tentativa mantém sua política e seu orçamento contabilizado. Falhas de persistência não iniciam outra geração, e não há troca após entrega parcial de texto. O esgotamento de uma tentativa não significa que todos os provedores configurados estejam esgotados. Consulte `/v1/usage`; o aviso refere-se à operação e aos provedores elegíveis para sua classificação.
 
 A interrupção automática preserva a resposta até o STT reconhecer palavras, em prévia ou transcrição final. A API faz uma consulta antecipada por vez, a partir de 800 ms durante resposta ativa; consultas obsoletas são canceladas e não substituem a transcrição final da frase completa. A confirmação manual de parada não comprova a meta de barge-in. O aceite exige 100 turnos e 30 interrupções automáticas no dispositivo real, mediana de resposta até 2 s e p95 de interrupção até 500 ms. As estimativas do navegador são auxiliares; latência física, ruído, AEC e consumo permanecem sujeitos ao ensaio.
+
+## Experimento híbrido local + nuvem
+
+A branch `experiment/local-llm-stt` mantém a cadeia atual da nuvem e permite adicionar `llm.localProvider`. O adaptador `openai-local` aceita somente HTTP de loopback em `/v1/chat/completions`, conserva a mensagem de sistema e usa streaming SSE. A opção é restrita ao LLM; STT/TTS não mudam de contrato.
+
+O roteamento usa uma lista conservadora de conversas conhecidas. Saudações, pequenas histórias e algumas reações pessoais podem ir ao local; termos técnicos, pedidos longos e entradas não classificadas seguem a cadeia remota. Isso não é um detector universal de dificuldade. `local-only` usa exclusivamente o candidato local, inclusive em pedidos complexos. Uma falha local anterior ao primeiro fragmento pode usar reserva elegível; depois de começar a resposta, não gera uma segunda resposta por outro modelo. Cotas, reservas e classificação de dados continuam aplicadas. `/v1/capabilities` informa o candidato local; `/v1/usage` identifica seu consumo com `isLocal`.
+
+### Runtime e avaliação independente
+
+Na raiz do repositório, preparar os arquivos oficiais e verificados por SHA256:
+
+```powershell
+code/backend/services/stt/.venv/Scripts/python.exe code/backend/tools/local-llm/setup.py
+.\code\backend\tools\local-llm\start.ps1
+```
+
+O runtime portátil llama.cpp `b11146` executa Qwen3-1.7B Q8_0 em CPU, quatro threads, contexto de 8.192 tokens, uma requisição por vez e raciocínio explícito desativado. Escuta somente `127.0.0.1:8003`, com credencial separada, sem UI. Downloads e credencial ficam em `.cache/`, ignorada pelo Git. Não altera a instalação do sistema nem ocupa a GPU. Modelo oficial: [Qwen3-1.7B-GGUF](https://huggingface.co/Qwen/Qwen3-1.7B-GGUF); runtime: [llama.cpp](https://github.com/ggml-org/llama.cpp/releases/tag/b11146).
+
+Na pasta `api`, avaliar sem trocar os provedores de produção:
+
+```powershell
+npm run eval:persona -- --local --dialogue --run --limit=4
+```
+
+### Ativação opcional e reversão
+
+O candidato não foi ativado como padrão. Para experimentar com a interface:
+
+```powershell
+npm run setup:hybrid -- --prepare
+# Reinicie a API para carregar LOCAL_LLM_API_KEY.
+npm run setup:hybrid -- --apply
+```
+
+Encerre a chamada antes de aplicar configuração. O comando sem flags apenas mostra o plano. Para voltar à cadeia anterior:
+
+```powershell
+npm run setup:hybrid -- --disable --apply
+```
+
+A alteração usa a API autenticada e seu bloqueio normal de configuração. A preparação grava apenas a credencial local no `.env`; não troca chaves da nuvem. Backups ficam em `api/data/hybrid/`.
+
+### Resultado observado e limites
+
+Com i5-12400F, 16 GB de RAM e os serviços de voz ativos, o primeiro trecho de fala local levou 36,82 s no primeiro caso e 3,80–4,81 s nos três seguintes. São tempos do LLM, sem STT, TTS ou áudio físico. D02/D03 copiaram exemplos da persona, e D01 inventou sentido para uma fala incompreensível: personalidade e naturalidade não estão aprovadas. Uma ativação temporária pela API respondeu uma saudação em 4,44 s até o primeiro trecho e foi revertida, com igualdade da configuração anterior verificada. Não satisfaz a meta de conversa de 2 s.
+
+Relatórios locais: `api/data/persona-evals/1791126180265-persona.json` e `api/data/hybrid/integration-smoke.json`. O modelo não recebeu fine-tuning; a direção atual vem do prompt. Treinamento exigirá exemplos curados, revisão e avaliação separada, e não substitui STT/TTS nem memória controlável.

@@ -4,6 +4,7 @@ import { createProvider } from './http-json.ts';
 import { createGeminiProvider } from './gemini.ts';
 import {
   createCloudflareAiProvider,
+  createOpenAiCompatibleProvider,
   createGroqProvider,
 } from './openai-compatible.ts';
 
@@ -19,6 +20,16 @@ export function createProviderFactory(
       }
 
       return createGeminiProvider(config, secrets);
+    }
+
+    if (config.adapter === 'openai-local') {
+      if (role !== 'llm') {
+        throw new ProviderConfigurationError(
+          'LLM local só pode responder conversas.',
+        );
+      }
+
+      return createOpenAiCompatibleProvider(config, secrets);
     }
 
     if (config.adapter === 'groq' || config.adapter === 'cloudflare-ai') {

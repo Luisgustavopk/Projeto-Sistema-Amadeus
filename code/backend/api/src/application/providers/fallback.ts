@@ -27,6 +27,7 @@ export function providerAttempts(
   config: ProviderConfig,
 ): ProviderConfig[] {
   const { fallbackModel, fallbackProviders, ...primary } = config;
+  delete primary.localProvider;
 
   if (role !== 'llm') {
     return [primary];

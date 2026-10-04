@@ -1,3 +1,4 @@
+import { selectProviderAttempts } from './routing.ts';
 import type { ProviderConfigurationRepository } from '../../ports/provider-configuration-repository.ts';
 import type { ProviderUsageRepository } from '../../ports/provider-usage-repository.ts';
 import type {
@@ -14,7 +15,6 @@ import {
 } from '../../domain/errors/providers.ts';
 import { validateProviderInput, estimateProviderBudget } from './input.ts';
 import {
-  providerAttempts,
   filterProviderAttemptsForDataClass,
   canUseFallback,
   notifyFallback,
@@ -39,7 +39,11 @@ export function createProviderStreaming(
 
       try {
         const providerConfig = (await configuration.get(ownerId)).llm;
-        const configuredAttempts = providerAttempts('llm', providerConfig);
+        const configuredAttempts = selectProviderAttempts(
+          'llm',
+          providerConfig,
+          input,
+        );
         const attempts = filterProviderAttemptsForDataClass(
           configuredAttempts,
           input.dataClass,

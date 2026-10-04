@@ -11,6 +11,7 @@ import {
 import { ApplicationError } from '../../domain/errors/application-error.ts';
 import { decodeServerSentEvents } from './sse.ts';
 import { NO_CAPABILITIES } from './http-json.ts';
+import { LocalCompletionEndpointSchema } from '../../domain/providers/local.ts';
 
 const Completion = z.object({
   choices: z.array(
@@ -53,6 +54,22 @@ function getCredentials(
   secrets: NodeJS.ProcessEnv,
 ): { key: string; endpoint: string } {
   const key = config.apiKeyEnv ? secrets[config.apiKeyEnv] : undefined;
+
+  if (config.adapter === 'openai-local') {
+    const endpoint = LocalCompletionEndpointSchema.parse(config.endpoint);
+
+    if (
+      !config.model ||
+      config.dataPolicy !== 'local-approved' ||
+      (config.apiKeyEnv && !key)
+    ) {
+      throw new ProviderConfigurationError(
+        'Configure o modelo e a credencial local.',
+      );
+    }
+
+    return { key: key ?? '', endpoint };
+  }
 
   if (!key || !config.model) {
     throw new ProviderConfigurationError(
@@ -130,7 +147,7 @@ export function createOpenAiCompatibleProvider(
       response = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          authorization: `Bearer ${key}`,
+          ...(key ? { authorization: `Bearer ${key}` } : {}),
           'content-type': 'application/json',
         },
         body: JSON.stringify({

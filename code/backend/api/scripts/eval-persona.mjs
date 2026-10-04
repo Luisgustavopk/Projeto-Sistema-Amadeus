@@ -23,6 +23,7 @@ import { SqliteProviderConfigurationRepository } from '../src/adapters/database/
 import { SqliteProviderUsageRepository } from '../src/adapters/database/provider-usage-repository.ts';
 import { createProviderFactory } from '../src/adapters/providers/factory.ts';
 import { createProviderStreaming } from '../src/application/providers/streaming.ts';
+import { ProviderSchema } from '../src/domain/providers/model.ts';
 import { providerAttempts } from '../src/application/providers/fallback.ts';
 import { ActivityGate } from '../src/application/runtime/activity-gate.ts';
 
@@ -86,9 +87,28 @@ async function main() {
       .find((arg) => arg.startsWith('--model='))
       ?.slice('--model='.length);
     const attempts = providerAttempts('llm', stored.llm);
-    const selected = model
-      ? attempts.find((item) => item.model === model)
-      : attempts[0];
+    const local = args.includes('--local');
+    const secrets = { ...process.env };
+    if (local) {
+      secrets.LOCAL_LLM_API_KEY = (
+        await readFile(
+          new URL('../../../../.cache/local-llm/access-token', import.meta.url),
+          'utf8',
+        )
+      ).trim();
+    }
+    const selected = local
+      ? ProviderSchema.parse({
+          adapter: 'openai-local',
+          model: 'amadeus-local',
+          endpoint: 'http://127.0.0.1:8003/v1/chat/completions',
+          apiKeyEnv: 'LOCAL_LLM_API_KEY',
+          dataPolicy: 'local-approved',
+          limits: stored.llm.limits,
+        })
+      : model
+        ? attempts.find((item) => item.model === model)
+        : attempts[0];
 
     if (!selected || selected.adapter === 'disabled') {
       throw new Error(
@@ -107,7 +127,7 @@ async function main() {
       configuration,
       new SqliteProviderUsageRepository(database.client),
       config.OWNER_ID,
-      createProviderFactory(process.env),
+      createProviderFactory(secrets),
       new ActivityGate(1),
     );
     const report = {

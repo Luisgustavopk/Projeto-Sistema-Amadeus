@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LocalLlmSchema, LocalCompletionEndpointSchema } from './local.ts';
 
 export const RoleSchema = z.enum(['llm', 'stt', 'tts']);
 export type Role = z.infer<typeof RoleSchema>;
@@ -71,6 +72,7 @@ export const ProviderSchema = z
     adapter: z.enum([
       'disabled',
       'http-json',
+      'openai-local',
       'gemini',
       'groq',
       'cloudflare-ai',
@@ -89,6 +91,7 @@ export const ProviderSchema = z
       .regex(/^[a-zA-Z0-9._-]{1,128}$/)
       .optional(),
     fallbackProviders: z.array(LlmFallbackSchema).max(2).optional(),
+    localProvider: LocalLlmSchema.optional(),
     dataPolicy: z
       .enum(['synthetic-only', 'personal-approved', 'local-approved'])
       .default('synthetic-only'),
@@ -123,7 +126,7 @@ export const ProviderSchema = z
 
     if (
       p.dataPolicy === 'local-approved' &&
-      (p.adapter !== 'http-json' ||
+      (!['http-json', 'openai-local'].includes(p.adapter) ||
         !p.endpoint ||
         !URL.canParse(p.endpoint) ||
         !['localhost', '127.0.0.1', '[::1]'].includes(
@@ -134,6 +137,30 @@ export const ProviderSchema = z
         code: 'custom',
         message:
           'Processamento local aprovado exige endpoint de loopback e adaptador HTTP.',
+      });
+    }
+
+    if (
+      p.adapter === 'openai-local' &&
+      (!p.model ||
+        !LocalCompletionEndpointSchema.safeParse(p.endpoint).success ||
+        p.dataPolicy !== 'local-approved')
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          'LLM local exige modelo, endpoint de loopback e política local-approved.',
+      });
+    }
+
+    if (
+      p.localProvider &&
+      !['gemini', 'groq', 'cloudflare-ai'].includes(p.adapter)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          'Roteamento híbrido exige principal remoto e LLM local separado.',
       });
     }
 
@@ -247,7 +274,9 @@ export const ProvidersSchema = z
     for (const role of ['stt', 'tts'] as const) {
       if (
         providers[role].fallbackModel ||
-        providers[role].fallbackProviders?.length
+        providers[role].fallbackProviders?.length ||
+        providers[role].localProvider ||
+        providers[role].adapter === 'openai-local'
       ) {
         ctx.addIssue({
           code: 'custom',

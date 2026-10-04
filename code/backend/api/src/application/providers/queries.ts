@@ -1,4 +1,4 @@
-import { providerAttempts } from './fallback.ts';
+import { configuredProviderAttempts } from './routing.ts';
 import type { ProviderConfigurationRepository } from '../../ports/provider-configuration-repository.ts';
 import type { ProviderUsageRepository } from '../../ports/provider-usage-repository.ts';
 import type { ProviderFactory } from '../../ports/provider.ts';
@@ -44,6 +44,19 @@ export function createProviderQueries(
                     ),
                   ]
                 : [],
+            ...(role === 'llm' && config.llm.localProvider
+              ? {
+                  local: {
+                    adapter: config.llm.localProvider.adapter,
+                    model: config.llm.localProvider.model,
+                    dataPolicy: config.llm.localProvider.dataPolicy,
+                    ...(await factory('llm', {
+                      ...config.llm.localProvider,
+                      limits: config.llm.limits,
+                    }).health()),
+                  },
+                }
+              : {}),
             ...(await adapter.health()),
             capabilitySource: 'adapter-reported' as const,
             transport: adapter.transport,
@@ -57,12 +70,15 @@ export function createProviderQueries(
 
       return Promise.all(
         (['llm', 'stt', 'tts'] as const).flatMap((role) =>
-          providerAttempts(role, config[role]).map(async (attempt, index) => ({
-            role,
-            model: attempt.model ?? null,
-            isFallback: index > 0,
-            ...(await usage.usage(ownerId, role, attempt)),
-          })),
+          configuredProviderAttempts(role, config[role]).map(
+            async (attempt, index) => ({
+              role,
+              model: attempt.model ?? null,
+              isFallback: index > 0 && attempt.adapter !== 'openai-local',
+              isLocal: attempt.adapter === 'openai-local',
+              ...(await usage.usage(ownerId, role, attempt)),
+            }),
+          ),
         ),
       );
     },

@@ -1,10 +1,10 @@
 import {
-  providerAttempts,
   filterProviderAttemptsForDataClass,
   canUseFallback,
   notifyFallback,
   type NotifyProviderFallback,
 } from './fallback.ts';
+import { selectProviderAttempts } from './routing.ts';
 import type { Role } from '../../domain/providers/model.ts';
 import { validateProviderInput, estimateProviderBudget } from './input.ts';
 import { assertProviderCanExecute } from '../../domain/providers/data-policy.ts';
@@ -36,7 +36,11 @@ export function createProviderExecution(
 
       try {
         const providerConfig = (await configuration.get(ownerId))[role];
-        const configuredAttempts = providerAttempts(role, providerConfig);
+        const configuredAttempts = selectProviderAttempts(
+          role,
+          providerConfig,
+          input,
+        );
         const attempts = filterProviderAttemptsForDataClass(
           configuredAttempts,
           input.dataClass,
