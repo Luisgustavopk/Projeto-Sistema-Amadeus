@@ -37,7 +37,7 @@ As cotas grátis não são SLA e são independentes por provedor: os limites Gro
 
 ## Conversa e diagnóstico de voz
 
-`llm.thinkingLevel` configura o raciocínio do Gemini (`low`, `medium`, `high`) quando Gemini está ativo; outros provedores ignoram essa opção. A resposta falada é orientada a uma ou duas frases por padrão. Para iniciar o TTS mais cedo, trechos longos também podem ser enviados à síntese nas pausas naturais após vírgula ou ponto e vírgula; isso pode aumentar o número de segmentos e alterar a prosódia entre eles.
+`llm.thinkingLevel` configura o raciocínio do Gemini (`low`, `medium`, `high`) quando Gemini está ativo; outros provedores ignoram essa opção. A resposta falada é orientada a uma ou duas frases por padrão. O TTS recebe frases completas assim que ficam disponíveis. Vírgulas e ponto e vírgula só são usados como fronteiras quando necessário para respeitar o limite de 220 caracteres; isso evita sintetizar separadamente cláusulas curtas da mesma frase. Esperar o fim da primeira frase pode aumentar o tempo até o primeiro áudio; a continuidade deve ser avaliada por escuta.
 
 O STT retorna `NO_SPEECH_DETECTED` para áudio válido sem fala. A captura candidata é descartada e a resposta anterior, se houver, continua; esse caso contabiliza `noSpeech` e não é tratado como indisponibilidade. Erros reais de validação continuam visíveis. O serviço local enfileira até uma inferência enquanto outra está ocupada; HTTP 429 indica fila cheia e 400 entrada recusada. No cliente, o VAD exige 160 ms acima do limiar e preserva 160 ms anteriores à fala, mas não interrompe por si só: durante a captura e a transcrição STT, a resposta atual continua. Ela só é interrompida após `transcript.partial` com palavras durante a captura ou `transcript.final` não vazio; a interrupção manual permanece imediata.
 
@@ -46,6 +46,14 @@ Cada usuário tem uma única chamada de voz ativa. Abrir outra chamada válida s
 Se não houver perfil de voz ativo, a resposta textual ainda pode ser gerada, mas a API emite `VOICE_NOT_READY` e não tenta TTS. Falhas no serviço TTS emitem `TTS_UNAVAILABLE_TEXT_AVAILABLE`. O cliente de teste também verifica que cada resposta concluída recebeu ao menos um segmento de áudio.
 
 Os serviços locais têm limite operacional de 500 pedidos diários nesta instalação. O orçamento estimado do STT é 50 milhões de unidades e o do TTS é 500 mil; a estimativa conservadora inclui o tamanho do áudio e não corresponde a cobrança do Google. Isso permite o ensaio de 100 turnos, inclusive segmentos TTS e áudio descartado. Os limites locais e remotos do Gemini permanecem separados.
+
+## Persona e atuação — fase 2
+
+A persona versionada usa a análise fornecida pelo usuário e o recorte aprovado anterior à viagem de Kurisu ao Japão. Curiosidade, humor contextual, cuidado e limites de identidade ficam em `src/application/persona/prompt.ts`; regras e vocabulário expressivos ficam em `src/domain/persona`. A biografia ficcional é separada do histórico confirmado e de fatos pessoais. Não há memória persistente da fase 3.
+
+O LLM propõe expressão na mesma geração de fala. O prefixo é removido antes do TTS; intensidade e transições são validadas por chamada. `reply.expression` acompanha os IDs do segmento e informa versão, intenção, emoção, preset e `deliveryApplied: false`. Os presets são direção artística: não alteram parâmetros de voz nativos não validados. `GET /v1/voice/protocol` publica a versão da persona e a associação para clientes futuros; vincule a expressão à reprodução efetiva do segmento, não ao instante em que o evento chega.
+
+Ferramentas: `npm run eval:persona` valida os 30 cenários; acrescente `-- --run --limit=30` para coletar respostas sintéticas com cota normal. `npm run check:persona-voice` cria três WAVs com o perfil ativo para ouvir continuidade. `npm run review:persona -- <relatório.json>` calcula o aceite a partir das notas humanas. Consulte [instruções e resultados](../evals/persona/README.md). Falhas de cota/disponibilidade e revisão humana pendente impedem declarar o aceite completo.
 
 ## Estabilização da fase 1
 

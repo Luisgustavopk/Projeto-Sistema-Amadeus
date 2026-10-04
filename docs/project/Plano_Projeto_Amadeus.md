@@ -1,6 +1,6 @@
 # Projeto Amadeus: plano de desenvolvimento
 
-**Versão 2.5 | 3 de outubro de 2026 | Status: fase 0 implementada; fase 1 em estabilização e com aceite operacional pendente**
+**Versão 2.6 | 4 de outubro de 2026 | Status: fase 0 implementada; fase 1 com aceite funcional provisório e ensaio físico pendente; fase 2 implementada inicialmente, em avaliação**
 
 ## 1. Objetivo e decisões aprovadas
 
@@ -458,3 +458,13 @@ A validação formal das metas no hardware permanece pendente. Os motores locais
 As dubladoras citadas pelo usuário são referências artísticas para uma voz própria. Os nove MP3 locais fornecidos foram analisados por medidas acústicas preliminares, com limitações de música, múltiplos falantes e atuação. Não houve avaliação auditiva de timbre nem uso dessas gravações para clonagem. A proposta inicial está em `code/backend/assets/voice-profiles/design.json`.
 
 Não foram adiados novos itens de escopo. Personalidade/expressão aprofundadas permanecem na fase 2; processamento de memória/retomada na fase 3; interface, Live2D e desktop nas fases já previstas. Consulte [protocolo da fase 1](../websocket/phase-1.md).
+
+## Registro de implementação inicial da fase 2 — 04/10/2026
+
+A análise `Persona_Kurisu_Amadeus_v0.4.md` foi preservada em `code/backend/assets/persona/source-v0.4.md`. O usuário aprovou o recorte anterior à viagem de Kurisu ao Japão. Persona `kurisu-amadeus-0.4.2`: prompt compacto versionado, distinção de biografia ficcional e vivências reais, humor contextual, cuidado, honestidade e limites de memória/capacidades.
+
+Cada segmento tem direção artística validada ligada a `responseId` e `segmentId`, emitida por `reply.expression`. O estado expressivo é limitado, suavizado e isolado por chamada. A mesma geração LLM produz expressão e texto; não há uma segunda geração para atuar. Os metadados são removidos antes do TTS. Presets e expressões visuais são semânticos: controles emocionais nativos do TTS permanecem não validados, e Live2D continua na fase 5. A referência e a configuração vocal aceitas são preservadas.
+
+O conjunto de 30 cenários e a rubrica existem, com coleta contabilizada e revisão humana. O ensaio real encontrou uma resposta inventando atividade no laboratório; o prompt foi reforçado, sem confirmação posterior de resolução por falta de ensaio completo. Cota local e indisponibilidade impediram o lote completo. Foram gerados três WAVs de continuidade, sem saturação digital detectada; a escuta ainda precisa avaliar qualidade e identidade.
+
+O aceite da fase 2 exige completar os cenários por modelo, revisão de persona/naturalidade e teste vocal sem avatar conforme a seção 10. Não foi declarado concluído. Decisão atual: manter os modelos/voz configurados e usar prompt; não executar fine-tuning sem dados curados e evidência de ganho. Consulte `code/backend/evals/persona/README.md` para comandos, limitações e resultados parciais. Memória persistente, NPC proativo e pesos ajustados não foram implementados nesta etapa.

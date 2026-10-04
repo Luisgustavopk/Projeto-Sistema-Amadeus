@@ -1,5 +1,13 @@
 # Protocolo de voz - fase 1
 
+## Extensão de persona — fase 2
+
+Chamadas 1.1 também recebem `reply.expression` após o texto do segmento. O evento carrega `turnId`, `responseId`, `segmentId`, `position`, `personaVersion`, `intent`, `emotion`, `intensity`, `voiceProfileId`, `deliveryPresetId`, `avatarExpression`, `metadataValid` e `deliveryApplied`. A expressão é direção artística validada, com intensidade máxima de 0,7 e estado isolado por chamada.
+
+O cliente deve associar esses metadados pelos IDs, armazená-los e só aplicar uma futura expressão visual quando o áudio correspondente estiver efetivamente reproduzindo. Não intercalam o bloco binário: `audio.segment` continua imediatamente antes dos quadros PCM. O cliente atual registra os metadados em Eventos técnicos; não muda voz nem ativa avatar.
+
+`deliveryApplied` é `false`, pois controles emocionais nativos ainda não foram validados para o TTS instalado. O preset não é enviado ao serviço de síntese. Metadados inválidos fechados ou ausentes usam expressão neutra e são contabilizados em `personaMetadataFallbacks`; vazamento estrutural ou cabeçalho incompleto sem fronteira segura é recusado antes da síntese. `personaHeader` mede espera pelo prefixo, sem equivaler ao início físico do áudio. A versão e o schema estão publicados em `GET /v1/voice/protocol`.
+
 O protocolo 1.0 da fundação permanece compatível. Para áudio e texto em chamadas, negocie 1.1. O contrato completo é publicado em GET `/v1/voice/protocol`, campo `voicePipeline`.
 
 ## Fluxo
@@ -34,3 +42,5 @@ O Gemini entrega texto por SSE. Uma fila limitada segmenta frases prontas e inic
 Falha STT permite continuar enviando texto. Falha TTS mantém `reply.text` e emite `TTS_UNAVAILABLE_TEXT_AVAILABLE`. Cotas geram `quota.warning`; não há mudança automática para plano pago. Em um turno ocioso, o operador pode atualizar os provedores pela rota existente. Controles inválidos e sequências incorretas encerram a conexão com 1008.
 
 O histórico mantém texto gerado, quantidade de áudio e amostras reproduzidas. Somente segmentos inteiros confirmados entram no contexto de fala; um trecho parcialmente reproduzido permanece registrado, mas é excluído desse contexto para não inventar palavras ouvidas.
+
+Quando uma resposta inválida chega antes de qualquer fala validada, o backend tenta uma única recuperação em texto simples, mantendo persona, contexto, política de dados e limites de uso. A recuperação é contabilizada em `personaRecoveries`; pode consumir uma chamada adicional e aumentar a latência desse turno. Depois de entregar qualquer trecho, não regenera, para evitar duplicação. Cancelamento, cota e configuração não ativam essa recuperação. Se a segunda tentativa falhar, o erro é mantido e a conexão permite outro turno.
