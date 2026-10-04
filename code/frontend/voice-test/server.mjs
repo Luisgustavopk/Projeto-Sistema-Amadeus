@@ -70,8 +70,8 @@ if (
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   createTestServer()
-    .listen(8080, "127.0.0.1", () => {
-      console.log("Teste de voz: http://127.0.0.1:8080");
+    .listen(5173, "127.0.0.1", () => {
+      console.log("Teste de voz: http://127.0.0.1:5173");
     })
     .on("error", (error) => {
       console.error(
