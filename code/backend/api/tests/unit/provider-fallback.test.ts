@@ -4,12 +4,21 @@ import {
   ProviderSchema,
 } from '../../src/domain/providers/model.ts';
 import {
+  providerAttempts,
+  filterProviderAttemptsForDataClass,
+  type ProviderFallbackNotice,
+} from '../../src/application/providers/fallback.ts';
+import {
   ProviderTemporarilyUnavailableError,
   ProviderUnavailableError,
   QuotaExceededError,
 } from '../../src/domain/errors/providers.ts';
 import { createProviderServices } from '../../src/application/providers/index.ts';
-import type { Provider, ProviderOutput } from '../../src/ports/provider.ts';
+import type {
+  Provider,
+  ProviderFactory,
+  ProviderOutput,
+} from '../../src/ports/provider.ts';
 
 const output = { content: 'Teste concluído.', inputTokens: 4, outputTokens: 3 };
 const input = {
@@ -114,7 +123,9 @@ it('usa reserva após 503 antes de qualquer chunk e contabiliza cada modelo', as
     ['gemini-3.6-flash', output],
   ]);
   expect(test.notify).toHaveBeenCalledWith({
+    fromProvider: 'gemini',
     fromModel: 'gemini-3.8-flash',
+    toProvider: 'gemini',
     toModel: 'gemini-3.6-flash',
     reason: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
   });
@@ -128,8 +139,73 @@ it('também usa reserva na execução sem streaming', async () => {
   expect(test.factory).toHaveBeenCalledTimes(2);
   expect(test.release).toHaveBeenCalledOnce();
 });
-it.each([new QuotaExceededError(), new ProviderUnavailableError()])(
-  'não troca em erro de cota ou indisponibilidade sem classificação temporária: %s',
+it('usa o modelo reserva quando a cota do modelo principal se esgota antes do primeiro fragmento', async () => {
+  const test = setup(async function* () {
+    yield await Promise.reject(new QuotaExceededError());
+  });
+  expect(await collect(test.services.executeStream(input))).toEqual([output]);
+  expect(test.factory).toHaveBeenCalledTimes(2);
+  expect(test.notify).toHaveBeenCalledWith({
+    fromProvider: 'gemini',
+    fromModel: 'gemini-3.8-flash',
+    toProvider: 'gemini',
+    toModel: 'gemini-3.6-flash',
+    reason: 'QUOTA_EXCEEDED',
+  });
+});
+it('não troca em indisponibilidade sem classificação temporária', async () => {
+  const error = new ProviderUnavailableError();
+  const test = setup(async function* () {
+    yield await Promise.reject(error);
+  });
+  await expect(collect(test.services.executeStream(input))).rejects.toBe(error);
+  expect(test.factory).toHaveBeenCalledOnce();
+  expect(test.notify).not.toHaveBeenCalled();
+});
+it('não usa reserva se a cota do modelo principal for ultrapassada após entregar conteúdo', async () => {
+  const error = new QuotaExceededError();
+  const test = setup(async function* () {
+    yield output;
+    yield await Promise.reject(error);
+  });
+  await expect(collect(test.services.executeStream(input))).rejects.toBe(error);
+  expect(test.factory).toHaveBeenCalledOnce();
+  expect(test.notify).not.toHaveBeenCalled();
+});
+
+it('preserva erro de cota da reserva sem repetir a cadeia', async () => {
+  const test = setup(async function* () {
+    yield await Promise.reject(new QuotaExceededError());
+  });
+  const original = test.factory.getMockImplementation()!;
+  test.factory.mockImplementation((role, config) => ({
+    ...original(role, config),
+    stream: async function* () {
+      yield await Promise.reject(new QuotaExceededError());
+    },
+  }));
+  await expect(
+    collect(test.services.executeStream(input)),
+  ).rejects.toMatchObject({ code: 'QUOTA_EXCEEDED' });
+  expect(test.factory).toHaveBeenCalledTimes(2);
+  expect(test.notify).toHaveBeenCalledOnce();
+});
+
+it('não troca em erro de cota quando a reserva está desativada', async () => {
+  const error = new QuotaExceededError();
+  const test = setup(
+    async function* () {
+      yield await Promise.reject(error);
+    },
+    { fallback: false },
+  );
+  await expect(collect(test.services.executeStream(input))).rejects.toBe(error);
+  expect(test.factory).toHaveBeenCalledOnce();
+  expect(test.notify).not.toHaveBeenCalled();
+});
+
+it.each([new ProviderUnavailableError()])(
+  'não troca em falha não temporária: %s',
   async (error) => {
     const test = setup(async function* () {
       yield await Promise.reject(error);
@@ -209,6 +285,418 @@ it('valida nomes e impede reserva idêntica ou em outro adaptador', () => {
   ).toBe(false);
 });
 
+it('ordena reservas e preserva política individual e limites compartilhados', () => {
+  const config = ProvidersSchema.parse({
+    llm: {
+      adapter: 'gemini',
+      model: 'gemini-primary',
+      apiKeyEnv: 'GEMINI_API_KEY',
+      geminiTier: 'paid',
+      dataPolicy: 'personal-approved',
+      policyReviewedAt: '2026-01-01T00:00:00.000Z',
+      policyReference: 'https://example.test/privacy',
+      limits: { requestsPerDay: 30, tokensPerDay: 30000 },
+      fallbackProviders: [
+        {
+          adapter: 'groq',
+          model: 'groq-model',
+          apiKeyEnv: 'GROQ_API_KEY',
+          dataPolicy: 'personal-approved',
+          policyReviewedAt: '2026-01-01T00:00:00.000Z',
+          policyReference: 'https://example.test/groq-privacy',
+        },
+        {
+          adapter: 'cloudflare-ai',
+          model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+          apiKeyEnv: 'CLOUDFLARE_AI_TOKEN',
+          accountId: 'a'.repeat(32),
+          dataPolicy: 'personal-approved',
+          policyReviewedAt: '2026-01-01T00:00:00.000Z',
+          policyReference: 'https://example.test/cloudflare-privacy',
+        },
+      ],
+    },
+    stt: { adapter: 'disabled' },
+    tts: { adapter: 'disabled' },
+  });
+  const attempts = providerAttempts('llm', config.llm);
+
+  expect(attempts.map(({ adapter, model }) => [adapter, model])).toEqual([
+    ['gemini', 'gemini-primary'],
+    ['groq', 'groq-model'],
+    ['cloudflare-ai', '@cf/meta/llama-3.3-70b-instruct-fp8-fast'],
+  ]);
+  expect(
+    attempts
+      .slice(1)
+      .map(({ dataPolicy, limits, policyReference }) => [
+        dataPolicy,
+        limits,
+        policyReference,
+      ]),
+  ).toEqual([
+    [
+      'personal-approved',
+      config.llm.limits,
+      'https://example.test/groq-privacy',
+    ],
+    [
+      'personal-approved',
+      config.llm.limits,
+      'https://example.test/cloudflare-privacy',
+    ],
+  ]);
+  expect(
+    filterProviderAttemptsForDataClass(attempts, 'personal').map(
+      ({ adapter }) => adapter,
+    ),
+  ).toEqual(['gemini', 'groq', 'cloudflare-ai']);
+});
+
+it('usa apenas provedores explicitamente aprovados para dados pessoais', () => {
+  const config = ProvidersSchema.parse({
+    llm: {
+      adapter: 'groq',
+      model: 'groq-model',
+      apiKeyEnv: 'GROQ_API_KEY',
+      dataPolicy: 'personal-approved',
+      policyReviewedAt: '2026-01-01T00:00:00.000Z',
+      policyReference: 'https://example.test/groq-privacy',
+      fallbackProviders: [
+        {
+          adapter: 'cloudflare-ai',
+          model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+          apiKeyEnv: 'CLOUDFLARE_AI_TOKEN',
+          accountId: 'c'.repeat(32),
+          dataPolicy: 'personal-approved',
+          policyReviewedAt: '2026-01-01T00:00:00.000Z',
+          policyReference: 'https://example.test/cloudflare-privacy',
+        },
+        {
+          adapter: 'gemini',
+          model: 'gemini-3.8-flash',
+          apiKeyEnv: 'GEMINI_API_KEY',
+        },
+      ],
+    },
+    stt: { adapter: 'disabled' },
+    tts: { adapter: 'disabled' },
+  });
+
+  expect(
+    filterProviderAttemptsForDataClass(
+      providerAttempts('llm', config.llm),
+      'personal',
+    ).map(({ adapter }) => adapter),
+  ).toEqual(['groq', 'cloudflare-ai']);
+  expect(
+    filterProviderAttemptsForDataClass(
+      providerAttempts('llm', config.llm),
+      'synthetic',
+    ).map(({ adapter }) => adapter),
+  ).toEqual(['groq', 'cloudflare-ai', 'gemini']);
+});
+
+it('não envia dados pessoais a um fallback sintético após falha do provedor aprovado', async () => {
+  const config = ProvidersSchema.parse({
+    llm: {
+      adapter: 'groq',
+      model: 'groq-model',
+      apiKeyEnv: 'GROQ_API_KEY',
+      dataPolicy: 'personal-approved',
+      policyReviewedAt: '2026-01-01T00:00:00.000Z',
+      policyReference: 'https://example.test/groq-privacy',
+      fallbackProviders: [
+        {
+          adapter: 'cloudflare-ai',
+          model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+          apiKeyEnv: 'CLOUDFLARE_AI_TOKEN',
+          accountId: 'd'.repeat(32),
+          dataPolicy: 'personal-approved',
+          policyReviewedAt: '2026-01-01T00:00:00.000Z',
+          policyReference: 'https://example.test/cloudflare-privacy',
+        },
+        {
+          adapter: 'gemini',
+          model: 'gemini-3.8-flash',
+          apiKeyEnv: 'GEMINI_API_KEY',
+        },
+      ],
+    },
+    stt: { adapter: 'disabled' },
+    tts: { adapter: 'disabled' },
+  });
+  const personalInput = { ...input, dataClass: 'personal' as const };
+  const reserve = vi.fn(async (_owner, _role, provider) => provider.adapter);
+  const settle = vi.fn(async () => {});
+  const factory = vi.fn((_role, provider) => ({
+    role: 'llm' as const,
+    transport: 'sse' as const,
+    nativeStreaming: true,
+    health: async () => ({
+      available: true,
+      capabilities: {
+        incrementalGeneration: true,
+        progressiveDelivery: true,
+        vision: false,
+        customVoice: false,
+        testedVoiceControls: [],
+      },
+    }),
+    execute: async () => {
+      if (provider.adapter === 'groq') {
+        throw new ProviderTemporarilyUnavailableError();
+      }
+
+      return output;
+    },
+    stream:
+      provider.adapter === 'groq'
+        ? temporaryFailure
+        : async function* () {
+            yield output;
+          },
+  }));
+  const notify = vi.fn();
+  const release = vi.fn();
+  const services = createProviderServices({
+    configuration: { get: async () => config, save: async () => {} },
+    usage: { reserve, settle, usage: vi.fn() },
+    ownerId: 'primary',
+    factory,
+    gate: {
+      beginConfiguration: () => release,
+      beginExecution: () => release,
+    },
+    onFallback: notify,
+  });
+
+  expect(await collect(services.executeStream(personalInput))).toEqual([
+    output,
+  ]);
+  expect(factory.mock.calls.map(([, provider]) => provider.adapter)).toEqual([
+    'groq',
+    'cloudflare-ai',
+  ]);
+  expect(reserve.mock.calls.map(([, , provider]) => provider.adapter)).toEqual([
+    'groq',
+    'cloudflare-ai',
+  ]);
+  expect(notify).toHaveBeenCalledWith({
+    fromProvider: 'groq',
+    fromModel: 'groq-model',
+    toProvider: 'cloudflare-ai',
+    toModel: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+    reason: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
+  });
+
+  factory.mockClear();
+  reserve.mockClear();
+  expect(await services.execute('llm', personalInput)).toEqual(output);
+  expect(factory.mock.calls.map(([, provider]) => provider.adapter)).toEqual([
+    'groq',
+    'cloudflare-ai',
+  ]);
+  expect(reserve.mock.calls.map(([, , provider]) => provider.adapter)).toEqual([
+    'groq',
+    'cloudflare-ai',
+  ]);
+});
+
+it('valida configuração e limita reservas a LLMs remotos', () => {
+  const validCloudflare = {
+    adapter: 'cloudflare-ai',
+    model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+    apiKeyEnv: 'CLOUDFLARE_AI_TOKEN',
+    accountId: 'b'.repeat(32),
+  };
+  const validGroq = {
+    adapter: 'groq',
+    model: 'groq-model',
+    apiKeyEnv: 'GROQ_API_KEY',
+  };
+
+  expect(
+    ProvidersSchema.safeParse({
+      llm: {
+        adapter: 'gemini',
+        model: 'gemini-primary',
+        apiKeyEnv: 'GEMINI_API_KEY',
+        fallbackProviders: [validGroq, validCloudflare],
+      },
+      stt: { adapter: 'disabled' },
+      tts: { adapter: 'disabled' },
+    }).success,
+  ).toBe(true);
+  expect(
+    ProviderSchema.safeParse({
+      adapter: 'cloudflare-ai',
+      model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+      apiKeyEnv: 'CLOUDFLARE_AI_TOKEN',
+    }).success,
+  ).toBe(false);
+  expect(
+    ProviderSchema.safeParse({
+      adapter: 'groq',
+      model: 'groq-model',
+      apiKeyEnv: 'GROQ_API_KEY',
+      fallbackProviders: [
+        {
+          adapter: 'gemini',
+          model: 'gemini-3.8-flash',
+          apiKeyEnv: 'GEMINI_API_KEY',
+          dataPolicy: 'personal-approved',
+          policyReviewedAt: '2026-01-01T00:00:00.000Z',
+          policyReference: 'https://example.test/gemini-privacy',
+        },
+      ],
+    }).success,
+  ).toBe(false);
+  expect(
+    ProviderSchema.safeParse({
+      adapter: 'gemini',
+      model: 'gemini-3.8-flash',
+      apiKeyEnv: 'GEMINI_API_KEY',
+      geminiTier: 'paid',
+      dataPolicy: 'personal-approved',
+      policyReviewedAt: '2026-01-01T00:00:00.000Z',
+      policyReference: 'https://example.test/gemini-privacy',
+    }).success,
+  ).toBe(true);
+  expect(
+    ProviderSchema.safeParse({
+      adapter: 'groq',
+      model: 'groq-model',
+      apiKeyEnv: 'GROQ_API_KEY',
+      fallbackProviders: [
+        {
+          adapter: 'gemini',
+          model: 'gemini-3.8-flash',
+          apiKeyEnv: 'GEMINI_API_KEY',
+          geminiTier: 'paid',
+          dataPolicy: 'personal-approved',
+          policyReviewedAt: '2026-01-01T00:00:00.000Z',
+          policyReference: 'https://example.test/gemini-privacy',
+        },
+      ],
+    }).success,
+  ).toBe(true);
+  expect(
+    ProviderSchema.safeParse({
+      adapter: 'groq',
+      model: 'groq-model',
+      apiKeyEnv: 'GROQ_API_KEY',
+      fallbackProviders: [validGroq, validCloudflare, validGroq],
+    }).success,
+  ).toBe(false);
+  expect(
+    ProvidersSchema.safeParse({
+      llm: { adapter: 'disabled', fallbackProviders: [validGroq] },
+      stt: { adapter: 'disabled' },
+      tts: { adapter: 'disabled' },
+    }).success,
+  ).toBe(false);
+});
+
+it('percorre Gemini, Groq e Cloudflare na ordem até uma resposta completa', async () => {
+  const config = ProvidersSchema.parse({
+    llm: {
+      adapter: 'gemini',
+      model: 'gemini-primary',
+      apiKeyEnv: 'GEMINI_API_KEY',
+      fallbackProviders: [
+        {
+          adapter: 'groq',
+          model: 'groq-model',
+          apiKeyEnv: 'GROQ_API_KEY',
+        },
+        {
+          adapter: 'cloudflare-ai',
+          model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+          apiKeyEnv: 'CLOUDFLARE_AI_TOKEN',
+          accountId: 'd'.repeat(32),
+        },
+      ],
+    },
+    stt: { adapter: 'disabled' },
+    tts: { adapter: 'disabled' },
+  });
+  const used: string[] = [];
+  const notices: ProviderFallbackNotice[] = [];
+  const reserve = vi.fn(async (_owner, _role, provider) => provider.adapter);
+  const settle = vi.fn(
+    async (
+      _id: string,
+      _outcome: {
+        inputTokens: number | null;
+        outputTokens: number | null;
+      } | null,
+    ) => {
+      void _id;
+      void _outcome;
+    },
+  );
+  const factory: ProviderFactory = (_role, provider) => ({
+    role: 'llm',
+    transport: 'sse',
+    nativeStreaming: true,
+    health: async () => ({
+      available: true,
+      capabilities: {
+        incrementalGeneration: true,
+        progressiveDelivery: true,
+        vision: false,
+        customVoice: false,
+        testedVoiceControls: [],
+      },
+    }),
+    execute: async () => output,
+    stream: async function* () {
+      used.push(provider.adapter);
+
+      if (provider.adapter === 'gemini') {
+        throw new QuotaExceededError();
+      }
+
+      if (provider.adapter === 'groq') {
+        throw new ProviderTemporarilyUnavailableError();
+      }
+
+      yield output;
+    },
+  });
+  const services = createProviderServices({
+    configuration: { get: async () => config, save: async () => {} },
+    usage: { reserve, settle, usage: vi.fn() },
+    ownerId: 'primary',
+    factory,
+    gate: {
+      beginConfiguration: () => () => {},
+      beginExecution: () => () => {},
+    },
+    onFallback: (notice) => notices.push(notice),
+  });
+
+  expect(await collect(services.executeStream(input))).toEqual([output]);
+  expect(used).toEqual(['gemini', 'groq', 'cloudflare-ai']);
+  expect(reserve.mock.calls.map((call) => call[2].adapter)).toEqual(used);
+  expect(settle.mock.calls.map((call) => call[1])).toEqual([
+    null,
+    null,
+    output,
+  ]);
+  expect(
+    notices.map(({ fromProvider, toProvider, reason }) => [
+      fromProvider,
+      toProvider,
+      reason,
+    ]),
+  ).toEqual([
+    ['gemini', 'groq', 'QUOTA_EXCEEDED'],
+    ['groq', 'cloudflare-ai', 'PROVIDER_TEMPORARILY_UNAVAILABLE'],
+  ]);
+});
+
 it('encerra após falha da reserva sem repetir a cadeia', async () => {
   const test = setup(temporaryFailure);
   const original = test.factory.getMockImplementation()!;
@@ -239,3 +727,60 @@ it('não chama a reserva quando seu orçamento recusa a tentativa', async () => 
   expect(test.factory).toHaveBeenCalledOnce();
   expect(test.release).toHaveBeenCalledOnce();
 });
+
+for (const mode of ['stream', 'execute'] as const) {
+  it(`usa a reserva após cota local do principal em ${mode}`, async () => {
+    const test = setup(temporaryFailure);
+    test.reserve.mockImplementation(async (_owner, _role, config) => {
+      if (config.model === 'gemini-3.8-flash') {
+        throw new QuotaExceededError();
+      }
+
+      return config.model;
+    });
+    const result =
+      mode === 'stream'
+        ? await collect(test.services.executeStream(input))
+        : [await test.services.execute('llm', input)];
+    expect(result).toEqual([output]);
+    expect(test.reserve.mock.calls.map((call) => call[2].model)).toEqual([
+      'gemini-3.8-flash',
+      'gemini-3.6-flash',
+    ]);
+    expect(test.factory).toHaveBeenCalledOnce();
+    expect(test.factory.mock.calls[0]?.[1].model).toBe('gemini-3.6-flash');
+    expect(test.settle).toHaveBeenCalledOnce();
+    expect(test.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'QUOTA_EXCEEDED' }),
+    );
+    expect(test.release).toHaveBeenCalledOnce();
+  });
+
+  it(`falha de persistência na reserva não inicia outro provedor em ${mode}`, async () => {
+    const test = setup(temporaryFailure);
+    test.reserve.mockRejectedValue(
+      new ProviderTemporarilyUnavailableError('storage failure'),
+    );
+    const promise =
+      mode === 'stream'
+        ? collect(test.services.executeStream(input))
+        : test.services.execute('llm', input);
+    await expect(promise).rejects.toThrow('storage failure');
+    expect(test.reserve).toHaveBeenCalledOnce();
+    expect(test.factory).not.toHaveBeenCalled();
+    expect(test.settle).not.toHaveBeenCalled();
+  });
+
+  it(`encerra quando todas as cotas locais elegíveis acabam em ${mode}`, async () => {
+    const test = setup(temporaryFailure);
+    test.reserve.mockRejectedValue(new QuotaExceededError());
+    const promise =
+      mode === 'stream'
+        ? collect(test.services.executeStream(input))
+        : test.services.execute('llm', input);
+    await expect(promise).rejects.toMatchObject({ code: 'QUOTA_EXCEEDED' });
+    expect(test.reserve).toHaveBeenCalledTimes(2);
+    expect(test.factory).not.toHaveBeenCalled();
+    expect(test.settle).not.toHaveBeenCalled();
+  });
+}

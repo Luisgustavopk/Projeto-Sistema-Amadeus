@@ -22,13 +22,26 @@ export const CapabilitiesSchema = z.object({
   providers: z.array(
     z.object({
       role: z.enum(['llm', 'stt', 'tts']),
-      adapter: z.enum(['disabled', 'http-json', 'gemini']),
+      adapter: z.enum([
+        'disabled',
+        'http-json',
+        'gemini',
+        'groq',
+        'cloudflare-ai',
+      ]),
       model: z.string().nullable(),
       dataPolicy: z.enum([
         'synthetic-only',
         'personal-approved',
         'local-approved',
       ]),
+      fallbacks: z.array(
+        z.object({
+          adapter: z.enum(['gemini', 'groq', 'cloudflare-ai']),
+          model: z.string().nullable(),
+          dataPolicy: z.enum(['synthetic-only', 'personal-approved']),
+        }),
+      ),
       available: z.boolean(),
       capabilities: z.object({
         incrementalGeneration: z.boolean(),

@@ -1,5 +1,6 @@
 import {
   providerAttempts,
+  filterProviderAttemptsForDataClass,
   canUseFallback,
   notifyFallback,
   type NotifyProviderFallback,
@@ -7,6 +8,10 @@ import {
 import type { Role } from '../../domain/providers/model.ts';
 import { validateProviderInput, estimateProviderBudget } from './input.ts';
 import { assertProviderCanExecute } from '../../domain/providers/data-policy.ts';
+import {
+  DataPolicyBlockedError,
+  QuotaExceededError,
+} from '../../domain/errors/providers.ts';
 import type { ProviderConfigurationRepository } from '../../ports/provider-configuration-repository.ts';
 import type { ProviderUsageRepository } from '../../ports/provider-usage-repository.ts';
 import type {
@@ -30,21 +35,54 @@ export function createProviderExecution(
       const release = gate.beginExecution();
 
       try {
-        const attempts = providerAttempts(
-          role,
-          (await configuration.get(ownerId))[role],
+        const providerConfig = (await configuration.get(ownerId))[role];
+        const configuredAttempts = providerAttempts(role, providerConfig);
+        const attempts = filterProviderAttemptsForDataClass(
+          configuredAttempts,
+          input.dataClass,
         );
+
+        if (!attempts.length) {
+          assertProviderCanExecute(configuredAttempts[0]!, input.dataClass);
+        }
+
+        if (attempts[0] !== configuredAttempts[0]) {
+          notifyFallback(
+            configuredAttempts[0]!,
+            attempts[0]!,
+            new DataPolicyBlockedError(),
+            onFallback,
+          );
+        }
 
         for (let index = 0; index < attempts.length; index++) {
           signal?.throwIfAborted();
           const config = attempts[index]!;
           assertProviderCanExecute(config, input.dataClass);
-          const reservation = await usage.reserve(
-            ownerId,
-            role,
-            config,
-            estimateProviderBudget(input),
-          );
+          let reservation: string;
+
+          try {
+            reservation = await usage.reserve(
+              ownerId,
+              role,
+              config,
+              estimateProviderBudget(input),
+            );
+          } catch (error) {
+            const next = attempts[index + 1];
+
+            if (
+              !next ||
+              !(error instanceof QuotaExceededError) ||
+              signal?.aborted
+            ) {
+              throw error;
+            }
+
+            notifyFallback(config, next, error, onFallback);
+            continue;
+          }
+
           let result: ProviderOutput;
 
           try {
@@ -57,7 +95,7 @@ export function createProviderExecution(
               throw error;
             }
 
-            notifyFallback(config, next, onFallback);
+            notifyFallback(config, next, error, onFallback);
             continue;
           }
 

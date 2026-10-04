@@ -7,10 +7,15 @@ import type {
 } from '../../ports/provider.ts';
 import type { ExecutionGate } from '../../ports/activity-gate.ts';
 import { assertProviderCanExecute } from '../../domain/providers/data-policy.ts';
-import { ProviderInvalidError } from '../../domain/errors/providers.ts';
+import {
+  DataPolicyBlockedError,
+  ProviderInvalidError,
+  QuotaExceededError,
+} from '../../domain/errors/providers.ts';
 import { validateProviderInput, estimateProviderBudget } from './input.ts';
 import {
   providerAttempts,
+  filterProviderAttemptsForDataClass,
   canUseFallback,
   notifyFallback,
   type NotifyProviderFallback,
@@ -33,24 +38,58 @@ export function createProviderStreaming(
       const release = gate.beginExecution();
 
       try {
-        const attempts = providerAttempts(
-          'llm',
-          (await configuration.get(ownerId)).llm,
+        const providerConfig = (await configuration.get(ownerId)).llm;
+        const configuredAttempts = providerAttempts('llm', providerConfig);
+        const attempts = filterProviderAttemptsForDataClass(
+          configuredAttempts,
+          input.dataClass,
         );
+
+        if (!attempts.length) {
+          assertProviderCanExecute(configuredAttempts[0]!, input.dataClass);
+        }
+
+        if (attempts[0] !== configuredAttempts[0]) {
+          notifyFallback(
+            configuredAttempts[0]!,
+            attempts[0]!,
+            new DataPolicyBlockedError(),
+            onFallback,
+          );
+        }
 
         for (let index = 0; index < attempts.length; index++) {
           signal?.throwIfAborted();
           const config = attempts[index]!;
           assertProviderCanExecute(config, input.dataClass);
-          const reservation = await usage.reserve(
-            ownerId,
-            'llm',
-            config,
-            estimateProviderBudget(input),
-          );
+          let reservation: string;
+
+          try {
+            reservation = await usage.reserve(
+              ownerId,
+              'llm',
+              config,
+              estimateProviderBudget(input),
+            );
+          } catch (error) {
+            const next = attempts[index + 1];
+
+            if (
+              !next ||
+              !(error instanceof QuotaExceededError) ||
+              signal?.aborted
+            ) {
+              throw error;
+            }
+
+            notifyFallback(config, next, error, onFallback);
+            continue;
+          }
+
           let settled = false;
           let delivered = false;
           let retry = false;
+          let fallbackError: unknown;
 
           try {
             const provider = factory('llm', config);
@@ -102,6 +141,7 @@ export function createProviderStreaming(
             }
 
             retry = true;
+            fallbackError = error;
           } finally {
             if (!settled) {
               await usage.settle(reservation, null);
@@ -109,7 +149,12 @@ export function createProviderStreaming(
           }
 
           if (retry) {
-            notifyFallback(config, attempts[index + 1]!, onFallback);
+            notifyFallback(
+              config,
+              attempts[index + 1]!,
+              fallbackError,
+              onFallback,
+            );
           }
         }
       } finally {

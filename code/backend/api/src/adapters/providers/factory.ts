@@ -2,6 +2,10 @@ import type { ProviderFactory } from '../../ports/provider.ts';
 import { ProviderConfigurationError } from '../../domain/errors/providers.ts';
 import { createProvider } from './http-json.ts';
 import { createGeminiProvider } from './gemini.ts';
+import {
+  createCloudflareAiProvider,
+  createGroqProvider,
+} from './openai-compatible.ts';
 
 export function createProviderFactory(
   secrets: NodeJS.ProcessEnv,
@@ -15,6 +19,18 @@ export function createProviderFactory(
       }
 
       return createGeminiProvider(config, secrets);
+    }
+
+    if (config.adapter === 'groq' || config.adapter === 'cloudflare-ai') {
+      if (role !== 'llm') {
+        throw new ProviderConfigurationError(
+          'Groq e Cloudflare Workers AI são adaptadores de LLM.',
+        );
+      }
+
+      return config.adapter === 'groq'
+        ? createGroqProvider(config, secrets)
+        : createCloudflareAiProvider(config, secrets);
     }
 
     return createProvider(role, config, secrets);

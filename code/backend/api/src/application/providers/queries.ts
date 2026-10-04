@@ -23,6 +23,27 @@ export function createProviderQueries(
             adapter: config[role].adapter,
             model: config[role].model ?? null,
             dataPolicy: config[role].dataPolicy,
+            fallbacks:
+              role === 'llm'
+                ? [
+                    ...(config[role].fallbackModel
+                      ? [
+                          {
+                            adapter: 'gemini' as const,
+                            model: config[role].fallbackModel,
+                            dataPolicy: 'synthetic-only' as const,
+                          },
+                        ]
+                      : []),
+                    ...(config[role].fallbackProviders ?? []).map(
+                      ({ adapter, model, dataPolicy }) => ({
+                        adapter,
+                        model,
+                        dataPolicy,
+                      }),
+                    ),
+                  ]
+                : [],
             ...(await adapter.health()),
             capabilitySource: 'adapter-reported' as const,
             transport: adapter.transport,

@@ -4,6 +4,20 @@ import {
 } from '../errors/providers.ts';
 import type { ProviderConfig, DataClass } from './model.ts';
 
+export function providerCanProcessDataClass(
+  config: ProviderConfig,
+  dataClass: DataClass,
+) {
+  return (
+    config.adapter !== 'disabled' &&
+    (dataClass !== 'local-only' || config.dataPolicy === 'local-approved') &&
+    (dataClass !== 'personal' ||
+      (config.dataPolicy === 'personal-approved' &&
+        (config.adapter !== 'gemini' || config.geminiTier === 'paid')) ||
+      config.dataPolicy === 'local-approved')
+  );
+}
+
 export function assertProviderCanExecute(
   config: ProviderConfig,
   dataClass: DataClass,
@@ -12,12 +26,7 @@ export function assertProviderCanExecute(
     throw new ProviderDisabledError();
   }
 
-  if (
-    (dataClass === 'local-only' && config.dataPolicy !== 'local-approved') ||
-    (dataClass === 'personal' &&
-      config.dataPolicy !== 'personal-approved' &&
-      config.dataPolicy !== 'local-approved')
-  ) {
+  if (!providerCanProcessDataClass(config, dataClass)) {
     throw new DataPolicyBlockedError();
   }
 }

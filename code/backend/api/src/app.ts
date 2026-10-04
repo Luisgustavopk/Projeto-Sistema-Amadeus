@@ -29,7 +29,9 @@ export async function buildApp(options: AppOptions) {
     (notice) => {
       app.log.warn(
         { event: 'provider.fallback', ...notice },
-        'Modelo principal indisponível; usando modelo reserva.',
+        notice.reason === 'DATA_POLICY_BLOCKED'
+          ? 'Provedor não aprovado para a classificação dos dados; usando próxima reserva permitida.'
+          : 'Modelo principal indisponível; usando modelo reserva.',
       );
     },
   );
