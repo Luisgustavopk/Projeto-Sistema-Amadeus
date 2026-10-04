@@ -3,7 +3,7 @@ import os
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -19,6 +19,8 @@ def create_service(role: str, loader: Callable, custom_voice: bool = False):
         raise RuntimeError("SERVICE_ACCESS_TOKEN must contain at least 32 characters")
     engine = None
     busy = False
+    waiting = 0
+    inference_lock = asyncio.Lock()
 
     @asynccontextmanager
     async def lifespan(_app):
@@ -73,26 +75,49 @@ def create_service(role: str, loader: Callable, custom_voice: bool = False):
             "role": role,
             "residentMemoryBytes": psutil.Process().memory_info().rss,
             "busy": busy,
+            "queuedInferences": waiting,
         }
         if engine is not None and hasattr(engine, "metrics"):
             values.update(engine.metrics())
         return values
 
     @app.post("/execute")
-    async def execute(data: Execute):
-        nonlocal busy
+    async def execute(data: Execute, request: Request):
+        nonlocal busy, waiting
         if data.role != role or engine is None:
             raise HTTPException(400, "Role or engine invalid")
-        if busy:
-            raise HTTPException(429, "Inference busy")
+
+        # Reserve admission before awaiting anything: one inference owner and
+        # at most one waiter, including requests checking for disconnection.
+        if int(busy) + waiting >= 2:
+            raise HTTPException(429, "Inference queue full")
+
+        waiting += 1
+        try:
+            while True:
+                if await request.is_disconnected():
+                    return Response(status_code=499)
+                try:
+                    await asyncio.wait_for(inference_lock.acquire(), timeout=0.1)
+                    break
+                except TimeoutError:
+                    continue
+        finally:
+            waiting -= 1
+
         busy = True
         # Cancellation of an HTTP client cannot interrupt a GPU kernel. Keep
         # ownership until the thread finishes; stale output is discarded by API.
-        task = asyncio.create_task(asyncio.to_thread(engine.execute, data))
+        task = None
         try:
+            # A canceled waiter must never start another obsolete inference.
+            if await request.is_disconnected():
+                return Response(status_code=499)
+            task = asyncio.create_task(asyncio.to_thread(engine.execute, data))
             return await asyncio.shield(task)
         except asyncio.CancelledError:
-            await task
+            if task is not None:
+                await task
             raise
         except NoSpeechDetected:
             return JSONResponse(status_code=422, content={"code": "NO_SPEECH_DETECTED"})
@@ -102,5 +127,6 @@ def create_service(role: str, loader: Callable, custom_voice: bool = False):
             raise HTTPException(503, "Inference unavailable") from None
         finally:
             busy = False
+            inference_lock.release()
 
     return app

@@ -3,7 +3,6 @@ import hashlib
 
 import pytest
 from fastapi.testclient import TestClient
-
 from speech_runtime.contracts import Execute, Voice
 from speech_runtime.server import create_service
 from stt.engine import WhisperEngine
@@ -104,6 +103,7 @@ def test_stt_pcm_validation_and_language():
             assert samples.shape == (1600,)
             assert options["language"] == "pt"
             assert options["vad_filter"] is True
+            assert options["beam_size"] == 1
             return [Segment()], None
 
     engine = WhisperEngine.__new__(WhisperEngine)
@@ -118,6 +118,18 @@ def test_stt_pcm_validation_and_language():
         )
     )
     assert engine.execute(data)["content"] == "Olá"
+    assert engine.metrics()["engine"] == "faster-whisper"
+    assert engine.metrics()["audioSeconds"] == 0.1
+    assert engine.metrics()["realTimeFactor"] >= 0
+
+    class FailingModel:
+        def transcribe(self, _samples, **_options):
+            raise RuntimeError("inference failed")
+
+    engine.model = FailingModel()
+    with pytest.raises(RuntimeError, match="inference failed"):
+        engine.execute(data)
+    assert engine.metrics()["transcriptionSeconds"] >= 0
     data.audio.pcmBase64 = "!!!!"
     with pytest.raises(ValueError):
         engine.execute(data)
@@ -132,23 +144,43 @@ def test_service_requires_secret(monkeypatch):
 def test_inference_has_one_owner_even_with_concurrent_requests(monkeypatch):
     from concurrent.futures import ThreadPoolExecutor
     from threading import Event
+    from time import monotonic, sleep
 
     monkeypatch.setenv("SERVICE_ACCESS_TOKEN", TOKEN)
     entered, release = Event(), Event()
+    calls = 0
 
     class BlockingEngine:
         def execute(self, _data):
-            entered.set()
-            assert release.wait(3)
+            nonlocal calls
+            calls += 1
+
+            if calls == 1:
+                entered.set()
+                assert release.wait(3)
+
             return {"content": "ok", "inputTokens": None, "outputTokens": None}
 
     with (
         TestClient(create_service("stt", BlockingEngine)) as client,
-        ThreadPoolExecutor(max_workers=1) as pool,
+        ThreadPoolExecutor(max_workers=2) as pool,
     ):
         pending = pool.submit(client.post, "/execute", json=payload(), headers=HEADERS)
         try:
             assert entered.wait(2)
+            queued = pool.submit(
+                client.post, "/execute", json=payload(), headers=HEADERS
+            )
+            deadline = monotonic() + 2
+            while (
+                client.get("/metrics", headers=HEADERS).json()["queuedInferences"]
+                != 1
+                and monotonic() < deadline
+            ):
+                sleep(0.01)
+            assert client.get("/metrics", headers=HEADERS).json()[
+                "queuedInferences"
+            ] == 1
             assert (
                 client.post("/execute", json=payload(), headers=HEADERS).status_code
                 == 429
@@ -156,11 +188,12 @@ def test_inference_has_one_owner_even_with_concurrent_requests(monkeypatch):
         finally:
             release.set()
         assert pending.result().status_code == 200
+        assert queued.result().status_code == 200
+        assert calls == 2
 
 
 def test_tts_requires_original_reference_and_returns_pcm(monkeypatch, tmp_path):
     import numpy as np
-
     from tts.config import SynthesisConfig
     from tts.engine import ChatterboxEngine
 
@@ -222,3 +255,55 @@ def test_valid_audio_without_speech_is_an_expected_outcome(monkeypatch):
         response = client.post("/execute", json=payload(), headers=HEADERS)
         assert response.status_code == 422
         assert response.json() == {"code": "NO_SPEECH_DETECTED"}
+
+
+def test_disconnected_waiter_never_starts_obsolete_inference(monkeypatch):
+    import asyncio
+    from threading import Event
+
+    monkeypatch.setenv("SERVICE_ACCESS_TOKEN", TOKEN)
+    entered, release = Event(), Event()
+    calls = []
+
+    class Engine:
+        def execute(self, data):
+            calls.append(data.content)
+            if len(calls) == 1:
+                entered.set()
+                assert release.wait(3)
+            return {"content": "ok", "inputTokens": None, "outputTokens": None}
+
+    class Connection:
+        disconnected = False
+
+        async def is_disconnected(self):
+            return self.disconnected
+
+    async def exercise():
+        app = create_service("stt", Engine)
+        async with app.router.lifespan_context(app):
+            execute = next(route.endpoint for route in app.routes if route.path == "/execute")
+            metrics = next(route.endpoint for route in app.routes if route.path == "/metrics")
+            first = asyncio.create_task(execute(Execute(**payload(content="first")), Connection()))
+            stale_connection = Connection()
+            try:
+                assert await asyncio.to_thread(entered.wait, 2)
+                stale = asyncio.create_task(execute(Execute(**payload(content="stale")), stale_connection))
+                await asyncio.sleep(0.02)
+                assert (await metrics())["queuedInferences"] == 1
+                stale_connection.disconnected = True
+                assert (await asyncio.wait_for(stale, timeout=1)).status_code == 499
+                assert calls == ["first"]
+                assert (await metrics())["queuedInferences"] == 0
+                current = asyncio.create_task(execute(Execute(**payload(content="current")), Connection()))
+                release.set()
+                await first
+                await current
+                assert calls == ["first", "current"]
+                assert (await metrics())["busy"] is False
+                assert (await metrics())["queuedInferences"] == 0
+            finally:
+                release.set()
+                await first
+
+    asyncio.run(exercise())
