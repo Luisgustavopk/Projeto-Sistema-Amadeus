@@ -13,11 +13,12 @@
     <section class="panel" aria-labelledby="connection-title">
       <h2 id="connection-title">Conexão local</h2>
       <form id="connect-form">
-        <div class="fields"><label>Endereço da API<input id="api-url" type="url" value="http://127.0.0.1:3001" required></label><label>Token de acesso da API<input id="token" type="password" autocomplete="off" placeholder="API_ACCESS_TOKEN do .env" required></label></div>
-        <p class="hint">O token fica apenas nesta página enquanto ela estiver aberta. Os testes usam frases fictícias.</p>
+        <div class="fields"><label>Endereço da API<input id="api-url" type="url" value="http://127.0.0.1:3001" required></label><label>Token de acesso da API<input id="token" type="password" autocomplete="off" placeholder="API_ACCESS_TOKEN do .env" required></label><label>Classificação dos dados<select id="data-class"><option value="personal" selected>Personal — microfone e mensagens reais</option><option value="synthetic">Synthetic — somente conteúdo artificial</option></select></label></div>
+        <p class="hint">Personal é o padrão para voz real. A opção synthetic só pode ser usada com conteúdo inteiramente artificial; nela, o microfone fica desabilitado. O token permanece apenas nesta página enquanto ela estiver aberta.</p>
         <div class="actions"><button id="connect" type="submit">Conectar</button><button id="disconnect" type="button" class="secondary" disabled>Encerrar chamada</button><button id="inspect" type="button" class="secondary">Verificar serviços</button></div>
       </form>
-      <div id="providers" class="providers" aria-live="polite">STT, Gemini e TTS precisam estar em execução.</div>
+      <div id="providers" class="providers" aria-live="polite">LLM, STT e TTS precisam estar em execução.</div>
+      <p id="data-policy-warning" class="error" role="status" hidden></p>
       <p id="error" class="error" role="alert" hidden></p>
     </section>
     <section class="panel conversation-panel" aria-labelledby="conversation-title">
@@ -29,9 +30,9 @@
     </section>
     <section class="panel" aria-labelledby="timing-title">
       <div class="section-heading"><h2 id="timing-title">Medições</h2><button id="export" class="secondary">Exportar JSON</button></div>
-      <div class="metrics"><div><span>Última resposta por voz</span><strong id="last-time">—</strong></div><div><span>Mediana · voz</span><strong id="median">—</strong></div><div><span>p95 · voz</span><strong id="p95">—</strong></div><div><span>Turnos / interrupções manuais</span><strong id="samples">0 / 0</strong></div></div>
-      <p class="hint">Tempo do fim da sua fala até o áudio agendado no navegador, incluindo VAD. Mensagens por texto não contam nessa métrica. Interrupção manual mede a parada local; observe também a interrupção automática por fala.</p>
-      <p id="baseline-status" class="muted">Coleta inicial: ensaio completo requer 100 turnos e 30 interrupções manuais.</p>
+      <div class="metrics"><div><span>Última resposta por voz</span><strong id="last-time">—</strong></div><div><span>Mediana · voz</span><strong id="median">—</strong></div><div><span>p95 · voz</span><strong id="p95">—</strong></div><div><span>Máximo · fim / início (diagnóstico)</span><strong id="max">— / —</strong></div><div><span>Turnos / interrupções automáticas / manuais</span><strong id="samples">0 / 0 / 0</strong></div></div>
+      <p class="hint">Estimativa do fim da fala até o áudio agendado no navegador, incluindo a pausa final do VAD. A coleta também registra desde o início detectado da fala. Agendamento não confirma som físico no dispositivo. Mensagens por texto não contam.</p>
+      <p id="baseline-status" class="muted">Coleta inicial: ensaio completo requer 100 turnos e 30 interrupções automáticas durante reprodução. Saída física requer validação separada.</p>
       <details><summary>Eventos técnicos</summary><pre id="events"></pre></details>
     </section>
   </main>
