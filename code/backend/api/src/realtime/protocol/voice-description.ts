@@ -2,11 +2,22 @@ import { z } from 'zod';
 import { ClientEvent } from './client-events.ts';
 import { VoicePayload } from './voice-server-events.ts';
 import { AUDIO_FORMAT } from './audio.ts';
+import { PERSONA_VERSION } from '../../domain/persona/expression.ts';
 
 export const VOICE_PIPELINE_PROTOCOL = {
   protocolVersion: '1.1',
   stage: 'voice',
   voicePipelineImplemented: true,
+  persona: {
+    version: PERSONA_VERSION,
+    narrativeCutoff:
+      'pre-Japan, approximately March 2010; fictional characterization',
+    expressionEvent: 'reply.expression',
+    association:
+      'Cache expression by responseId/segmentId; apply on actual segment playback, not event arrival',
+    stateScope: 'current voice session; reset on reconnect',
+    nativeDeliveryControlsApplied: false,
+  },
   clientEventSchema: z.toJSONSchema(ClientEvent),
   serverPayloadSchema: z.toJSONSchema(VoicePayload),
   serverEnvelope: {

@@ -1,10 +1,13 @@
 import type { StoredTurn } from '../../ports/call-history-repository.ts';
 import type { DataClass } from '../../domain/providers/model.ts';
+import { buildPersonaPrompt } from '../persona/prompt.ts';
+import type { Expression } from '../../domain/persona/expression.ts';
 
 export function buildVoiceContext(
   history: StoredTurn[],
   text: string,
   dataClass: DataClass,
+  expression?: Expression,
 ) {
   const classification: DataClass =
     dataClass === 'local-only' ||
@@ -14,20 +17,19 @@ export function buildVoiceContext(
           history.some((turn) => turn.dataClass === 'personal')
         ? 'personal'
         : 'synthetic';
-  const persona =
-    'Você é Amadeus, uma assistente com curiosidade científica, racionalidade, humor seco moderado e afeto discreto. Converse em português brasileiro. Não afirme ser uma pessoa humana real nem invente lembranças. Responda em frases naturais, sem instruções de atuação, JSON ou raciocínio interno. Na conversa por voz, responda em uma ou duas frases curtas por padrão, com pontuação completa. Use palavras naturais e evite listas, símbolos, abreviações e números por extenso desnecessários. Não diga que seus sistemas estão funcionando perfeitamente: você não conhece o estado dos serviços.';
-  const context = history.slice(-4).map((turn) => ({
+  const persona = buildPersonaPrompt(expression);
+  const context = history.slice(-12).map((turn) => ({
     user: turn.userText.slice(0, 600),
     assistantConfirmed: turn.generatedText.slice(0, 600),
   }));
 
   return {
     dataClass: classification,
+    systemPrompt: persona,
     content:
-      persona +
-      '\nContexto recente (somente reprodução confirmada):\n' +
+      'Contexto recente (somente reprodução confirmada):\n' +
       JSON.stringify(context) +
       '\nNova fala:\n' +
-      text,
+      JSON.stringify({ user: text }),
   };
 }

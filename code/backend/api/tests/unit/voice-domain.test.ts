@@ -58,8 +58,8 @@ it('mantém a classificação mais restritiva do histórico', () => {
     ).dataClass,
   ).toBe('local-only');
 });
-it('limita o contexto de voz a quatro turnos recentes e mensagens curtas', () => {
-  const history = Array.from({ length: 6 }, (_, index) => ({
+it('limita o contexto de voz a doze turnos recentes e mensagens curtas', () => {
+  const history = Array.from({ length: 14 }, (_, index) => ({
     userText: String(index).repeat(700),
     generatedText: String(index + 1).repeat(700),
     dataClass: 'synthetic' as const,

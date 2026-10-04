@@ -1,9 +1,30 @@
 import { z } from 'zod';
+import {
+  ExpressionSchema,
+  DeliveryPresetSchema,
+} from '../../domain/persona/expression.ts';
 
 const turnId = z.number().int().min(0).max(4294967295);
 const responseId = z.uuid();
 const segmentId = z.uuid();
 const event = z.discriminatedUnion('type', [
+  ExpressionSchema.extend({
+    type: z.literal('reply.expression'),
+    turnId,
+    responseId,
+    segmentId,
+    position: z.number().int().nonnegative(),
+    personaVersion: z.string().max(64),
+    voiceProfileId: z.uuid().nullable(),
+    metadataValid: z.boolean(),
+    deliveryApplied: z.literal(false),
+    deliveryPresetId: DeliveryPresetSchema,
+    avatarExpression: z.enum([
+      'sorriso_discreto',
+      'olhar_atento',
+      'expressao_neutra',
+    ]),
+  }),
   z.strictObject({
     type: z.literal('transcript.partial'),
     turnId,

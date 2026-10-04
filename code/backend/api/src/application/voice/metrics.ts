@@ -6,6 +6,8 @@ export function createVoiceMetrics() {
     interrupted: 0,
     failed: 0,
     textFallbacks: 0,
+    personaMetadataFallbacks: 0,
+    personaRecoveries: 0,
   };
   const durations = new Map<string, number[]>();
   const failureReasons = new Map<string, number>();

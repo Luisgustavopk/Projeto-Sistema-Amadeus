@@ -7,8 +7,14 @@ import type { DataClass } from '../../domain/providers/model.ts';
 import type { VoiceMetrics } from './metrics.ts';
 import { ApplicationError } from '../../domain/errors/application-error.ts';
 import { VoiceInputError } from '../../domain/errors/voice.ts';
-import { streamSpeech } from './speech-stream.ts';
+import { streamPersonaSpeech } from '../persona/speech-recovery.ts';
+import { buildSpeechOnlyPersonaPrompt } from '../persona/prompt.ts';
 import { buildVoiceContext } from './context.ts';
+import { createExpressionState } from '../../domain/persona/expression-policy.ts';
+import {
+  PERSONA_VERSION,
+  describeDelivery,
+} from '../../domain/persona/expression.ts';
 
 export type VoiceTurn = {
   sessionId: string;
@@ -29,6 +35,8 @@ export function createTurnProcessor(
   history: CallHistoryRepository,
   metrics: VoiceMetrics,
 ) {
+  const expressionState = createExpressionState();
+
   const executeProvider = async (
     role: Parameters<typeof providers.execute>[0],
     providerInput: Parameters<typeof providers.execute>[1],
@@ -138,14 +146,36 @@ export function createTurnProcessor(
 
       await history.updateTurn(responseId, { userText: text });
       signal.throwIfAborted();
-      const recent = await history.recent(turn.conversationId, turn.ownerId, 4);
-      const context = buildVoiceContext(recent, text, turn.dataClass);
+      const recent = await history.recent(
+        turn.conversationId,
+        turn.ownerId,
+        12,
+      );
+      const context = buildVoiceContext(
+        recent,
+        text,
+        turn.dataClass,
+        expressionState.snapshot(),
+      );
+      let proposal = expressionState.snapshot();
+      let metadataValid = false;
+      let expression = proposal;
       const started = performance.now();
       let firstLlmToken = false;
-      const segments = streamSpeech(async function* (streamSignal) {
+
+      const source = async function* (
+        streamSignal: AbortSignal,
+        speechOnly: boolean,
+      ) {
         try {
           for await (const chunk of providers.executeStream(
-            { ...context, maxTokens: 512 },
+            {
+              ...context,
+              systemPrompt: speechOnly
+                ? buildSpeechOnlyPersonaPrompt(expressionState.snapshot())
+                : context.systemPrompt,
+              maxTokens: 512,
+            },
             streamSignal,
           )) {
             if (!firstLlmToken && chunk.content.trim()) {
@@ -167,13 +197,36 @@ export function createTurnProcessor(
         } finally {
           metrics.time('llm', performance.now() - started);
         }
-      }, signal);
+      };
+
+      const segments = streamPersonaSpeech(
+        source,
+        signal,
+        (value, valid) => {
+          proposal = value;
+          metadataValid = valid;
+          metrics.time('personaHeader', performance.now() - started);
+
+          if (!valid) {
+            metrics.count('personaMetadataFallbacks');
+          }
+        },
+        () => metrics.count('personaRecoveries'),
+      );
       emit({ type: 'reply.start', turnId, responseId });
       const generated: string[] = [];
       let position = 0;
 
-      for await (const spokenText of segments) {
+      for await (const segment of segments) {
+        signal.throwIfAborted();
+        const spokenText = segment;
+
+        if (!spokenText) {
+          continue;
+        }
+
         if (position === 0) {
+          expression = expressionState.accept(proposal);
           metrics.time('llmFirstSpeechSegment', performance.now() - started);
         }
 
@@ -196,6 +249,19 @@ export function createTurnProcessor(
           segmentId,
           position,
           text: spokenText,
+        });
+        emit({
+          type: 'reply.expression',
+          turnId,
+          responseId,
+          segmentId,
+          position,
+          personaVersion: PERSONA_VERSION,
+          ...expression,
+          ...describeDelivery(expression),
+          voiceProfileId: turn.profile?.id ?? null,
+          metadataValid,
+          deliveryApplied: false,
         });
 
         if (!turn.profile) {

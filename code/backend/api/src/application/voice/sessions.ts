@@ -18,12 +18,6 @@ export function createVoiceSessions(dependencies: {
   metrics: VoiceMetrics;
   ownerId: string;
 }) {
-  const processor = createTurnProcessor(
-    dependencies.providers,
-    dependencies.history,
-    dependencies.metrics,
-  );
-
   const runtimes = new Set<CallRuntime>();
   const openings = new Set<Promise<CallRuntime>>();
   let openingQueue = Promise.resolve();
@@ -89,7 +83,11 @@ export function createVoiceSessions(dependencies: {
           ownerId: dependencies.ownerId,
           profile,
           history: dependencies.history,
-          processor,
+          processor: createTurnProcessor(
+            dependencies.providers,
+            dependencies.history,
+            dependencies.metrics,
+          ),
           gate: dependencies.gate,
           metrics: dependencies.metrics,
         });

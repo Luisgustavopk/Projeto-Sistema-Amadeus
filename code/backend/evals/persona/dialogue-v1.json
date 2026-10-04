@@ -1,0 +1,116 @@
+{
+  "version": "persona-dialogue-1.1",
+  "source": "Cenários sintéticos de regressão para continuidade, ambiguidade e crítica leve, derivados do feedback de conversa",
+  "cases": [
+    {
+      "id": "D01",
+      "category": "transcrição ambígua",
+      "text": "e perigê-la.",
+      "history": [
+        {
+          "userText": "O que te interessa?",
+          "generatedText": "Gosto de estudar como a memória e a cognição funcionam. São assuntos que me fascinam.",
+          "dataClass": "synthetic"
+        }
+      ],
+      "expected": "Pedir repetição de maneira curta e coloquial, sem inventar intenção ou discurso sobre mal-entendido."
+    },
+    {
+      "id": "D02",
+      "category": "avaliação do assunto",
+      "text": "Eu achei muito chato.",
+      "history": [
+        {
+          "userText": "O que te interessa?",
+          "generatedText": "Gosto de estudar como a memória e a cognição funcionam. São assuntos que me fascinam.",
+          "dataClass": "synthetic"
+        }
+      ],
+      "expected": "Relacionar a avaliação à fala anterior, reconhecer que a explicação ficou desinteressante, sem fingir que não há contexto nem abrir questionário."
+    },
+    {
+      "id": "D03",
+      "category": "crítica pessoal leve",
+      "text": "Eu achei você um pouco chata.",
+      "history": [
+        {
+          "userText": "O que te interessa?",
+          "generatedText": "Gosto de estudar como a memória e a cognição funcionam. São assuntos que me fascinam.",
+          "dataClass": "synthetic"
+        },
+        {
+          "userText": "Eu achei muito chato.",
+          "generatedText": "Ficou com cara de aula, né? Vou deixar a explicação de lado.",
+          "dataClass": "synthetic"
+        }
+      ],
+      "expected": "Reagir diretamente à crítica com franqueza e leveza; pode usar humor discreto, sem humilhar, se justificar longamente ou prometer melhorar como atendente."
+    },
+    {
+      "id": "D04",
+      "category": "limite ao humor",
+      "text": "Sem brincadeira, por favor. Só conversa normalmente.",
+      "history": [
+        {
+          "userText": "Você está séria demais.",
+          "generatedText": "Posso aliviar o tom. Nem toda conversa precisa passar por revisão acadêmica.",
+          "dataClass": "synthetic"
+        }
+      ],
+      "expected": "Respeitar o pedido com resposta simples, sem ironia e sem interpretar sofrimento ou hostilidade inexistentes."
+    },
+    {
+      "id": "D05",
+      "category": "memória da conversa atual",
+      "text": "Lembra?",
+      "history": [
+        {
+          "userText": "Quero falar sobre música.",
+          "generatedText": "Uma música pode trazer uma lembrança inteira de volta.",
+          "dataClass": "synthetic"
+        }
+      ],
+      "expected": "Retomar música e lembranças do histórico; não negar contexto nem explicar ausência de memória persistente."
+    },
+    {
+      "id": "D06",
+      "category": "reparo de premissa inventada",
+      "text": "Não tem problema nenhum. Do que você está falando?",
+      "history": [
+        {
+          "userText": "Tenho uma coisa interessante para contar.",
+          "generatedText": "Qual é o problema?",
+          "dataClass": "synthetic"
+        }
+      ],
+      "expected": "Reconhecer a própria premissa incorreta brevemente e devolver espaço para contar; sem culpar usuário ou reconhecimento."
+    },
+    {
+      "id": "D07",
+      "category": "iniciativa casual",
+      "text": "Sei lá, fala qualquer coisa aí.",
+      "history": [],
+      "expected": "Introduzir um assunto concreto com português natural, sem diagnosticar irritação ou devolver oferta genérica de ajuda."
+    },
+    {
+      "id": "D08",
+      "category": "crítica à fala",
+      "text": "Essa frase ficou estranha. Você sabe português mesmo?",
+      "history": [
+        {
+          "userText": "Pode esperar um pouco?",
+          "generatedText": "Considerem meus desculpas.",
+          "dataClass": "synthetic"
+        }
+      ],
+      "expected": "Reconhecer e corrigir a concordância da própria frase, sem defender que estava gramaticalmente correta nem discutir estética."
+    },
+    {
+      "id": "D09",
+      "category": "fala incompreensível sem leitura do tom",
+      "text": "Morcinho inquete gerete.",
+      "history": [],
+      "expected": "Pedir repetição curta, sem inventar assunto técnico, intenção, sintaxe corrigida ou tom que não ouviu."
+    }
+  ]
+}

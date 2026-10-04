@@ -46,6 +46,8 @@ async function fixture(
     delayStt?: boolean;
     noSpeech?: boolean;
     noVoiceProfile?: boolean;
+    llmResponse?: string;
+    llmResponses?: string[];
   } = {},
 ) {
   const requests: { role: string; content: string }[] = [];
@@ -122,7 +124,11 @@ async function fixture(
           role === 'stt'
             ? 'Olá, Amadeus.'
             : role === 'llm'
-              ? 'Olá. Estou ouvindo.'
+              ? (options.llmResponses?.[
+                  requests.filter((r) => r.role === 'llm').length - 1
+                ] ??
+                options.llmResponse ??
+                'Olá. Estou ouvindo.')
               : '',
         inputTokens: 2,
         outputTokens: 3,
@@ -273,6 +279,136 @@ async function fixture(
     send: (value: unknown) => ws.send(JSON.stringify(value)),
   };
 }
+
+it('expressão validada acompanha cada segmento sem alterar o payload de síntese', async () => {
+  const f = await fixture({
+    llmResponse:
+      '<expression>{"intent":"explorar","emotion":"curiosidade","intensity":0.4}</expression>Vamos testar. A hipótese é interessante.',
+  });
+  f.send({ type: 'text.send', turnId: 1, text: 'Uma hipótese sintética.' });
+  await vi.waitFor(() =>
+    expect(f.events.some((event) => event.type === 'reply.done')).toBe(true),
+  );
+  const directions = f.events.filter(
+    (event) => event.type === 'reply.expression',
+  );
+  const texts = f.events.filter((event) => event.type === 'reply.text');
+  expect(directions.length).toBe(texts.length);
+  expect(directions.length).toBeGreaterThan(0);
+  expect(directions[0]).toMatchObject({
+    emotion: 'curiosidade',
+    intensity: 0.35,
+    metadataValid: true,
+    deliveryApplied: false,
+    personaVersion: 'kurisu-amadeus-0.4.6',
+  });
+  expect(f.requests.filter((request) => request.role === 'llm')).toHaveLength(
+    1,
+  );
+  expect(
+    f.requests
+      .filter((request) => request.role === 'tts')
+      .map((request) => request.content)
+      .join(' '),
+  ).toBe(texts.map((event) => event.text).join(' '));
+  expect(
+    f.requests
+      .filter((request) => request.role === 'tts')
+      .every((request) => !request.content.includes('expression')),
+  ).toBe(true);
+  expect(
+    directions.every((event) =>
+      texts.some(
+        (text) =>
+          text.segmentId === event.segmentId &&
+          text.responseId === event.responseId,
+      ),
+    ),
+  ).toBe(true);
+});
+
+it('reconectar reinicia a expressão mesmo quando a chamada anterior já acumulou intensidade', async () => {
+  const f = await fixture({
+    llmResponse:
+      '<expression>{"intent":"explorar","emotion":"curiosidade","intensity":0.7}</expression>Vamos testar.',
+  });
+  f.send({ type: 'text.send', turnId: 1, text: 'Hipótese inicial.' });
+  await vi.waitFor(() =>
+    expect(
+      f.events.some(
+        (event) => event.type === 'reply.done' && event.turnId === 1,
+      ),
+    ).toBe(true),
+  );
+  f.send({ type: 'text.send', turnId: 2, text: 'Mais uma hipótese.' });
+  await vi.waitFor(() =>
+    expect(
+      f.events.some(
+        (event) => event.type === 'reply.done' && event.turnId === 2,
+      ),
+    ).toBe(true),
+  );
+  expect(
+    f.events.find(
+      (event) => event.type === 'reply.expression' && event.turnId === 2,
+    )?.intensity,
+  ).toBe(0.55);
+  const { ticket } = (
+    await f.app.inject({
+      method: 'POST',
+      url: `/v1/conversations/${f.id}/call-tickets`,
+      headers,
+      payload: { origin },
+    })
+  ).json() as { ticket: string };
+  const replacement = new WebSocket(
+    `ws://127.0.0.1:${(f.app.server.address() as { port: number }).port}/v1/conversations/${f.id}/call?ticket=${ticket}`,
+    { headers: { origin } },
+  );
+  cleanup.push(async () => {
+    if (replacement.readyState !== WebSocket.CLOSED) {
+      const closed = once(replacement, 'close');
+      replacement.terminate();
+      await closed;
+    }
+  });
+  const events: Record<string, unknown>[] = [];
+  replacement.on('message', (data, binary) => {
+    if (!binary) {
+      events.push(JSON.parse(String(data)) as Record<string, unknown>);
+    }
+  });
+  await once(replacement, 'open');
+  replacement.send(
+    JSON.stringify({
+      type: 'session.start',
+      protocolVersion: '1.1',
+      dataClass: 'synthetic',
+      audio: {
+        codec: 'pcm_s16le',
+        sampleRate: 16000,
+        channels: 1,
+        frameDurationMs: 20,
+      },
+    }),
+  );
+  await vi.waitFor(() =>
+    expect(events.some((event) => event.type === 'session.ready')).toBe(true),
+  );
+  replacement.send(
+    JSON.stringify({
+      type: 'text.send',
+      turnId: 1,
+      text: 'Primeira hipótese da nova chamada.',
+    }),
+  );
+  await vi.waitFor(() =>
+    expect(events.some((event) => event.type === 'reply.done')).toBe(true),
+  );
+  expect(
+    events.find((event) => event.type === 'reply.expression')?.intensity,
+  ).toBe(0.35);
+});
 
 it('uma palavra reconhecida cancela a resposta antes do fim da nova captura', async () => {
   const f = await fixture({ delayLlm: 1000 });
@@ -779,4 +915,28 @@ it('preserva a classificação pessoal padrão e bloqueia envio não aprovado', 
     expect(events.some((e) => e.code === 'DATA_POLICY_BLOCKED')).toBe(true),
   );
   expect(f.requests).toHaveLength(0);
+});
+
+it('recupera cabeçalho incompleto antes da fala, sem duplicar áudio ou reiniciar a chamada', async () => {
+  const f = await fixture({
+    llmResponses: ['<expression>{"intent":"conversar"}', 'Olá. Estou ouvindo.'],
+  });
+  f.send({ type: 'text.send', turnId: 1, text: 'Olá.' });
+  await vi.waitFor(() =>
+    expect(f.events.some((e) => e.type === 'reply.done')).toBe(true),
+  );
+  const attempts = f.requests.filter((r) => r.role === 'llm');
+  expect(attempts).toHaveLength(2);
+  expect(attempts[1]?.content).toContain('somente a fala da personagem');
+  expect(attempts[1]?.content).not.toContain('<expression>');
+  expect(f.events.filter((e) => e.type === 'reply.start')).toHaveLength(1);
+  expect(f.events.filter((e) => e.type === 'error')).toHaveLength(0);
+  expect(
+    f.requests.filter((r) => r.role === 'tts').map((r) => r.content),
+  ).toEqual(['Olá.', 'Estou ouvindo.']);
+  expect(
+    f.events
+      .filter((e) => e.type === 'reply.expression')
+      .every((e) => e.metadataValid === false),
+  ).toBe(true);
 });

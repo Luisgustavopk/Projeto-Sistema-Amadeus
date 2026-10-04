@@ -31,7 +31,7 @@ it('entrega uma frase antes do fim da geração', async () => {
     await stream.return?.();
   }
 });
-it('entrega uma cláusula longa na vírgula antes do fim da frase', async () => {
+it('preserva a frase completa quando uma vírgula chega antes da continuação', async () => {
   let finish = () => {};
 
   const pending = new Promise<void>((resolve) => {
@@ -41,28 +41,48 @@ it('entrega uma cláusula longa na vírgula antes do fim da frase', async () => 
   const source = async function* () {
     yield 'Histórias requerem narração, ';
     await pending;
-    yield 'o que já estamos fazendo aqui.';
+    yield 'o que já estamos fazendo aqui. Outra frase.';
   };
 
   const stream = streamSpeech(source, new AbortController().signal)[
     Symbol.asyncIterator
   ]();
+  let delivered = false;
+  const first = stream.next().then((value) => {
+    delivered = true;
+
+    return value;
+  });
 
   try {
-    expect(await stream.next()).toEqual({
-      value: 'Histórias requerem narração,',
-      done: false,
-    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(delivered).toBe(false);
     finish();
-    expect(await stream.next()).toEqual({
-      value: 'o que já estamos fazendo aqui.',
+    expect(await first).toEqual({
+      value: 'Histórias requerem narração, o que já estamos fazendo aqui.',
       done: false,
     });
+    expect(await stream.next()).toEqual({ value: 'Outra frase.', done: false });
     expect((await stream.next()).done).toBe(true);
   } finally {
     finish();
     await stream.return?.();
   }
+});
+it('limita frases longas sem perder palavras e prefere uma pausa dentro do limite', async () => {
+  const prefix = 'Esta hipótese precisa de evidências concretas, ';
+  const text = prefix + 'palavra '.repeat(40) + 'fim.';
+  const segments: string[] = [];
+
+  for await (const segment of streamSpeech(async function* () {
+    yield text;
+  }, new AbortController().signal)) {
+    segments.push(segment);
+  }
+
+  expect(segments[0]).toBe(prefix.trim());
+  expect(segments.every((segment) => segment.length <= 220)).toBe(true);
+  expect(segments.join(' ')).toBe(text);
 });
 it('não divide uma introdução curta em um segmento sem contexto', async () => {
   const source = async function* () {

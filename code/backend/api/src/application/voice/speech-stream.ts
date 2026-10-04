@@ -46,27 +46,23 @@ export async function* streamSpeech(
 
         while (text.trim()) {
           const sentenceEnd = text.search(/[.!?]\s/);
-          const clauseEnd = text.search(/[,;]\s/);
-          const splitAtClause =
-            clauseEnd >= 24 && (sentenceEnd < 0 || clauseEnd < sentenceEnd);
-          let end = splitAtClause
-            ? clauseEnd + 1
-            : sentenceEnd >= 0
-              ? sentenceEnd + 1
-              : 0;
+          let end = sentenceEnd >= 0 ? sentenceEnd + 1 : 0;
 
-          if (!end && text.length >= 220) {
+          if (end > 220 || (!end && text.length >= 220)) {
+            const prefix = text.slice(0, 220);
+            const clauses = [...prefix.matchAll(/[,;]\s/g)];
+            const clause = clauses.at(-1)?.index;
             const word = text.lastIndexOf(' ', 220);
-            end = word > 0 ? word : 220;
+            end =
+              clause !== undefined && clause >= 24
+                ? clause + 1
+                : word > 0
+                  ? word
+                  : 220;
           }
 
           if (!end) {
             break;
-          }
-
-          if (end > 220) {
-            const word = text.lastIndexOf(' ', 220);
-            end = word > 0 ? word : 220;
           }
 
           const value = text.slice(0, end).replace(/\s+/g, ' ').trim();
