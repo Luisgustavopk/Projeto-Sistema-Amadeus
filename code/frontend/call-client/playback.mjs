@@ -32,6 +32,13 @@ export function createPlayback(context, send, onError, onStart) {
     }
   };
   return {
+    isPlaying() {
+      return [...confirmations].some(
+        (item) =>
+          context.currentTime >= item.start &&
+          context.currentTime < item.start + item.meta.sampleCount / 16000,
+      );
+    },
     stop(nextTurn = turnId) {
       for (const item of confirmations) {
         progress(item);

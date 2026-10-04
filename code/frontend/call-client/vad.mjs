@@ -1,9 +1,9 @@
 export class VoiceActivityDetector {
   constructor({
-    threshold = 0.018,
-    silenceFrames = 30,
-    preRollFrames = 5,
-    startFrames = 4,
+    threshold = 0.025,
+    silenceFrames = 15,
+    preRollFrames = 8,
+    startFrames = 8,
   } = {}) {
     if (!Number.isInteger(startFrames) || startFrames < 1 || startFrames > preRollFrames) throw new Error("Invalid VAD onset window");
     this.startFrames = startFrames;

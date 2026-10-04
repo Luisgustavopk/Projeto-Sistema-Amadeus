@@ -1,62 +1,113 @@
 import { openCall } from "./connection.mjs";
 import { createPlayback } from "./playback.mjs";
 import { createMicrophone } from "./microphone.mjs";
+import { createVoiceTimings } from "./voice-timings.mjs";
 
 // Headless integration module; the product interface remains a later phase.
-export async function createCallClient(options) {
+export async function createCallClient(options, runtime = {}) {
+  const AudioContext = runtime.AudioContext ?? globalThis.AudioContext;
+  const connect = runtime.openCall ?? openCall;
+  const makePlayback = runtime.createPlayback ?? createPlayback;
+  const makeMicrophone = runtime.createMicrophone ?? createMicrophone;
+  const now = runtime.now ?? (() => performance.now());
   const context = new AudioContext({ sampleRate: 48000 });
   await context.resume();
+
+  const ensureAudioRunning = async () => {
+    if (context.state !== "running") {
+      let timeout;
+      try {
+        await Promise.race([
+          context.resume(),
+          new Promise((_, reject) => {
+            timeout = setTimeout(
+              () => reject(new Error("Audio resume timeout")),
+              5000,
+            );
+          }),
+        ]);
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+    if (context.state !== "running") {
+      throw new Error("Browser audio output is not running");
+    }
+  };
+
   let connection;
   try {
-    connection = await openCall(options);
+    connection = await connect(options);
   } catch (error) {
     await context.close();
     throw error;
   }
   const { socket } = connection;
+  let audioFrameQueue = Promise.resolve();
+  let audioResumeFailed = false;
+  let queuedMessages = 0;
+  let queuedBytes = 0;
   let turnId = 0;
-  let sequence = 0;
+  let turnSequence = 0;
+  let captureTurnId = null;
+  let captureSequence = 0;
+  let recognizingTurnId = null;
   let microphone;
   let disposed = false;
-  let speechEndedAt = null;
-  let firstAudioTurn = 0;
+  const timings = createVoiceTimings(now, options.onTiming);
   const send = (event) => {
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify(event));
     }
   };
-  const playback = createPlayback(
+  const playback = makePlayback(
     context,
     send,
     (error) => {
       options.onError?.(error);
       socket.close(1008, "Invalid playback");
     },
-    (timing) => {
-      if (speechEndedAt !== null && firstAudioTurn !== timing.turnId) {
-        firstAudioTurn = timing.turnId;
-        options.onTiming?.({
-          stage: "firstAudioScheduled",
-          turnId: timing.turnId,
-          milliseconds:
-            performance.now() - speechEndedAt + timing.scheduledInMs,
-        });
-      }
-    },
+    (timing) => timings.firstAudio(timing),
   );
   const newTurn = () => {
-    playback.stop(++turnId);
+    turnId = ++turnSequence;
+    playback.stop(turnId);
     send({ type: "interrupt" });
-    sequence = 0;
     return turnId;
   };
-  socket.onmessage = (event) => {
-    if (event.data instanceof ArrayBuffer) {
-      playback.frame(event.data);
-      return;
-    }
+  const receiveControl = (data) => {
     try {
-      const value = JSON.parse(event.data);
+      const value = JSON.parse(data);
+      if (value.type === "transcript.partial") {
+        if (
+          value.turnId !== (captureTurnId ?? recognizingTurnId) ||
+          typeof value.text !== "string" ||
+          !/[\p{L}\p{N}]/u.test(value.text)
+        )
+          return;
+        const wasPlaying = playback.isPlaying();
+        turnId = value.turnId;
+        playback.stop(turnId);
+        timings.confirm(turnId, wasPlaying);
+      } else if (value.type === "transcript.final") {
+        if (
+          value.turnId !== recognizingTurnId ||
+          typeof value.text !== "string" ||
+          !value.text.trim()
+        ) {
+          return;
+        }
+        const wasPlaying = playback.isPlaying();
+        turnId = value.turnId;
+        playback.stop(turnId);
+        timings.confirm(turnId, wasPlaying);
+        recognizingTurnId = null;
+      } else if (value.type === "error" && value.turnId === recognizingTurnId) {
+        timings.discard(recognizingTurnId);
+        recognizingTurnId = null;
+        options.onEvent?.(value);
+        return;
+      }
       if (value.turnId !== undefined && value.turnId !== turnId) {
         return;
       }
@@ -74,6 +125,58 @@ export async function createCallClient(options) {
       options.onError?.(error);
     }
   };
+  const receive = async (data) => {
+    if (disposed || socket.readyState !== WebSocket.OPEN) return;
+    if (data instanceof ArrayBuffer) {
+      if (context.state !== "running") await ensureAudioRunning();
+      if (!disposed && socket.readyState === WebSocket.OPEN)
+        playback.frame(data);
+    } else {
+      receiveControl(data);
+    }
+  };
+  const outputFailed = (error) => {
+    if (audioResumeFailed || disposed) return;
+    audioResumeFailed = true;
+    options.onError?.(
+      new Error(
+        "Não foi possível retomar a saída de áudio do navegador. Reconecte a chamada e tente novamente.",
+        { cause: error },
+      ),
+    );
+    socket.close(1008, "Audio output unavailable");
+  };
+  socket.onmessage = ({ data }) => {
+    // Metadata and PCM must share the queue while resume() is pending.
+    // A new frame must not overtake an older frame after the context resumes.
+    if (
+      queuedMessages ||
+      (data instanceof ArrayBuffer && context.state !== "running")
+    ) {
+      const size =
+        data instanceof ArrayBuffer ? data.byteLength : data.length * 2;
+      if (queuedBytes + size > 4 * 1024 * 1024) {
+        options.onError?.(
+          new Error(
+            "A fila de áudio do navegador excedeu o limite. Reconecte a chamada.",
+          ),
+        );
+        socket.close(1008, "Receive backpressure");
+        return;
+      }
+      queuedMessages++;
+      queuedBytes += size;
+      audioFrameQueue = audioFrameQueue
+        .then(() => receive(data))
+        .catch(outputFailed)
+        .finally(() => {
+          queuedMessages--;
+          queuedBytes -= size;
+        });
+    } else {
+      void receive(data).catch(outputFailed);
+    }
+  };
   const dispose = async () => {
     if (disposed) {
       return;
@@ -81,11 +184,17 @@ export async function createCallClient(options) {
     disposed = true;
     microphone?.stop();
     playback.stop();
+    timings.clear();
     await context.close();
   };
-  socket.onclose = () => {
+  socket.onclose = (event) => {
     void dispose();
-    options.onEvent?.({ type: "connection.closed" });
+    options.onEvent?.({
+      type: "connection.closed",
+      code: event?.code ?? 1006,
+      reason: event?.reason ?? "",
+      wasClean: event?.wasClean ?? false,
+    });
   };
   socket.onerror = () => options.onError?.(new Error("WebSocket failed"));
   const heartbeat = setInterval(
@@ -99,32 +208,44 @@ export async function createCallClient(options) {
     ...connection,
     text(text) {
       microphone?.reset();
-      speechEndedAt = null;
+      captureTurnId = null;
+      recognizingTurnId = null;
+      timings.clear();
       send({ type: "text.send", turnId: newTurn(), text });
     },
     interrupt() {
-      const started = performance.now();
+      const started = now();
       microphone?.reset();
+      captureTurnId = null;
+      recognizingTurnId = null;
+      timings.clear();
       playback.stop();
       send({ type: "interrupt" });
       options.onTiming?.({
         stage: "localInterruption",
         turnId,
-        milliseconds: performance.now() - started,
+        milliseconds: now() - started,
       });
     },
     async startMicrophone() {
       if (microphone || disposed) {
         return;
       }
-      microphone = await createMicrophone(
+      await ensureAudioRunning();
+      microphone = await makeMicrophone(
         context,
         {
           start() {
-            send({ type: "speech.start", turnId: newTurn() });
+            captureTurnId = ++turnSequence;
+            timings.start(captureTurnId);
+            captureSequence = 0;
+            send({ type: "speech.start", turnId: captureTurnId });
           },
           frame(pcm) {
-            if (socket.readyState !== WebSocket.OPEN) {
+            if (
+              socket.readyState !== WebSocket.OPEN ||
+              captureTurnId === null
+            ) {
               return;
             }
             if (socket.bufferedAmount > 65536) {
@@ -133,16 +254,20 @@ export async function createCallClient(options) {
             }
             const bytes = new ArrayBuffer(648);
             const view = new DataView(bytes);
-            view.setUint32(0, sequence++, true);
-            view.setUint32(4, turnId, true);
+            view.setUint32(0, captureSequence++, true);
+            view.setUint32(4, captureTurnId, true);
             for (let index = 0; index < 320; index++) {
               view.setInt16(8 + index * 2, pcm[index], true);
             }
             socket.send(bytes);
           },
           end({ silenceMs }) {
-            speechEndedAt = performance.now() - silenceMs;
-            send({ type: "speech.end", turnId });
+            if (captureTurnId !== null) {
+              timings.end(captureTurnId, silenceMs);
+              recognizingTurnId = captureTurnId;
+              send({ type: "speech.end", turnId: captureTurnId });
+              captureTurnId = null;
+            }
           },
         },
         options.vad,
@@ -155,6 +280,9 @@ export async function createCallClient(options) {
     stopMicrophone() {
       microphone?.stop();
       microphone = null;
+      captureTurnId = null;
+      recognizingTurnId = null;
+      timings.clear();
       playback.stop();
       send({ type: "interrupt" });
     },

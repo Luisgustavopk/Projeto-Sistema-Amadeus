@@ -14,7 +14,15 @@ function fixture() {
       };
     },
     createBufferSource() {
-      const source = { connect() {}, disconnect() {}, start() {}, stop() {} };
+      const source = {
+        connect() {},
+        disconnect() {},
+        startTime: null,
+        start(when) {
+          this.startTime = when;
+        },
+        stop() {},
+      };
       sources.push(source);
       return source;
     },
@@ -48,8 +56,11 @@ function fill(f) {
 test("confirms only samples actually played when interrupted", () => {
   const f = fixture();
   fill(f);
+  assert.equal(f.player.isPlaying(), false);
   f.context.currentTime = 0.04;
+  assert.equal(f.player.isPlaying(), true);
   f.player.stop(2);
+  assert.equal(f.player.isPlaying(), false);
   assert.equal(f.sent[0].playedSamples, 320);
   assert.equal(
     f.sent.some((event) => event.type === "playback.ended"),
@@ -78,6 +89,18 @@ test("rejects malformed frame before reading header", () => {
   assert.throws(
     () => f.player.frame(new ArrayBuffer(1)),
     /Invalid audio frame/,
+  );
+  f.player.stop();
+});
+
+test("segments of one response are scheduled sequentially without overlap", () => {
+  const f = fixture();
+  fill(f);
+  fill(f);
+  assert.equal(f.sources.length, 2);
+  assert.ok(
+    f.sources[1].startTime >=
+      f.sources[0].startTime + f.sources[0].buffer.duration,
   );
   f.player.stop();
 });
