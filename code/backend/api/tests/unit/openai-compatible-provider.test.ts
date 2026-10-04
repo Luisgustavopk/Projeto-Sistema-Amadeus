@@ -27,6 +27,7 @@ it('usa Groq via endpoint oficial compatível e contabiliza tokens', async () =>
   await expect(
     provider.execute({
       content: 'teste',
+      systemPrompt: 'Direção da persona',
       dataClass: 'synthetic',
       maxTokens: 128,
     }),
@@ -43,6 +44,10 @@ it('usa Groq via endpoint oficial compatível e contabiliza tokens', async () =>
   });
   expect(JSON.parse(fetch.mock.calls[0]?.[1]?.body as string)).toMatchObject({
     model: 'openai/gpt-oss-20b',
+    messages: [
+      { role: 'system', content: 'Direção da persona' },
+      { role: 'user', content: 'teste' },
+    ],
     max_tokens: 128,
     stream: false,
   });

@@ -14,6 +14,7 @@ export type ProviderCapabilities = {
 };
 export type ProviderInput = {
   content: string;
+  systemPrompt?: string;
   dataClass: DataClass;
   maxTokens: number;
   audio?: { pcmBase64: string; sampleRate: 16000; channels: 1 } | undefined;

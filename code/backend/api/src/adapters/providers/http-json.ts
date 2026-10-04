@@ -203,6 +203,10 @@ export function createProvider(
                 role,
                 model: config.model ?? null,
                 ...input,
+                systemPrompt: undefined,
+                content: input.systemPrompt
+                  ? `${input.systemPrompt}\n${input.content}`
+                  : input.content,
               }),
             },
             signal,

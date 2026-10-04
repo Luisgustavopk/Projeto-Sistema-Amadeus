@@ -26,6 +26,7 @@ it('envia a chave somente ao endpoint oficial e extrai texto e uso', async () =>
   expect(
     await provider.execute({
       content: 'teste',
+      systemPrompt: 'Direção da persona',
       dataClass: 'synthetic',
       maxTokens: 512,
     }),
@@ -33,6 +34,10 @@ it('envia a chave somente ao endpoint oficial e extrai texto e uso', async () =>
   expect(fetch.mock.calls[0]?.[0]).toBe(
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
   );
+  expect(JSON.parse(fetch.mock.calls[0]?.[1]?.body as string)).toMatchObject({
+    systemInstruction: { parts: [{ text: 'Direção da persona' }] },
+    contents: [{ role: 'user', parts: [{ text: 'teste' }] }],
+  });
 });
 it('classifica cota remota e não inicia alternativas automáticas', async () => {
   const fetch = vi.fn(async () => new Response('{}', { status: 429 }));

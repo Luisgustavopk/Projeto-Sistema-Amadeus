@@ -120,7 +120,7 @@ export function createOpenAiCompatibleProvider(
   const { key, endpoint } = getCredentials(config, secrets);
 
   async function open(
-    input: { content: string; maxTokens: number },
+    input: { content: string; maxTokens: number; systemPrompt?: string },
     stream: boolean,
     signal?: AbortSignal,
   ) {
@@ -135,7 +135,12 @@ export function createOpenAiCompatibleProvider(
         },
         body: JSON.stringify({
           model: config.model,
-          messages: [{ role: 'user', content: input.content }],
+          messages: [
+            ...(input.systemPrompt
+              ? [{ role: 'system', content: input.systemPrompt }]
+              : []),
+            { role: 'user', content: input.content },
+          ],
           max_tokens: input.maxTokens,
           stream,
         }),

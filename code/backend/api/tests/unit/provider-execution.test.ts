@@ -50,3 +50,19 @@ it('não sobrescreve sucesso com falha quando a gravação do consumo falha', as
   const release = gate.beginConfiguration();
   release();
 });
+
+it('contabiliza instruções da persona e recusa seu envio a serviços de fala', async () => {
+  const { estimateProviderBudget, validateProviderInput } =
+    await import('../../src/application/providers/input.ts');
+  const input = {
+    content: 'Olá',
+    systemPrompt: 'Persona',
+    dataClass: 'synthetic' as const,
+    maxTokens: 10,
+  };
+  expect(estimateProviderBudget(input)).toBe(
+    Buffer.byteLength('OláPersona', 'utf8') + 10,
+  );
+  expect(() => validateProviderInput('llm', input)).not.toThrow();
+  expect(() => validateProviderInput('tts', input)).toThrow();
+});

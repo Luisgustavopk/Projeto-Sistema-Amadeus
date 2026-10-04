@@ -145,6 +145,9 @@ export function createGeminiProvider(
         ':streamGenerateContent?alt=sse',
         {
           contents: [{ role: 'user', parts: [{ text: input.content }] }],
+          ...(input.systemPrompt
+            ? { systemInstruction: { parts: [{ text: input.systemPrompt }] } }
+            : {}),
           generationConfig: {
             maxOutputTokens: input.maxTokens,
             ...(config.thinkingLevel
@@ -195,6 +198,13 @@ export function createGeminiProvider(
             ':generateContent',
             {
               contents: [{ role: 'user', parts: [{ text: input.content }] }],
+              ...(input.systemPrompt
+                ? {
+                    systemInstruction: {
+                      parts: [{ text: input.systemPrompt }],
+                    },
+                  }
+                : {}),
               generationConfig: {
                 maxOutputTokens: input.maxTokens,
                 ...(config.thinkingLevel
