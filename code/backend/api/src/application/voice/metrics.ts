@@ -8,10 +8,14 @@ export function createVoiceMetrics() {
     textFallbacks: 0,
   };
   const durations = new Map<string, number[]>();
+  const failureReasons = new Map<string, number>();
 
   return {
     count(key: keyof typeof counts) {
       counts[key]++;
+    },
+    failure(code: string) {
+      failureReasons.set(code, (failureReasons.get(code) ?? 0) + 1);
     },
     time(stage: string, milliseconds: number) {
       const samples = durations.get(stage) ?? [];
@@ -26,6 +30,7 @@ export function createVoiceMetrics() {
     snapshot() {
       return {
         ...counts,
+        failureReasons: Object.fromEntries(failureReasons),
         stages: Object.fromEntries(
           [...durations].map(([stage, values]) => {
             const sorted = [...values].sort((a, b) => a - b);

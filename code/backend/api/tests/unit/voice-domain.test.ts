@@ -58,6 +58,18 @@ it('mantém a classificação mais restritiva do histórico', () => {
     ).dataClass,
   ).toBe('local-only');
 });
+it('limita o contexto de voz a quatro turnos recentes e mensagens curtas', () => {
+  const history = Array.from({ length: 6 }, (_, index) => ({
+    userText: String(index).repeat(700),
+    generatedText: String(index + 1).repeat(700),
+    dataClass: 'synthetic' as const,
+  }));
+  const context = buildVoiceContext(history, 'nova fala', 'synthetic').content;
+  expect(context).not.toContain('"user":"0');
+  expect(context).toContain('"user":"2');
+  expect(context).toContain('2'.repeat(600));
+  expect(context).not.toContain('2'.repeat(601));
+});
 it('troca provedores com chamada ociosa e bloqueia durante um turno', () => {
   const gate = new ActivityGate(1);
   const close = gate.acquireCall();

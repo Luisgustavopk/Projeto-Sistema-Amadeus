@@ -23,13 +23,22 @@ export async function registerWebSocket(app: FastifyInstance) {
     },
 
     preClose: async () => {
-      for (const socket of app.websocketServer.clients) {
-        socket.terminate();
+      const sockets = [...app.websocketServer.clients];
+
+      for (const socket of sockets) {
+        socket.close(1012, 'Service restart');
       }
 
+      const timeout = setTimeout(() => {
+        for (const socket of sockets) {
+          socket.terminate();
+        }
+      }, 2000);
+      timeout.unref();
       await new Promise<void>((resolve) =>
         app.websocketServer.close(() => resolve()),
       );
+      clearTimeout(timeout);
     },
   });
 }

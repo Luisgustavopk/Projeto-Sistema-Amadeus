@@ -11,8 +11,8 @@ import { VoiceNotReadyError } from '../../domain/errors/voice.ts';
 import type { VoiceMetrics } from './metrics.ts';
 
 export function createVoiceSessions(dependencies: {
-  providers: ProviderServices;
-  profiles: VoiceProfiles;
+  providers: Pick<ProviderServices, 'execute' | 'executeStream'>;
+  profiles: Pick<VoiceProfiles, 'active'>;
   history: CallHistoryRepository;
   gate: ExecutionGate;
   metrics: VoiceMetrics;
@@ -26,6 +26,11 @@ export function createVoiceSessions(dependencies: {
 
   const runtimes = new Set<CallRuntime>();
   const openings = new Set<Promise<CallRuntime>>();
+  let openingQueue = Promise.resolve();
+  let activeSession: {
+    runtime: CallRuntime;
+    onReplaced: () => Promise<void>;
+  } | null = null;
   let shuttingDown = false;
 
   return {
@@ -42,6 +47,8 @@ export function createVoiceSessions(dependencies: {
       conversationId: string;
       dataClass: DataClass;
       sink: VoiceSink;
+      signal?: AbortSignal;
+      onReplaced?: () => Promise<void>;
     }) {
       if (shuttingDown) {
         return Promise.reject(
@@ -49,8 +56,27 @@ export function createVoiceSessions(dependencies: {
         );
       }
 
-      const opening = (async () => {
+      // This service belongs to one owner. Serialize takeover as well as open
+      // so two browser tabs cannot each become the active voice call.
+      const opening = openingQueue.then(async () => {
+        if (shuttingDown) {
+          throw new VoiceNotReadyError('O serviço está encerrando.');
+        }
+
+        input.signal?.throwIfAborted();
         const profile = await dependencies.profiles.active();
+        input.signal?.throwIfAborted();
+
+        if (activeSession) {
+          const previous = activeSession;
+          activeSession = null;
+          await Promise.all([
+            previous.runtime.close('closed'),
+            previous.onReplaced(),
+          ]);
+        }
+
+        input.signal?.throwIfAborted();
         await dependencies.history.startSession({
           id: input.sessionId,
           conversationId: input.conversationId,
@@ -71,15 +97,34 @@ export function createVoiceSessions(dependencies: {
         let closing: Promise<void> | undefined;
 
         runtime.close = (state) => {
-          closing ??= close(state).finally(() => runtimes.delete(runtime));
+          closing ??= close(state).finally(() => {
+            runtimes.delete(runtime);
+
+            if (activeSession?.runtime === runtime) {
+              activeSession = null;
+            }
+          });
 
           return closing;
         };
 
         runtimes.add(runtime);
+        activeSession = {
+          runtime,
+          onReplaced: input.onReplaced ?? (async () => {}),
+        };
+
+        if (input.signal?.aborted) {
+          await runtime.close('disconnected');
+          input.signal.throwIfAborted();
+        }
 
         return runtime;
-      })();
+      });
+      openingQueue = opening.then(
+        () => undefined,
+        () => undefined,
+      );
       openings.add(opening);
       void opening
         .finally(() => openings.delete(opening))

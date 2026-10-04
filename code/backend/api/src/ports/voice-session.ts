@@ -3,6 +3,7 @@ import type { CallState } from '../domain/voice/model.ts';
 export type VoiceEvent =
   | { type: 'state'; turnId: number; state: CallState }
   | { type: 'transcript.final'; turnId: number; text: string }
+  | { type: 'transcript.partial'; turnId: number; text: string }
   | { type: 'reply.start'; turnId: number; responseId: string }
   | {
       type: 'reply.text';
@@ -24,7 +25,12 @@ export type VoiceEvent =
   | { type: 'reply.done'; turnId: number; responseId: string }
   | { type: 'interrupted'; turnId: number; responseId: string }
   | { type: 'quota.warning'; turnId: number; role: 'llm' | 'stt' | 'tts' }
-  | { type: 'error'; code: string; recoverable: boolean };
+  | {
+      type: 'error';
+      code: string;
+      recoverable: boolean;
+      turnId?: number;
+    };
 
 export interface VoiceSink {
   send(event: VoiceEvent): void;

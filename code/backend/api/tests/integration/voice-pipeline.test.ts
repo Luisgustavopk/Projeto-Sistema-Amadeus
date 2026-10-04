@@ -40,7 +40,13 @@ function wav() {
 }
 
 async function fixture(
-  options: { failTts?: boolean; delayLlm?: boolean } = {},
+  options: {
+    failTts?: boolean;
+    delayLlm?: boolean | number;
+    delayStt?: boolean;
+    noSpeech?: boolean;
+    noVoiceProfile?: boolean;
+  } = {},
 ) {
   const requests: { role: string; content: string }[] = [];
   const server = createServer(async (req, res) => {
@@ -79,12 +85,28 @@ async function fixture(
     };
     requests.push({ role, content: value.content });
 
+    if (role === 'stt' && options.delayStt) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    if (role === 'stt' && options.noSpeech) {
+      res.statusCode = 422;
+      res.end(JSON.stringify({ code: 'NO_SPEECH_DETECTED' }));
+
+      return;
+    }
+
     if (
       role === 'llm' &&
       options.delayLlm &&
       requests.filter((r) => r.role === 'llm').length === 1
     ) {
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await new Promise((resolve) =>
+        setTimeout(
+          resolve,
+          typeof options.delayLlm === 'number' ? options.delayLlm : 250,
+        ),
+      );
     }
 
     if (role === 'tts' && options.failTts) {
@@ -163,20 +185,24 @@ async function fixture(
       })
     ).statusCode,
   ).toBe(200);
-  expect(
-    (
-      await app.inject({
-        method: 'PUT',
-        url: '/v1/voice/profile',
-        headers,
-        payload: {
-          name: 'Referência sintética de teste',
-          referenceFile: 'reference.wav',
-          consentConfirmed: true,
-        },
-      })
-    ).statusCode,
-  ).toBe(200);
+
+  if (!options.noVoiceProfile) {
+    expect(
+      (
+        await app.inject({
+          method: 'PUT',
+          url: '/v1/voice/profile',
+          headers,
+          payload: {
+            name: 'Referência sintética de teste',
+            referenceFile: 'reference.wav',
+            consentConfirmed: true,
+          },
+        })
+      ).statusCode,
+    ).toBe(200);
+  }
+
   const { id } = (
     await app.inject({
       method: 'POST',
@@ -248,6 +274,160 @@ async function fixture(
   };
 }
 
+it('uma palavra reconhecida cancela a resposta antes do fim da nova captura', async () => {
+  const f = await fixture({ delayLlm: 1000 });
+  f.send({ type: 'text.send', turnId: 1, text: 'Resposta sintética anterior' });
+  await vi.waitFor(() =>
+    expect(f.requests.some((r) => r.role === 'llm')).toBe(true),
+  );
+  f.send({ type: 'speech.start', turnId: 2 });
+
+  for (let sequence = 0; sequence < 40; sequence++) {
+    const frame = Buffer.alloc(648);
+    frame.writeUInt32LE(sequence, 0);
+    frame.writeUInt32LE(2, 4);
+    f.ws.send(frame);
+  }
+
+  await vi.waitFor(() =>
+    expect(
+      f.events.some((e) => e.type === 'transcript.partial' && e.turnId === 2),
+    ).toBe(true),
+  );
+  expect(f.events.some((e) => e.type === 'interrupted' && e.turnId === 1)).toBe(
+    true,
+  );
+  expect(f.events.some((e) => e.type === 'transcript.final')).toBe(false);
+  expect(f.requests.filter((r) => r.role === 'llm')).toHaveLength(1);
+  f.send({ type: 'speech.end', turnId: 2 });
+  await vi.waitFor(() =>
+    expect(
+      f.events.some((e) => e.type === 'reply.done' && e.turnId === 2),
+    ).toBe(true),
+  );
+  expect(f.requests.filter((r) => r.role === 'llm')).toHaveLength(2);
+});
+
+it('ruído durante captura não interrompe a resposta nem inicia outra geração', async () => {
+  const f = await fixture({ noSpeech: true, delayLlm: 250 });
+  f.send({ type: 'text.send', turnId: 1, text: 'Resposta sintética anterior' });
+  await vi.waitFor(() =>
+    expect(f.requests.some((r) => r.role === 'llm')).toBe(true),
+  );
+  f.send({ type: 'speech.start', turnId: 2 });
+
+  for (let sequence = 0; sequence < 40; sequence++) {
+    const frame = Buffer.alloc(648);
+    frame.writeUInt32LE(sequence, 0);
+    frame.writeUInt32LE(2, 4);
+    f.ws.send(frame);
+  }
+
+  await vi.waitFor(() =>
+    expect(
+      f.events.some((e) => e.type === 'reply.done' && e.turnId === 1),
+    ).toBe(true),
+  );
+  expect(f.requests.some((r) => r.role === 'stt')).toBe(true);
+  expect(
+    f.events.some(
+      (e) => e.type === 'transcript.partial' || e.type === 'interrupted',
+    ),
+  ).toBe(false);
+  expect(f.frames.length).toBeGreaterThan(0);
+  f.send({ type: 'speech.end', turnId: 2 });
+  await vi.waitFor(() =>
+    expect(
+      f.events.some(
+        (e) => e.type === 'error' && e.code === 'NO_SPEECH_DETECTED',
+      ),
+    ).toBe(true),
+  );
+  expect(f.events.some((e) => e.type === 'interrupted')).toBe(false);
+  expect(f.requests.filter((r) => r.role === 'llm')).toHaveLength(1);
+});
+
+it('substitui a chamada anterior do mesmo usuário antes de liberar outra voz', async () => {
+  const f = await fixture({ delayLlm: 1000 });
+  f.send({ type: 'text.send', turnId: 1, text: 'Fala sintética anterior' });
+  await vi.waitFor(() =>
+    expect(f.requests.some((request) => request.role === 'llm')).toBe(true),
+  );
+  const previousClosed = once(f.ws, 'close');
+  const { id } = (
+    await f.app.inject({
+      method: 'POST',
+      url: '/v1/conversations',
+      headers,
+      payload: {},
+    })
+  ).json() as { id: string };
+  const { ticket } = (
+    await f.app.inject({
+      method: 'POST',
+      url: `/v1/conversations/${id}/call-tickets`,
+      headers,
+      payload: { origin },
+    })
+  ).json() as { ticket: string };
+  const address = f.app.server.address();
+
+  if (!address || typeof address === 'string') {
+    throw new Error('No address');
+  }
+
+  const replacement = new WebSocket(
+    `ws://127.0.0.1:${address.port}/v1/conversations/${id}/call?ticket=${ticket}`,
+    { headers: { origin } },
+  );
+  cleanup.push(async () => {
+    replacement.terminate();
+  });
+  const events: Record<string, unknown>[] = [];
+  replacement.on('message', (data, binary) => {
+    if (!binary) {
+      events.push(JSON.parse(String(data)) as Record<string, unknown>);
+    }
+  });
+  await once(replacement, 'open');
+  replacement.send(
+    JSON.stringify({
+      type: 'session.start',
+      protocolVersion: '1.1',
+      dataClass: 'synthetic',
+      audio: {
+        codec: 'pcm_s16le',
+        sampleRate: 16000,
+        channels: 1,
+        frameDurationMs: 20,
+      },
+    }),
+  );
+  await vi.waitFor(() =>
+    expect(events.some((event) => event.type === 'session.ready')).toBe(true),
+  );
+  expect(f.ws.readyState).toBe(WebSocket.CLOSED);
+  const [code, reason] = await previousClosed;
+  expect(code).toBe(4001);
+  expect(String(reason)).toBe('Voice session replaced');
+  const result = await f.database.client.execute(
+    'SELECT COUNT(*) AS count FROM call_sessions WHERE ended_at IS NULL',
+  );
+  expect(result.rows[0]?.count).toBe(1);
+  replacement.send(
+    JSON.stringify({
+      type: 'text.send',
+      turnId: 1,
+      text: 'Fala sintética atual',
+    }),
+  );
+  await vi.waitFor(() =>
+    expect(events.some((event) => event.type === 'reply.done')).toBe(true),
+  );
+  expect(f.frames).toHaveLength(0);
+  expect(events.some((event) => event.type === 'audio.segment')).toBe(true);
+});
+
 it('percorre PCM → STT → LLM → voz personalizada e persiste reprodução confirmada', async () => {
   const f = await fixture();
   expect(
@@ -270,6 +450,14 @@ it('percorre PCM → STT → LLM → voz personalizada e persiste reprodução c
   await vi.waitFor(() =>
     expect(f.events.some((e) => e.type === 'reply.done')).toBe(true),
   );
+  const metricResponse = await f.app.inject({ url: '/v1/metrics', headers });
+  expect(metricResponse.json().voice.stages).toMatchObject({
+    stt: { samples: 1 },
+    llmFirstToken: { samples: 1 },
+    llmFirstSpeechSegment: { samples: 1 },
+    tts: { samples: 2 },
+    audioDelivery: { samples: 2 },
+  });
   expect(f.requests.map((r) => r.role)).toEqual(['stt', 'llm', 'tts', 'tts']);
   expect(f.frames).toHaveLength(4);
   expect(f.frames[0]?.readUInt32LE(0)).toBe(0);
@@ -358,6 +546,132 @@ it('mantém texto quando o TTS falha', async () => {
   expect(f.events.some((e) => e.type === 'reply.text')).toBe(true);
   expect(f.frames).toHaveLength(0);
 });
+it('avisa que a resposta ficará sem áudio quando não há perfil de voz ativo', async () => {
+  const f = await fixture({ noVoiceProfile: true });
+  f.send({ type: 'text.send', turnId: 1, text: 'teste' });
+  await vi.waitFor(() =>
+    expect(f.events.some((e) => e.type === 'reply.done')).toBe(true),
+  );
+  expect(f.events.some((e) => e.type === 'reply.text')).toBe(true);
+  expect(f.events.some((e) => e.code === 'VOICE_NOT_READY')).toBe(true);
+  expect(f.events.some((e) => e.type === 'audio.segment')).toBe(false);
+  expect(
+    (await f.app.inject({ url: '/v1/metrics', headers })).json().voice,
+  ).toMatchObject({ failureReasons: { VOICE_NOT_READY: 1 }, textFallbacks: 2 });
+});
+it('informa fala não reconhecida e volta ao estado ocioso sem chamar o LLM', async () => {
+  const f = await fixture({ noSpeech: true });
+  f.send({ type: 'speech.start', turnId: 1 });
+
+  for (let index = 0; index < 5; index++) {
+    const frame = Buffer.alloc(648);
+    frame.writeUInt32LE(index, 0);
+    frame.writeUInt32LE(1, 4);
+    f.ws.send(frame);
+  }
+
+  f.send({ type: 'speech.end', turnId: 1 });
+  await vi.waitFor(() => {
+    expect(f.events.some((e) => e.code === 'NO_SPEECH_DETECTED')).toBe(true);
+    expect(
+      f.events.some(
+        (e) => e.type === 'state' && e.turnId === 1 && e.state === 'idle',
+      ),
+    ).toBe(true);
+  });
+  expect(f.requests.map((request) => request.role)).toEqual(['stt']);
+  expect(
+    (await f.app.inject({ url: '/v1/metrics', headers })).json().voice,
+  ).toMatchObject({
+    noSpeech: 1,
+    failureReasons: { NO_SPEECH_DETECTED: 1 },
+    stages: { stt: { samples: 1 } },
+  });
+});
+it('mantém a resposta em andamento quando o áudio capturado não produz transcrição', async () => {
+  const f = await fixture({
+    delayLlm: 1000,
+    delayStt: true,
+    noSpeech: true,
+  });
+  f.send({ type: 'text.send', turnId: 1, text: 'resposta em andamento' });
+  await vi.waitFor(() =>
+    expect(f.requests.some((request) => request.role === 'llm')).toBe(true),
+  );
+  f.send({ type: 'speech.start', turnId: 2 });
+  expect(
+    f.events.some(
+      (event) => event.type === 'interrupted' && event.turnId === 1,
+    ),
+  ).toBe(false);
+
+  for (let index = 0; index < 5; index++) {
+    const frame = Buffer.alloc(648);
+    frame.writeUInt32LE(index, 0);
+    frame.writeUInt32LE(2, 4);
+    f.ws.send(frame);
+  }
+
+  f.send({ type: 'speech.end', turnId: 2 });
+  await vi.waitFor(() =>
+    expect(f.events.some((event) => event.code === 'NO_SPEECH_DETECTED')).toBe(
+      true,
+    ),
+  );
+  expect(
+    f.events.some(
+      (event) => event.type === 'interrupted' && event.turnId === 1,
+    ),
+  ).toBe(false);
+  await vi.waitFor(() =>
+    expect(
+      f.events.some(
+        (event) => event.type === 'reply.done' && event.turnId === 1,
+      ),
+    ).toBe(true),
+  );
+  expect(f.requests.filter((request) => request.role === 'llm')).toHaveLength(
+    1,
+  );
+});
+
+it('interrompe a resposta anterior somente após STT confirmar uma transcrição', async () => {
+  const f = await fixture({ delayLlm: 1000 });
+  f.send({ type: 'text.send', turnId: 1, text: 'resposta em andamento' });
+  await vi.waitFor(() =>
+    expect(f.requests.some((request) => request.role === 'llm')).toBe(true),
+  );
+  f.send({ type: 'speech.start', turnId: 2 });
+
+  for (let index = 0; index < 5; index++) {
+    const frame = Buffer.alloc(648);
+    frame.writeUInt32LE(index, 0);
+    frame.writeUInt32LE(2, 4);
+    f.ws.send(frame);
+  }
+
+  f.send({ type: 'speech.end', turnId: 2 });
+
+  await vi.waitFor(() =>
+    expect(
+      f.events.some(
+        (event) => event.type === 'reply.done' && event.turnId === 2,
+      ),
+    ).toBe(true),
+  );
+  const transcriptIndex = f.events.findIndex(
+    (event) => event.type === 'transcript.final' && event.turnId === 2,
+  );
+  const interruptionIndex = f.events.findIndex(
+    (event) => event.type === 'interrupted' && event.turnId === 1,
+  );
+  expect(transcriptIndex).toBeGreaterThanOrEqual(0);
+  expect(interruptionIndex).toBeGreaterThan(transcriptIndex);
+  expect(f.requests.filter((request) => request.role === 'llm')).toHaveLength(
+    2,
+  );
+});
+
 it('rejeita captura repetida e não dispara inferência', async () => {
   const f = await fixture();
   const closed = once(f.ws, 'close');

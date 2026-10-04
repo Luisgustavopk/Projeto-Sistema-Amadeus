@@ -31,6 +31,56 @@ it('entrega uma frase antes do fim da geração', async () => {
     await stream.return?.();
   }
 });
+it('entrega uma cláusula longa na vírgula antes do fim da frase', async () => {
+  let finish = () => {};
+
+  const pending = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+
+  const source = async function* () {
+    yield 'Histórias requerem narração, ';
+    await pending;
+    yield 'o que já estamos fazendo aqui.';
+  };
+
+  const stream = streamSpeech(source, new AbortController().signal)[
+    Symbol.asyncIterator
+  ]();
+
+  try {
+    expect(await stream.next()).toEqual({
+      value: 'Histórias requerem narração,',
+      done: false,
+    });
+    finish();
+    expect(await stream.next()).toEqual({
+      value: 'o que já estamos fazendo aqui.',
+      done: false,
+    });
+    expect((await stream.next()).done).toBe(true);
+  } finally {
+    finish();
+    await stream.return?.();
+  }
+});
+it('não divide uma introdução curta em um segmento sem contexto', async () => {
+  const source = async function* () {
+    yield 'Sim, ';
+    yield 'essa frase continua até o ponto final.';
+  };
+
+  const segments = [];
+
+  for await (const segment of streamSpeech(
+    source,
+    new AbortController().signal,
+  )) {
+    segments.push(segment);
+  }
+
+  expect(segments).toEqual(['Sim, essa frase continua até o ponto final.']);
+});
 it('cancela a leitura pendente quando o consumidor interrompe', async () => {
   let aborted = false;
 
@@ -96,7 +146,8 @@ it('inicia TTS enquanto a geração ainda está aberta e mantém ordem', async (
           },
         };
       },
-      async *executeStream() {
+      async *executeStream(input) {
+        expect(input.maxTokens).toBe(512);
         yield {
           content: 'Primeira frase. ',
           inputTokens: null,

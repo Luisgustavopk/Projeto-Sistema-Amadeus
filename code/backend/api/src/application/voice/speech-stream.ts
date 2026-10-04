@@ -45,8 +45,15 @@ export async function* streamSpeech(
         text += chunk;
 
         while (text.trim()) {
-          const sentence = text.match(/[.!?]\s/);
-          let end = sentence?.index !== undefined ? sentence.index + 1 : 0;
+          const sentenceEnd = text.search(/[.!?]\s/);
+          const clauseEnd = text.search(/[,;]\s/);
+          const splitAtClause =
+            clauseEnd >= 24 && (sentenceEnd < 0 || clauseEnd < sentenceEnd);
+          let end = splitAtClause
+            ? clauseEnd + 1
+            : sentenceEnd >= 0
+              ? sentenceEnd + 1
+              : 0;
 
           if (!end && text.length >= 220) {
             const word = text.lastIndexOf(' ', 220);

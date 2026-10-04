@@ -5,6 +5,11 @@ const responseId = z.uuid();
 const segmentId = z.uuid();
 const event = z.discriminatedUnion('type', [
   z.strictObject({
+    type: z.literal('transcript.partial'),
+    turnId,
+    text: z.string().max(4000),
+  }),
+  z.strictObject({
     type: z.literal('state'),
     turnId,
     state: z.enum([
@@ -50,6 +55,7 @@ const event = z.discriminatedUnion('type', [
     type: z.literal('error'),
     code: z.string().max(64),
     recoverable: z.boolean(),
+    turnId: turnId.optional(),
   }),
 ]);
 export const VoicePayload = event;

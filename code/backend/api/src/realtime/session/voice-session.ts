@@ -16,6 +16,7 @@ export function createVoiceSession(
   let runtime: CallRuntime | undefined;
   let opening = false;
   let closed = false;
+  const openingAbort = new AbortController();
   let controls = 0;
   let acknowledgements = 0;
   const reset = setInterval(() => {
@@ -47,6 +48,7 @@ export function createVoiceSession(
 
   socket.once('close', () => {
     closed = true;
+    openingAbort.abort();
     clearInterval(reset);
     clearTimeout(lifetime);
     void runtime?.close('disconnected').catch(() => undefined);
@@ -61,6 +63,25 @@ export function createVoiceSession(
           conversationId,
           dataClass: event.dataClass ?? 'personal',
           sink,
+          signal: openingAbort.signal,
+          onReplaced: () =>
+            new Promise<void>((resolve) => {
+              if (closed) {
+                resolve();
+
+                return;
+              }
+
+              closed = true;
+              openingAbort.abort();
+              const timeout = setTimeout(() => socket.terminate(), 2000);
+              timeout.unref();
+              socket.once('close', () => {
+                clearTimeout(timeout);
+                resolve();
+              });
+              socket.close(4001, 'Voice session replaced');
+            }),
         })
         .then(async (value) => {
           runtime = value;

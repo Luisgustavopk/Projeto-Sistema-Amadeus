@@ -32,7 +32,11 @@ export class AudioTurnBuffer {
     this.sequence++;
   }
 
-  finish() {
+  get frameCount() {
+    return this.sequence;
+  }
+
+  snapshot() {
     if (this.sequence < 5) {
       throw new VoiceInputError('Envie pelo menos 100 ms de áudio.');
     }
@@ -41,5 +45,9 @@ export class AudioTurnBuffer {
     this.chunks.forEach((chunk, index) => pcm.set(chunk, index * 640));
 
     return pcm;
+  }
+
+  finish() {
+    return this.snapshot();
   }
 }

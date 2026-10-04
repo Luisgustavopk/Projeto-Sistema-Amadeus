@@ -29,7 +29,92 @@ export function createTurnProcessor(
   history: CallHistoryRepository,
   metrics: VoiceMetrics,
 ) {
+  const executeProvider = async (
+    role: Parameters<typeof providers.execute>[0],
+    providerInput: Parameters<typeof providers.execute>[1],
+    signal: Parameters<typeof providers.execute>[2],
+    turnId: number,
+    sink: VoiceSink,
+  ) => {
+    try {
+      return await providers.execute(role, providerInput, signal);
+    } catch (error) {
+      if (
+        error instanceof ApplicationError &&
+        error.code === 'QUOTA_EXCEEDED'
+      ) {
+        sink.send({ type: 'quota.warning', turnId, role });
+      }
+
+      throw error;
+    }
+  };
+
+  async function transcribe(
+    turn: Pick<VoiceTurn, 'turnId' | 'dataClass' | 'signal'>,
+    audio: AudioClip,
+    sink: VoiceSink,
+    mode: 'final' | 'preview' = 'final',
+  ) {
+    const started = performance.now();
+
+    try {
+      const transcript = await executeProvider(
+        'stt',
+        {
+          content: '',
+          audio,
+          dataClass: turn.dataClass,
+          maxTokens: 1000,
+        },
+        turn.signal,
+        turn.turnId,
+        sink,
+      );
+      turn.signal.throwIfAborted();
+      const text = transcript.content.trim();
+
+      if (!text || text.length > 4000) {
+        throw new VoiceInputError(
+          'A fala transcrita deve conter de 1 a 4000 caracteres.',
+        );
+      }
+
+      if (mode === 'final') {
+        sink.send({ type: 'transcript.final', turnId: turn.turnId, text });
+      }
+
+      return text;
+    } catch (error) {
+      if (
+        mode === 'final' &&
+        !turn.signal.aborted &&
+        !(
+          error instanceof ApplicationError &&
+          error.code === 'NO_SPEECH_DETECTED'
+        )
+      ) {
+        metrics.count('textFallbacks');
+      }
+
+      throw error;
+    } finally {
+      metrics.time(
+        mode === 'final' ? 'stt' : 'sttPreview',
+        performance.now() - started,
+      );
+    }
+  }
+
   return {
+    transcribe,
+    preview(
+      turn: Pick<VoiceTurn, 'turnId' | 'dataClass' | 'signal'>,
+      audio: AudioClip,
+      sink: VoiceSink,
+    ) {
+      return transcribe(turn, audio, sink, 'preview');
+    },
     async process(turn: VoiceTurn, sink: VoiceSink) {
       const { signal, turnId, responseId } = turn;
 
@@ -41,49 +126,8 @@ export function createTurnProcessor(
       let text = turn.text;
       let firstAudio = true;
 
-      const execute: typeof providers.execute = async (role, input, signal) => {
-        try {
-          return await providers.execute(role, input, signal);
-        } catch (error) {
-          if (
-            error instanceof ApplicationError &&
-            error.code === 'QUOTA_EXCEEDED'
-          ) {
-            emit({ type: 'quota.warning', turnId, role });
-          }
-
-          throw error;
-        }
-      };
-
       if (turn.audio) {
-        const started = performance.now();
-
-        try {
-          const transcript = await execute(
-            'stt',
-            {
-              content: '',
-              audio: turn.audio,
-              dataClass: turn.dataClass,
-              maxTokens: 1000,
-            },
-            signal,
-          );
-          signal.throwIfAborted();
-          text = transcript.content.trim();
-          metrics.time('stt', performance.now() - started);
-          emit({ type: 'transcript.final', turnId, text });
-        } catch (error) {
-          if (!(
-            error instanceof ApplicationError &&
-            error.code === 'NO_SPEECH_DETECTED'
-          )) {
-            metrics.count('textFallbacks');
-          }
-
-          throw error;
-        }
+        text = await transcribe(turn, turn.audio, sink);
       }
 
       if (!text?.trim() || text.length > 4000) {
@@ -94,15 +138,21 @@ export function createTurnProcessor(
 
       await history.updateTurn(responseId, { userText: text });
       signal.throwIfAborted();
-      const recent = await history.recent(turn.conversationId, turn.ownerId, 6);
+      const recent = await history.recent(turn.conversationId, turn.ownerId, 4);
       const context = buildVoiceContext(recent, text, turn.dataClass);
       const started = performance.now();
+      let firstLlmToken = false;
       const segments = streamSpeech(async function* (streamSignal) {
         try {
           for await (const chunk of providers.executeStream(
             { ...context, maxTokens: 512 },
             streamSignal,
           )) {
+            if (!firstLlmToken && chunk.content.trim()) {
+              firstLlmToken = true;
+              metrics.time('llmFirstToken', performance.now() - started);
+            }
+
             yield chunk.content;
           }
         } catch (error) {
@@ -150,6 +200,16 @@ export function createTurnProcessor(
 
         if (!turn.profile) {
           metrics.count('textFallbacks');
+
+          if (position === 0) {
+            metrics.failure('VOICE_NOT_READY');
+            emit({
+              type: 'error',
+              code: 'VOICE_NOT_READY',
+              recoverable: true,
+            });
+          }
+
           position++;
           continue;
         }
@@ -158,7 +218,7 @@ export function createTurnProcessor(
         const synthesisStart = performance.now();
 
         try {
-          const synthesized = await execute(
+          const synthesized = await executeProvider(
             'tts',
             {
               content: spokenText,
@@ -171,6 +231,8 @@ export function createTurnProcessor(
               },
             },
             signal,
+            turnId,
+            sink,
           );
           signal.throwIfAborted();
 
@@ -193,6 +255,9 @@ export function createTurnProcessor(
             throw error;
           }
 
+          metrics.failure(
+            error instanceof ApplicationError ? error.code : 'INTERNAL_ERROR',
+          );
           metrics.count('textFallbacks');
           emit({
             type: 'error',
@@ -201,9 +266,9 @@ export function createTurnProcessor(
           });
           position++;
           continue;
+        } finally {
+          metrics.time('tts', performance.now() - synthesisStart);
         }
-
-        metrics.time('tts', performance.now() - synthesisStart);
 
         if (firstAudio) {
           metrics.time(
@@ -215,7 +280,9 @@ export function createTurnProcessor(
 
         await history.setAudio(segmentId, pcm.length / 2);
         emit({ type: 'state', turnId, state: 'speaking' });
+        const deliveryStart = performance.now();
         await sink.audio({ turnId, responseId, segmentId, pcm, signal });
+        metrics.time('audioDelivery', performance.now() - deliveryStart);
         position++;
       }
 

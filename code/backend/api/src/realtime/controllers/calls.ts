@@ -32,7 +32,11 @@ export function createCallController(
         release();
       }
     },
-    connect: (socket: WebSocket, request: CallRequest) =>
-      attachCallSession(socket, sessions, request.params.id),
+    connect: (socket: WebSocket, request: CallRequest) => {
+      socket.once('close', (closeCode) => {
+        request.log.info({ closeCode }, 'websocket.closed');
+      });
+      attachCallSession(socket, sessions, request.params.id);
+    },
   };
 }

@@ -87,6 +87,17 @@ const start = {
   },
 };
 
+it('avisa o cliente quando a API encerra para reinicialização', async () => {
+  const f = await setup();
+  const ws = f.connect(await f.ticket());
+  await once(ws, 'open');
+  const closed = once(ws, 'close');
+  await f.app.close();
+  const [code, reason] = await closed;
+  expect(code).toBe(1012);
+  expect(String(reason)).toBe('Service restart');
+});
+
 async function exchange(ws: WebSocket, payload: unknown) {
   const result = once(ws, 'message');
   ws.send(JSON.stringify(payload));
