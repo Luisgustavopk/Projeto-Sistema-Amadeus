@@ -28,6 +28,14 @@
       <div id="conversation" class="conversation" role="log" aria-live="polite"><p class="empty">Conecte a API e inicie o microfone. A voz será reproduzida automaticamente.</p></div>
       <form id="text-form" class="text-form"><label class="sr-only" for="text">Mensagem de teste</label><input id="text" maxlength="4000" placeholder="Ou envie uma pergunta por texto…" disabled required><button id="send" disabled>Enviar</button></form>
     </section>
+    <section class="panel" aria-labelledby="stt-title">
+      <h2 id="stt-title">Comparação do reconhecimento de fala</h2>
+      <p class="hint">Encerre a chamada para gravar uma amostra completa, sem os cortes do VAD. A captura fica nesta página; o download só ocorre ao clicar nos botões. Nenhum áudio é enviado à nuvem por este painel.</p>
+      <label>Fala correta para comparar<input id="stt-expected" value="Hum, então me conta uma história legal." maxlength="4000"></label>
+      <label><input id="stt-verified" type="checkbox"> Conferi que esse texto corresponde ao que falei na gravação.</label>
+      <div class="actions"><button id="stt-record" type="button">Gravar amostra</button><button id="stt-stop" type="button" class="secondary" disabled>Parar</button><button id="stt-wav" type="button" class="secondary" disabled>Baixar WAV</button><button id="stt-manifest" type="button" class="secondary" disabled>Baixar manifesto</button></div>
+      <p id="stt-record-status" class="muted" role="status">Grave a frase, confira o texto e baixe os dois arquivos na mesma pasta.</p>
+    </section>
     <section class="panel" aria-labelledby="timing-title">
       <div class="section-heading"><h2 id="timing-title">Medições</h2><button id="export" class="secondary">Exportar JSON</button></div>
       <div class="metrics"><div><span>Última resposta por voz</span><strong id="last-time">—</strong></div><div><span>Mediana · voz</span><strong id="median">—</strong></div><div><span>p95 · voz</span><strong id="p95">—</strong></div><div><span>Máximo · fim / início (diagnóstico)</span><strong id="max">— / —</strong></div><div><span>Turnos / interrupções automáticas / manuais</span><strong id="samples">0 / 0 / 0</strong></div></div>

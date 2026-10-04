@@ -10,6 +10,8 @@ const allowed = {
   "/styles.css": "styles.css",
   "/app.mjs": "app.mjs",
   "/report.mjs": "report.mjs",
+  "/stt-sample.mjs": "stt-sample.mjs",
+  "/stt-diagnostic.mjs": "stt-diagnostic.mjs",
   "/connection-status.mjs": "connection-status.mjs",
 };
 const types = {

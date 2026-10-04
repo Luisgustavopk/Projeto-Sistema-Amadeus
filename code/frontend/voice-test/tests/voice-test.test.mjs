@@ -13,6 +13,8 @@ test("servidor publica somente arquivos da interface e módulos do cliente", asy
     "/app.mjs",
     "/report.mjs",
     "/connection-status.mjs",
+    "/stt-sample.mjs",
+    "/stt-diagnostic.mjs",
     "/styles.css",
     "/call-client/index.mjs",
     "/call-client/voice-timings.mjs",

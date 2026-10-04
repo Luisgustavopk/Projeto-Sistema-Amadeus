@@ -1,6 +1,7 @@
 import { createCallClient } from "/call-client/index.mjs";
 import { createVoiceBaseline } from "/call-client/baseline.mjs";
 import { createTestReport } from "./report.mjs";
+import { attachSttDiagnostic } from './stt-diagnostic.mjs';
 import { describeCallClosure } from "./connection-status.mjs";
 
 const element = (id) => document.getElementById(id);
@@ -16,6 +17,8 @@ let microphone = false;
 let microphonePending = false;
 let state = "disconnected";
 let llmDataPolicies = [];
+let diagnosticBusy = false;
+let renderDiagnostic;
 
 function showError(error) {
   element("error").textContent =
@@ -36,7 +39,7 @@ function renderControls() {
   };
   element("status").textContent = labels[state] || state;
   element("status").dataset.active = String(connected);
-  element("connect").disabled = connected || state === "connecting";
+  element("connect").disabled = connected || state === "connecting" || diagnosticBusy;
   element("disconnect").disabled = !connected;
   element("api-url").disabled = connected || state === "connecting";
   element("token").disabled = connected || state === "connecting";
@@ -58,6 +61,7 @@ function renderControls() {
     : "Microfone desligado";
   element("interrupt").disabled =
     !connected || !["thinking", "speaking"].includes(state);
+  renderDiagnostic?.();
   element("text").disabled =
     !connected || (dataClass === "personal" && !personalDataAllowed);
   element("send").disabled =
@@ -272,6 +276,7 @@ async function inspect() {
             dataPolicy: llm.dataPolicy,
           },
           ...(llm.fallbacks || []),
+          ...(llm.local ? [llm.local] : []),
         ]
       : [];
     element("providers").textContent =
@@ -292,7 +297,7 @@ async function inspect() {
         )
         .join(" · ") +
       (llmDataPolicies.length > 1
-        ? " · Reservas LLM: " +
+        ? " · Modelos LLM adicionais: " +
           llmDataPolicies
             .slice(1)
             .map(
@@ -341,7 +346,7 @@ async function inspect() {
 
 element("connect-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (client || state === "connecting") return;
+  if (client || state === "connecting" || diagnosticBusy) return;
   element("error").hidden = true;
   const current = ++generation;
   try {
@@ -440,6 +445,8 @@ element("export").addEventListener("click", () => {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
+renderDiagnostic = attachSttDiagnostic(() => !client && state !== 'connecting', (busy) => { diagnosticBusy = busy; element('connect').disabled = Boolean(client) || state === 'connecting' || busy; });
+
 window.addEventListener("pagehide", () => {
   void client?.close();
 });

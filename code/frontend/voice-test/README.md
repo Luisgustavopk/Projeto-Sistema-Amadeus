@@ -42,3 +42,9 @@ node --test ../call-client/tests/*.test.mjs
 ```
 
 `localhost` e `127.0.0.1` são origens diferentes para o navegador. O endereço permitido deve coincidir com a URL da página, incluindo a porta. Um `OPTIONS` com status 403 indica origem recusada antes da autenticação. Reinicie a API após editar seu `.env`.
+
+## Amostra para comparar o STT
+
+Reinicie `npm run dev` da interface e recarregue a página após atualizar a branch. O painel **Comparação do reconhecimento de fala** funciona sem conexão com a API. Encerre a chamada, clique em **Gravar amostra**, diga “Hum, então me conta uma história legal” e clique em **Parar**. Baixe o WAV e o manifesto na mesma pasta, conferindo que o texto corresponde ao que você disse.
+
+A captura inteira fica apenas em memória nesta página até você baixar. Ela não entra no relatório normal de medições nem é enviada a provedores. Regravar substitui a amostra anterior. O limite é 30 s; a gravação usa PCM16 mono de 16 kHz e preserva a fala sem o VAD da chamada. O comparador local está documentado no README do STT.

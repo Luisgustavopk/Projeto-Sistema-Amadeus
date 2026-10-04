@@ -42,3 +42,5 @@ summary { cursor: pointer; color: #b2c5e0; }
 pre { overflow: auto; max-height: 180px; font-size: 12px; line-height: 1.7; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 @media(max-width: 680px) { main { margin: 24px auto; padding: 0 14px; } .panel { padding: 18px; } header { align-items: flex-start; flex-direction: column; } .fields { grid-template-columns: 1fr; } .metrics { grid-template-columns: repeat(2,1fr); } .section-heading { flex-wrap: wrap; } }
+
+input[type="checkbox"] { width: auto; padding: 0; margin: 12px 6px 12px 0; }
