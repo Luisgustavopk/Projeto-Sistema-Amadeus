@@ -11,3 +11,9 @@ Compare CPU e GPU no hardware real: CUDA divide os 8 GB de VRAM com o Qwen e nã
 O aquecimento CUDA ocorre durante startup. Em Windows, `STT_CUDA_LIBRARY_DIRECTORY` pode apontar para as DLLs cuBLAS/cuDNN já instaladas; o arquivo de exemplo mantém CPU como alternativa. Na máquina atual, a pasta usada é `code/backend/tools/voice-design/.venv/Lib/site-packages/torch/lib`, configurada por caminho absoluto no `.env` local.
 
 Configuração, instalação e comandos estão em [Serviços locais](../README.md).
+
+## Reconhecimento de conversa
+
+O idioma fica fixado em português. "STT_BEAM_SIZE" controla quantas hipóteses o decoder compara (1 a 5, padrão 3). Temperatura zero mantém a decodificação determinística, e cada captura é transcrita sem condicionar a janelas anteriores. GET /metrics informa beamSize. Reinicie o STT para aplicar mudanças.
+
+Beam maior pode aumentar o tempo; a melhoria de precisão precisa ser medida com as mesmas gravações e transcrições corretas. O modelo small permanece configurado: não foi baixado nem ativado um modelo maior. Whisper não garante a variante pt-BR nem transcrições corretas só por fixar o idioma. Compare primeiro erros por palavra e latência; depois avalie um modelo maior se necessário.

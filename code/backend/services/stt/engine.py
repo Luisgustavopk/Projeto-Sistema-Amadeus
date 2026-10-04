@@ -6,10 +6,12 @@ import numpy as np
 
 from speech_runtime.contracts import Execute
 from speech_runtime.errors import NoSpeechDetected
+from stt.config import SttConfig
 
 
 class WhisperEngine:
     def __init__(self):
+        self.config = SttConfig.from_environment()
         from faster_whisper import WhisperModel
 
         self.device = os.environ.get("STT_DEVICE", "cpu")
@@ -30,8 +32,11 @@ class WhisperEngine:
         if self.device == "cuda":
             started = perf_counter()
             segments, _ = self.model.transcribe(
-                np.zeros(16000, dtype=np.float32), language="pt", beam_size=1,
-                vad_filter=False, max_new_tokens=8,
+                np.zeros(16000, dtype=np.float32),
+                language="pt",
+                beam_size=1,
+                vad_filter=False,
+                max_new_tokens=8,
             )
             list(segments)
             self._warmup_seconds = perf_counter() - started
@@ -47,7 +52,12 @@ class WhisperEngine:
         audio_seconds = len(samples) / 16000
         try:
             segments, _ = self.model.transcribe(
-                samples, language="pt", vad_filter=True, beam_size=1
+                samples,
+                language="pt",
+                vad_filter=True,
+                beam_size=self.config.beam_size,
+                temperature=0.0,
+                condition_on_previous_text=False,
             )
             text = " ".join(segment.text.strip() for segment in segments).strip()
         finally:
@@ -66,6 +76,7 @@ class WhisperEngine:
     def metrics(self):
         return {
             "engine": "faster-whisper",
+            "beamSize": self.config.beam_size,
             "model": os.environ.get("STT_MODEL", "small"),
             "device": os.environ.get("STT_DEVICE", "cpu"),
             "computeType": os.environ.get("STT_COMPUTE_TYPE", "int8"),

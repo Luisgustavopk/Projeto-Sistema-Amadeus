@@ -3,8 +3,10 @@ import hashlib
 
 import pytest
 from fastapi.testclient import TestClient
+
 from speech_runtime.contracts import Execute, Voice
 from speech_runtime.server import create_service
+from stt.config import SttConfig
 from stt.engine import WhisperEngine
 from tts.reference import resolve_reference
 
@@ -103,11 +105,14 @@ def test_stt_pcm_validation_and_language():
             assert samples.shape == (1600,)
             assert options["language"] == "pt"
             assert options["vad_filter"] is True
-            assert options["beam_size"] == 1
+            assert options["beam_size"] == 3
+            assert options["temperature"] == 0.0
+            assert options["condition_on_previous_text"] is False
             return [Segment()], None
 
     engine = WhisperEngine.__new__(WhisperEngine)
     engine.model = Model()
+    engine.config = SttConfig()
     data = Execute(
         **payload(
             audio={
@@ -194,6 +199,7 @@ def test_inference_has_one_owner_even_with_concurrent_requests(monkeypatch):
 
 def test_tts_requires_original_reference_and_returns_pcm(monkeypatch, tmp_path):
     import numpy as np
+
     from tts.config import SynthesisConfig
     from tts.engine import ChatterboxEngine
 
@@ -222,6 +228,7 @@ def test_tts_requires_original_reference_and_returns_pcm(monkeypatch, tmp_path):
 
     engine = ChatterboxEngine.__new__(ChatterboxEngine)
     engine.model = Model()
+    engine.config = SttConfig()
     engine.synthesis = SynthesisConfig(0.3, 0.5, 0.65)
     data = Execute(
         **payload(
