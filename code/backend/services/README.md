@@ -25,7 +25,9 @@ Inicie os processos em terminais separados, ambos a partir de `code/backend/serv
 
 Mantenha um worker por serviço: cada processo carrega uma cópia do modelo. Para GPU, prepare PyTorch/CTranslate2 compatíveis com seu ambiente e ajuste `TTS_DEVICE`, `STT_DEVICE` e `STT_COMPUTE_TYPE`. CPU não implica cumprimento da meta de dois segundos.
 
-GET `/health`, GET `/metrics` e POST `/execute` exigem Bearer do serviço. A API usa o contrato publicado em `/v1/providers/protocol`. Os serviços aceitam uma inferência por vez; devolvem 429 quando ocupados. A API cancela requisições e descarta resultados antigos, mas um kernel de GPU já iniciado pode continuar até terminar.
+GET `/health`, GET `/metrics` e POST `/execute` exigem Bearer do serviço. A API usa o contrato publicado em `/v1/providers/protocol`. Cada processo executa uma inferência por vez e mantém no máximo uma requisição aguardando; requisições adicionais recebem 429. `/metrics` expõe `busy` e `queuedInferences`. A API cancela requisições e descarta resultados antigos, mas uma inferência local já iniciada pode continuar até terminar; a próxima chamada pode aguardar sua conclusão.
+
+Enquanto uma requisição espera a inferência, o serviço verifica a desconexão do cliente a cada 100 ms. Uma espera cancelada é descartada com 499 e libera sua posição na fila; ela não inicia uma inferência obsoleta. O bloqueio continua pertencendo ao trabalho já iniciado até a thread terminar, evitando duas inferências simultâneas no mesmo motor.
 
 As dependências de implantação têm versões/faixas declaradas; a árvore completa dos motores ainda precisa ser travada e validada na instalação real, principalmente PyTorch/CUDA. O `model` do payload local é metadado: a escolha efetiva do Whisper vem de `STT_MODEL`; o TTS usa o motor multilíngue carregado no processo.
 

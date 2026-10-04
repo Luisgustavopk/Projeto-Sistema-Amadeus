@@ -11,9 +11,13 @@ O protocolo 1.0 da fundação permanece compatível. Para áudio e texto em cham
 5. `speech.start` abre turno; quadros binários carregam a fala; `speech.end` inicia processamento. `text.send` também inicia um turno.
 6. Receba `transcript.final`, `reply.start`, `reply.text`, `audio.segment` e quadros PCM; `reply.done` indica fim da geração.
 7. Confirme `playback.progress` com responseId, segmentId e playedSamples. `playback.ended` informa fim da reprodução e não substitui essas confirmações.
-8. `interrupt` cancela captura/geração. Um turno novo também cancela o anterior. `session.end` encerra e persiste uma tarefa de memória pendente.
+8. `interrupt` cancela captura, reconhecimento pendente e geração imediatamente. `text.send` substitui a resposta anterior. `speech.start` abre uma captura candidata sem cancelar a resposta; `speech.end` solicita STT. Durante uma resposta ativa, snapshots da captura permitem reconhecer palavras antes de speech.end: `transcript.partial` com palavras interrompe a resposta anterior, mantém a captura e emite estado listening. A primeira tentativa usa 800 ms; há no máximo uma em andamento e pelo menos 800 ms adicionais entre tentativas. A transcrição final da fala completa é o único texto usado para iniciar o próximo LLM. `transcript.final` não vazio também interrompe se não houve reconhecimento antecipado. STT sem fala ou com falha recuperável descarta somente a candidata. Uma captura mais recente cancela um reconhecimento ainda pendente, e resultados obsoletos são descartados. `session.end` encerra e persiste uma tarefa de memória pendente.
 
 Cada turnId deve ser inteiro positivo crescente, até uint32. Um ticket é consumido uma única vez; nova conexão exige outro ticket. Retomada automática está na fase 3.
+
+Há uma chamada de voz ativa por usuário. Uma nova negociação válida encerra a chamada anterior, cancela sua captura e geração e fecha seu WebSocket com código 4001 (`Voice session replaced`), antes de liberar a nova sessão. O cliente deve parar a reprodução e liberar o microfone ao fechar a conexão. Negociações concorrentes são serializadas; uma negociação cancelada antes de assumir a chamada não substitui a existente. O limite geral de conexões também inclui negociação e o canal 1.0.
+
+O estado volta a `idle` quando a geração termina e `playback.ended` é recebido para a mesma resposta, independentemente da ordem desses dois acontecimentos. Uma falha libera o turno ativo e sinaliza `error`; confirmações antigas não alteram a resposta atual.
 
 ## Quadros
 

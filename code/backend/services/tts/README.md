@@ -19,7 +19,7 @@ Ao lado de `references/amadeus.wav`, mantenha um arquivo local `amadeus.json`:
 
 Áudio e JSON ficam fora do Git. Se trocar o WAV, atualize a transcrição e o hash no JSON e recadastre o perfil na API. A transcrição inicial foi automática e ainda precisa de conferência humana.
 
-Com `QWEN_WARMUP_REFERENCE=amadeus.wav`, o contexto e uma síntese de aquecimento são preparados durante a inicialização, antes de aceitar pedidos. Sem essa opção, a preparação acontece no primeiro pedido. O contexto é reutilizado enquanto áudio e transcrição permanecerem iguais. A síntese usa texto completo, idioma `Portuguese` e até 512 novos tokens. O idioma do modelo, sozinho, não garante sotaque brasileiro: a avaliação depende da escuta.
+Para latência previsível, configure `QWEN_WARMUP_REFERENCE` com o nome exato do WAV ativo. O contexto de clonagem e uma síntese curta de aquecimento são preparados durante a inicialização, antes de aceitar pedidos. Sem essa opção, a preparação e o custo de inicialização de CUDA Graphs podem recair sobre a primeira chamada. O contexto é reutilizado enquanto áudio e transcrição permanecerem iguais. A síntese usa texto completo, idioma `Portuguese` e até 512 novos tokens. O idioma do modelo, sozinho, não garante sotaque brasileiro: a avaliação depende da escuta.
 
 Cada pedido aceita até 220 caracteres e devolve PCM16 mono de 16 kHz, mantendo o contrato público. GET `/metrics` autenticado informa tempo de preparação, geração, execução, duração de áudio e reutilização do contexto. Essas medidas são do TTS e não representam a latência total de uma chamada.
 
@@ -46,7 +46,9 @@ Mantenha somente um processo TTS na porta 8002. Com API e TTS rodando, execute `
 
 A aceleração está restrita às versões verificadas: PyTorch 2.6.0, Transformers 4.57.3 e qwen-tts 0.1.1. Ela usa CUDA Graphs e SDPA, sem instalar Triton ou alterar o código dos pacotes. Para usar outro runtime, configure `QWEN_CUDA_GRAPHS=false` até validá-lo. Referência técnica: [CUDA Graphs no PyTorch](https://docs.pytorch.org/docs/stable/notes/cuda.html#cuda-graphs).
 
-O benchmark local de 03/10/2026 comparou três frases e três sementes por modo na RTX 4060 de 8 GB, após aquecimento. A mediana geral passou de 7.18 s para 1.82 s; o fator de tempo real mediano ficou em 0.62. Esses nove testes por modo medem apenas TTS e não substituem os 100 turnos de aceite com STT, LLM e reprodução no cliente. O TTS ainda entrega cada segmento completo; não anuncia streaming nativo.
+O benchmark local de 03/10/2026 comparou três frases e três sementes por modo na RTX 4060 de 8 GB, após aquecimento. A mediana geral passou de 7.18 s para 1.82 s; o fator de tempo real mediano ficou em 0.62. Esses nove testes por modo medem apenas TTS, não a latência total de conversa. O adaptador Qwen Base atual materializa a forma de onda completa antes de devolver áudio. A documentação upstream descreve um modo híbrido de geração, mas o caminho público `generate_voice_clone()` ainda retorna as formas de onda completas; `non_streaming_mode=False` não habilita geração de áudio em streaming. Portanto, os 97 ms anunciados pelo projeto não se aplicam automaticamente a este adaptador nem comprovam TTFA neste computador.
+
+A meta de 2 s de ponta a ponta não foi comprovada e não é realista para este pipeline enquanto a mediana do TTS isolado for 1.82 s. O benchmark do serviço deve ser lido junto às métricas `/v1/metrics` da API (`stt`, `llmFirstToken`, `llmFirstSpeechSegment`, `tts`, `audioDelivery`) e ao baseline do navegador. Não use os tempos agregados de processos diferentes como timestamps de relógios absolutos.
 
 Para repetir, em `code/backend/tools/voice-design`:
 

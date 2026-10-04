@@ -1,10 +1,12 @@
 # Projeto Amadeus: plano de desenvolvimento
 
-**Versão 2.3 | 3 de outubro de 2026 | Status: fases 0 e 1 implementadas em código; aceite operacional da fase 1 pendente**
+**Versão 2.5 | 3 de outubro de 2026 | Status: fase 0 implementada; fase 1 em estabilização e com aceite operacional pendente**
 
 ## 1. Objetivo e decisões aprovadas
 
 Construir uma Amadeus inspirada na personalidade da Kurisu de Steins;Gate: conversa por voz em português brasileiro, memória entre conversas, texto, imagens e um avatar Live2D. A experiência deve parecer uma ligação: ouvir, responder e aceitar interrupções sem exigir um botão a cada fala.
+
+O objetivo de assistente pessoal combina personalidade persistente com memória consultável, mas não pressupõe treinar o modelo com todas as conversas. Histórico, memórias recuperáveis e pesos de um modelo ajustado são mecanismos distintos, com controles e ciclos de vida próprios. Rotinas proativas de NPC são uma extensão a especificar e aprovar; não fazem parte dos 67 requisitos ativos até a aprovação de critérios de comportamento, permissões e notificações.
 
 **A voz personalizada é essencial.** A identidade vocal deve permanecer reconhecível entre frases, emoções e sessões. Uma voz genérica não substitui esse requisito. O pipeline escolhido é STT (transcrição) + LLM (resposta) + TTS (síntese com a voz personalizada).
 
@@ -24,18 +26,18 @@ Live2D e desktop têm fases próprias e critérios de aceite. Uma interface simp
 
 ### 1.2 Somente estes itens foram adiados nesta revisão
 
-| Item adiado | Solução desta versão | Condição para reavaliar |
-| --- | --- | --- |
-| Embeddings e banco vetorial | Fatos selecionados por categoria, recência, palavras-chave e busca textual; resumos limitados por orçamento de contexto | Busca textual deixar de recuperar memórias relevantes nos testes |
-| Administração completa de múltiplos clientes | Uso pessoal, proprietário único, credencial básica e sessões autenticadas; emissão e revogação simples | Necessidade real de gerenciar vários clientes ou usuários |
-| Garantia de 95% de disponibilidade mensal | Medir falhas e disponibilidade sem compromisso mensal; tratar quedas e reinícios | Hospedagem contínua e dependências com capacidade previsível |
+| Item adiado                                  | Solução desta versão                                                                                                    | Condição para reavaliar                                          |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Embeddings e banco vetorial                  | Fatos selecionados por categoria, recência, palavras-chave e busca textual; resumos limitados por orçamento de contexto | Busca textual deixar de recuperar memórias relevantes nos testes |
+| Administração completa de múltiplos clientes | Uso pessoal, proprietário único, credencial básica e sessões autenticadas; emissão e revogação simples                  | Necessidade real de gerenciar vários clientes ou usuários        |
+| Garantia de 95% de disponibilidade mensal    | Medir falhas e disponibilidade sem compromisso mensal; tratar quedas e reinícios                                        | Hospedagem contínua e dependências com capacidade previsível     |
 
 ## 2. Arquitetura e responsabilidades
 
 ```text
 Microfone -> cliente (AEC + VAD) -> WebSocket -> STT local
                                                   |
-Persona + memória selecionada -> LLM na nuvem -> segmentos falados
+Persona + memória relevante autorizada -> LLM compatível -> segmentos falados
                                                   |
                                     direção de expressão
                                                   |
@@ -60,7 +62,7 @@ Node coordena a aplicação. Inferência local de áudio roda em serviço Python
 
 O cliente controla microfone, cancelamento de eco, reprodução, buffer de áudio, interrupção local, legendas e Live2D. As regras de persona, memória, autorização e escolha de provedores permanecem no backend.
 
-Ao detectar nova fala, o cliente interrompe imediatamente a reprodução, limpa o áudio pendente e avisa a API. Ele não espera uma viagem de rede para silenciar. O servidor valida o evento e cancela o trabalho restante.
+O VAD abre uma captura candidata e mantém a resposta atual tocando. Durante uma resposta ativa, a API reconhece palavras em snapshots a partir de 800 ms de captura, com uma consulta antecipada por vez. Uma prévia com palavras confirma a interrupção e preserva a captura; a transcrição final da frase completa é o único texto usado para iniciar o próximo LLM. Sem prévia válida, a transcrição final continua confirmando a troca. Ruído sem transcrição e falhas recuperáveis de STT preservam a resposta. O VAD usa limiar RMS de 0,025, confirmação e pre-roll de 160 ms e silêncio final de 300 ms. Captura, reconhecimento e resposta têm identificadores independentes; uma transcrição atrasada não deve apagar outra captura. O botão de interrupção manual permanece imediato. Validar fala normal/baixa, eco e ruído no microfone real.
 
 Hooks como useCall, useChat e useAvatar coordenam a interface. TanStack Query atende dados do servidor; estado efêmero da chamada fica em um controlador próprio/Zustand. Os clientes web e desktop compartilham componentes e contrato.
 
@@ -72,18 +74,18 @@ Gemini Live deixa de ser um caminho concorrente de implementação obrigatória.
 
 ## 3. Stack e organização
 
-| Área | Escolha |
-| --- | --- |
-| API | Node.js LTS, TypeScript, Fastify, Zod, OpenAPI |
-| Transporte | REST para recursos; WebSocket para chamada, áudio e eventos |
-| Persistência | SQLite + Drizzle; migrações; arquivos locais |
-| Tarefas de memória | Tabela persistente de jobs, worker, tentativas limitadas e recuperação no reinício |
-| Serviços de áudio | Python; faster-whisper como candidato de STT; Qwen3-TTS Base 1.7B selecionado provisoriamente para TTS após avaliação auditiva |
-| Interface | React + Vite + TypeScript; AudioWorklet; VAD no cliente |
-| Avatar | Live2D; mapeamento de expressões e movimentos versionado |
-| Desktop | Tauri; Windows como primeiro alvo de validação |
-| Qualidade | Vitest, testes de integração de áudio, ESLint e Prettier |
-| Execução | Docker para backend/serviços compatíveis; instalador desktop separado |
+| Área               | Escolha                                                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| API                | Node.js LTS, TypeScript, Fastify, Zod, OpenAPI                                                                                 |
+| Transporte         | REST para recursos; WebSocket para chamada, áudio e eventos                                                                    |
+| Persistência       | SQLite + Drizzle; migrações; arquivos locais                                                                                   |
+| Tarefas de memória | Tabela persistente de jobs, worker, tentativas limitadas e recuperação no reinício                                             |
+| Serviços de áudio  | Python; faster-whisper como candidato de STT; Qwen3-TTS Base 1.7B selecionado provisoriamente para TTS após avaliação auditiva |
+| Interface          | React + Vite + TypeScript; AudioWorklet; VAD no cliente                                                                        |
+| Avatar             | Live2D; mapeamento de expressões e movimentos versionado                                                                       |
+| Desktop            | Tauri; Windows como primeiro alvo de validação                                                                                 |
+| Qualidade          | Vitest, testes de integração de áudio, ESLint e Prettier                                                                       |
+| Execução           | Docker para backend/serviços compatíveis; instalador desktop separado                                                          |
 
 ```text
 amadeus/
@@ -114,12 +116,12 @@ EventEmitter pode notificar componentes, mas não é a fonte de verdade das tare
 
 As páginas oficiais consultadas em 02/10/2026 apresentam essas ofertas. A disponibilidade real e os limites precisam ser conferidos na conta antes do uso. Não se assume gratuidade ilimitada, disponibilidade garantida nem a permanência de um modelo. [S1-S7]
 
-| Candidato | Papel | Verificação necessária |
-| --- | --- | --- |
-| Gemini 3.8 Flash | Cérebro inicial para testes com dados fictícios | Acesso ao modelo, cotas, latência e compatibilidade da política de dados |
-| Kimi K3 via NVIDIA | Comparação de qualidade de raciocínio, persona e visão | Latência com raciocínio ativo, limites e condições do endpoint de experimentação |
-| Qwen 3.8 27B via Groq | Alternativa com visão, controle de raciocínio e controles de retenção | Qualidade da personagem, cota de tokens e configuração dos controles de dados |
-| OpenRouter gratuito | Experimentos pontuais | Cota diária e política do provedor de cada modelo; não usar roteamento aleatório na chamada |
+| Candidato             | Papel                                                                 | Verificação necessária                                                                      |
+| --------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Gemini 3.8 Flash      | Cérebro inicial para testes com dados fictícios                       | Acesso ao modelo, cotas, latência e compatibilidade da política de dados                    |
+| Kimi K3 via NVIDIA    | Comparação de qualidade de raciocínio, persona e visão                | Latência com raciocínio ativo, limites e condições do endpoint de experimentação            |
+| Qwen 3.8 27B via Groq | Alternativa com visão, controle de raciocínio e controles de retenção | Qualidade da personagem, cota de tokens e configuração dos controles de dados               |
+| OpenRouter gratuito   | Experimentos pontuais                                                 | Cota diária e política do provedor de cada modelo; não usar roteamento aleatório na chamada |
 
 O Gemini Flash produz texto; a voz vem do TTS local. Gemini Live é outro modelo/produto e não deve ser confundido com esse adaptador. [S1]
 
@@ -193,12 +195,12 @@ Não existe correspondência garantida entre exaggeration e uma emoção especí
 
 ### 5.4 Exemplos de direção, sujeitos à validação
 
-| Situação | Texto proposto | Direção vocal desejada | Live2D |
-| --- | --- | --- | --- |
-| Curiosidade científica | "Espera. Você mediu isso ou está supondo?" | Pergunta clara, leve ênfase e pausa breve | Olhar atento, inclinação discreta |
-| Provocação afetuosa | "Uma ideia brilhante. Faltou só testar antes." | Tom seco, sem agressividade | Sorriso discreto, sobrancelha elevada |
-| Elogio recebido | "Obrigada... Eu só queria que desse certo." | Pequena hesitação, energia mais baixa | Olhar lateral e expressão suave |
-| Preocupação | "Você parece cansado. Quer me contar o que aconteceu?" | Ritmo calmo e fala acolhedora | Olhar estável, movimentos reduzidos |
+| Situação               | Texto proposto                                         | Direção vocal desejada                    | Live2D                                |
+| ---------------------- | ------------------------------------------------------ | ----------------------------------------- | ------------------------------------- |
+| Curiosidade científica | "Espera. Você mediu isso ou está supondo?"             | Pergunta clara, leve ênfase e pausa breve | Olhar atento, inclinação discreta     |
+| Provocação afetuosa    | "Uma ideia brilhante. Faltou só testar antes."         | Tom seco, sem agressividade               | Sorriso discreto, sobrancelha elevada |
+| Elogio recebido        | "Obrigada... Eu só queria que desse certo."            | Pequena hesitação, energia mais baixa     | Olhar lateral e expressão suave       |
+| Preocupação            | "Você parece cansado. Quer me contar o que aconteceu?" | Ritmo calmo e fala acolhedora             | Olhar estável, movimentos reduzidos   |
 
 Esses exemplos são alvos de atuação, não resultados já alcançados. Texto e avatar ajudam a comunicar emoção, mas não substituem uma voz expressiva.
 
@@ -208,7 +210,7 @@ Avaliar pelo menos 30 falas cobrindo neutralidade, curiosidade, alegria discreta
 
 Critério inicial proposto: média de pelo menos 4/5 em naturalidade, identidade e adequação à personagem; intenção reconhecida em pelo menos 80% dos casos por avaliação do usuário, com a matriz de confusões registrada. Depois conferir coerência com o avatar. Esses limiares são metas de produto, não promessas do modelo nem estimativas estatísticas de uma população.
 
-Se o Chatterbox falhar, testar outro TTS capaz de preservar a voz personalizada. Se necessário, avaliar adaptação do modelo com material autorizado. Isso mantém o requisito; não declarar a fase concluída apenas porque o avatar parece emocionado. Comparar identidade e naturalidade antes de aumentar a intensidade.
+Se o Chatterbox falhar, testar outro TTS capaz de preservar a voz personalizada. Se necessário, avaliar adaptação do modelo TTS com material autorizado. Esse trabalho altera ou condiciona a síntese vocal e é diferente de ajustar um LLM para personalidade. Não declarar a fase concluída apenas porque o avatar parece emocionado. Comparar identidade e naturalidade antes de aumentar a intensidade.
 
 ### 5.6 Emoção sem bloquear a primeira fala
 
@@ -216,29 +218,39 @@ Produzir unidades estruturadas curtas por segmento, validadas antes da síntese;
 
 O início do áudio depende apenas da primeira unidade válida. Uma expressão atrasada nunca deve ser aplicada ao segmento errado. Sincronizar pelo segmento efetivamente reproduzido.
 
+### 5.7 Experimento opcional de fine-tuning do LLM
+
+A fase 2 é o ponto para decidir se vale a pena ajustar os pesos do LLM para tornar mais consistentes a personalidade, o estilo e os padrões comportamentais. Primeiro estabelecer a persona versionada, os exemplos de referência e o conjunto de avaliação da seção 10. Em seguida, comparar a versão atual, com prompt, à versão ajustada usando os mesmos cenários, modelos-base e critérios; registrar também latência, custo, erros factuais, segurança e comportamento fora dos exemplos. Um resultado inconclusivo ou sem ganho claro mantém a versão com prompt, sem bloquear a fase.
+
+O experimento é opcional e depende de um modelo e de uma plataforma que permitam fine-tuning. Os adaptadores Gemini, Groq e Cloudflare configurados nesta versão atendem inferência; não se presume que o modelo escolhido ou a cota gratuita ofereça treinamento. Se necessário, avaliar separadamente um modelo aberto e seu ambiente de treinamento/hospedagem, contabilizando GPU/VRAM, custos, latência, implantação, atualizações e rollback. A prova de conceito da fase 2 não coloca pesos ajustados em produção. A adoção só pode ser considerada na fase 7 ou após ela, mediante gate documentado e plano operacional.
+
+Usar apenas material cuja autorização documentada cubra especificamente treinamento, criação de derivados e processamento pela plataforma escolhida. Curar e versionar os exemplos com origem e escopo de uso; separar treino, validação e teste, removendo duplicatas e informações pessoais desnecessárias. Não usar automaticamente o histórico de conversas como corpus. O conjunto de teste deve permanecer fora do treino para evitar avaliar memorização em vez de comportamento generalizável.
+
+Fine-tuning de LLM ensina padrões de resposta, não é a memória consultável do universo nem substitui a recuperação de fatos da fase 3. Adaptação/clonagem do TTS para identidade vocal é outro trabalho, com dados, ferramentas e gates próprios; aprovação de um experimento não implica aprovação do outro.
+
 ## 6. Sessões, protocolo e interrupções
 
 ### 6.1 Estado e concorrência
 
-Separar estado da conexão (connecting, connected, reconnecting, closed) do turno (idle, listening, thinking, speaking, cancelling, error). speaking descreve áudio reproduzido no cliente; geração pode continuar em paralelo. Nova fala durante thinking também cancela uma resposta obsoleta.
+Separar estado da conexão (connecting, connected, reconnecting, closed) do turno (idle, listening, thinking, speaking, cancelling, error). speaking descreve áudio reproduzido no cliente; geração pode continuar em paralelo. Durante uma resposta ativa, o VAD abre uma captura candidata sem cancelar reprodução ou geração. Palavras reconhecidas pelo STT, em prévia durante captura ou na transcrição final, confirmam a nova fala e cancelam a resposta obsoleta; áudio sem fala reconhecida mantém a resposta atual.
 
 Permitir apenas uma resposta ativa por sessão. Texto ou imagem durante a fala é incorporado a um novo turno após cancelamento explícito ou colocado em espera, conforme ação da interface; nunca gerar duas respostas concorrentes por acidente.
 
 ### 6.2 REST
 
-| Método | Rota | Uso |
-| --- | --- | --- |
-| GET | /v1/health | Estado mínimo; detalhes protegidos |
-| POST / GET | /v1/conversations | Criar/listar conversas |
-| GET / DELETE | /v1/conversations/:id | Histórico/exclusão |
-| POST | /v1/conversations/:id/messages | Texto e referências de imagem; streaming via fetch/SSE |
-| POST | /v1/conversations/:id/call-tickets | Ticket curto, de uso único, para abertura autenticada do WS |
-| POST | /v1/uploads/images | Upload validado |
-| GET | /v1/facts | Consultar fatos |
-| PATCH / DELETE | /v1/facts/:id | Corrigir/esquecer um fato |
-| GET | /v1/capabilities | Capacidades habilitadas de STT, LLM, TTS e avatar |
-| GET | /v1/usage | Consumo estimado e limites configurados/conhecidos |
-| GET | /v1/openapi.json | Contrato REST |
+| Método         | Rota                               | Uso                                                         |
+| -------------- | ---------------------------------- | ----------------------------------------------------------- |
+| GET            | /v1/health                         | Estado mínimo; detalhes protegidos                          |
+| POST / GET     | /v1/conversations                  | Criar/listar conversas                                      |
+| GET / DELETE   | /v1/conversations/:id              | Histórico/exclusão                                          |
+| POST           | /v1/conversations/:id/messages     | Texto e referências de imagem; streaming via fetch/SSE      |
+| POST           | /v1/conversations/:id/call-tickets | Ticket curto, de uso único, para abertura autenticada do WS |
+| POST           | /v1/uploads/images                 | Upload validado                                             |
+| GET            | /v1/facts                          | Consultar fatos                                             |
+| PATCH / DELETE | /v1/facts/:id                      | Corrigir/esquecer um fato                                   |
+| GET            | /v1/capabilities                   | Capacidades habilitadas de STT, LLM, TTS e avatar           |
+| GET            | /v1/usage                          | Consumo estimado e limites configurados/conhecidos          |
+| GET            | /v1/openapi.json                   | Contrato REST                                               |
 
 O navegador não deve receber a chave do provedor. Para WebSocket, validar ticket, origem e proprietário da conversa; evitar credenciais duradouras em URLs. Redigir logs para que nem tickets apareçam. Documentar expiração, uso único e autenticação da reconexão.
 
@@ -246,21 +258,21 @@ O navegador não deve receber a chave do provedor. Para WebSocket, validar ticke
 
 Canal /v1/conversations/:id/call. Envelope de controle com protocolVersion, sessionId, responseId, segmentId, seq e tipo, conforme evento. Frames de áudio binários associados aos mesmos identificadores.
 
-| Direção | Eventos | Finalidade |
-| --- | --- | --- |
-| Cliente para API | audio.chunk, speech.start, speech.end | Áudio e detecção de fala |
-| Cliente para API | text.send, image.send, interrupt | Novas entradas e cancelamento |
-| Cliente para API | playback.progress, playback.ended | Segmento e posição aproximada efetivamente reproduzidos |
-| Cliente para API | session.resume | Retomar contexto com novo ticket e último evento confirmado |
-| API para cliente | state, transcript.partial, transcript.final | Estado e legendas |
-| API para cliente | reply.text, reply.expression, audio.chunk | Texto, atuação e áudio por segmento |
-| API para cliente | reply.done, interrupted, quota.warning, error | Finalização e falhas |
+| Direção          | Eventos                                       | Finalidade                                                  |
+| ---------------- | --------------------------------------------- | ----------------------------------------------------------- |
+| Cliente para API | audio.chunk, speech.start, speech.end         | Áudio e detecção de fala                                    |
+| Cliente para API | text.send, image.send, interrupt              | Novas entradas e cancelamento                               |
+| Cliente para API | playback.progress, playback.ended             | Segmento e posição aproximada efetivamente reproduzidos     |
+| Cliente para API | session.resume                                | Retomar contexto com novo ticket e último evento confirmado |
+| API para cliente | state, transcript.partial, transcript.final   | Estado e legendas                                           |
+| API para cliente | reply.text, reply.expression, audio.chunk     | Texto, atuação e áudio por segmento                         |
+| API para cliente | reply.done, interrupted, quota.warning, error | Finalização e falhas                                        |
 
 reply.done significa geração terminada; playback.ended significa reprodução terminada. Registrar ambos. Fixar o formato negociado de áudio, canais, sample rate, duração máxima de chunk, ordem e limites de buffer no contrato antes da implementação.
 
 ### 6.4 Cancelamento e retomada
 
-O cliente silencia e invalida responseId localmente. A API cancela LLM/TTS quando suportado; quando não há cancelamento cooperativo, descarta resultados, limita o trabalho pendente e pode reciclar o worker. A conexão não deve reproduzir chunks de uma resposta invalidada após retomada.
+Na interrupção automática, o cliente mantém a reprodução da resposta atual durante captura e STT. Ao receber `transcript.partial` com palavras ou `transcript.final` não vazio para a captura candidata, silencia/invalida localmente a resposta antiga e a API cancela LLM/TTS quando suportado; `NO_SPEECH_DETECTED` ou erro recuperável de STT descarta apenas a captura e preserva a resposta. A interrupção manual continua imediata. Quando não há cancelamento cooperativo, a API descarta resultados, limita o trabalho pendente e pode reciclar o worker. A conexão não deve reproduzir chunks de uma resposta invalidada após confirmação da fala. Essa semântica reduz falsos cortes, mas adiciona a latência do STT ao barge-in automático; medir esse intervalo separadamente da latência de resposta normal.
 
 Persistir separadamente texto gerado, segmentos sintetizados e posição de reprodução confirmada pelo cliente. Confirmação indica reprodução aproximada, não prova de percepção humana. Quando não houver alinhamento de palavras, guardar posição e marcar o trecho como parcial/incerto. A memória não presume que a resposta inteira foi ouvida.
 
@@ -271,11 +283,27 @@ Persistir separadamente texto gerado, segmentos sintetizados e posição de repr
 - Fatos: texto, origem, data, versão, categoria, status (declarado/inferido/confirmado) e permissão de envio.
 - Recuperação: busca textual, recência e categorias; embeddings e banco vetorial adiados.
 
+### 7.1 Memória pessoal não é treinamento
+
+Histórico e memórias são persistidos como dados da aplicação; o LLM não aprende automaticamente nem altera seus pesos a cada conversa. Para preservar controle e permitir correção ou esquecimento:
+
+- Separar histórico bruto, resumos e fatos/memórias recuperáveis, mantendo origem e ligações entre derivados.
+- Começar com extração sugerida e confirmação do usuário para fatos pessoais duráveis; permitir consultar, editar, revogar permissão, exportar e apagar.
+- Recuperar apenas as memórias pertinentes ao turno e ao orçamento de contexto. Não anexar o arquivo completo de conversas por padrão.
+- Aplicar a política de envio também às memórias recuperadas: um dado armazenado localmente não deixa de ser pessoal quando enviado como contexto a um LLM remoto.
+- Manter os fatos pessoais fora dos exemplos de treinamento por padrão. Fine-tuning é uma opção posterior para padrões de resposta/atuação, usando um conjunto curado, minimizado e autorizado; não é mecanismo de memória nem mecanismo confiável de esquecimento.
+
+Escolher explicitamente armazenamento local ou remoto, proteção em repouso, backup, retenção e comportamento na exclusão antes de habilitar a memória pessoal em uso real. `personal-approved` autoriza o fluxo da aplicação para um provedor após revisão humana; não é uma garantia de retenção zero, confidencialidade absoluta ou uso de dados do provedor restrito. Verificar os termos e controles efetivos de cada conta e modalidade antes de enviar conteúdo.
+
 Uma inferência não vira automaticamente um fato confirmado. Correções explícitas prevalecem e mantêm rastreabilidade. Exclusão de conversa invalida resumos e fatos derivados apenas dela; fatos com outras fontes são recalculados ou apresentados para decisão do usuário.
 
 Esquecer um fato remove/invalida suas cópias derivadas e impede reextração automática da fonte ainda existente. A operação deve informar se o histórico original permanece; para apagar o dado também do histórico, remover/redigir as mensagens e atualizar resumos. Testar que o fato não reaparece após reinício ou reconstrução da memória.
 
 Jobs guardam estado, tentativas, prazo e chave de idempotência. Salvar mensagem e agendar trabalho de forma transacional quando necessário. Backup deve ser consistente com SQLite e seus arquivos associados; não copiar apenas um arquivo em uso sem considerar o estado do banco. Validar restauração.
+
+### 7.2 Rotina proativa de NPC — extensão a especificar
+
+Uma rotina própria deve ser implementada como eventos e tarefas agendadas, não como uma LLM em execução contínua. Exemplos futuros incluem lembrar um compromisso, retomar um assunto ou iniciar uma interação em uma janela configurada. Antes de implementação, especificar fuso horário, horários silenciosos, frequência, cancelamento, fonte do evento, limites de cota e como a iniciativa aparece ao usuário. Ações externas ou com efeitos duráveis exigem confirmação explícita; toda tarefa deve ser pausável, auditável e removível. Esta extensão não autoriza acesso irrestrito a contas, arquivos ou dispositivos.
 
 ## 8. Live2D e aplicativo desktop
 
@@ -299,69 +327,73 @@ Aceitar JPEG, PNG e WebP, com teto inicial de 10 MB e limite configurado de dime
 
 Autenticação básica desde a fundação. A API só aceita acesso aos dados do proprietário; administração multiusuário fica adiada. Usar HTTPS/WSS fora de localhost, inclusive ao expor na rede local. Chaves no servidor, origem permitida, limites de payload, sessões e buffers. Não registrar conversas, áudios ou credenciais em logs técnicos por padrão.
 
-| Falha | Comportamento |
-| --- | --- |
-| STT indisponível | Oferecer texto digitado; manter a voz personalizada de saída se TTS funcionar |
-| TTS indisponível | Mostrar texto e avisar; preservar a identidade vocal ao recuperar, sem trocar por voz genérica |
-| LLM/cota indisponível | Avisar; tentar alternativa configurada e compatível entre turnos ou aguardar |
-| Rede caiu | Silenciar resposta inválida e retomar contexto, sem reproduzir áudio antigo |
-| Metadado de emoção inválido | Usar expressão neutra/anterior; registrar falha técnica sem bloquear a fala |
+| Falha                       | Comportamento                                                                                  |
+| --------------------------- | ---------------------------------------------------------------------------------------------- |
+| STT indisponível            | Oferecer texto digitado; manter a voz personalizada de saída se TTS funcionar                  |
+| TTS indisponível            | Mostrar texto e avisar; preservar a identidade vocal ao recuperar, sem trocar por voz genérica |
+| LLM/cota indisponível       | Avisar; tentar alternativa configurada e compatível entre turnos ou aguardar                   |
+| Rede caiu                   | Silenciar resposta inválida e retomar contexto, sem reproduzir áudio antigo                    |
+| Metadado de emoção inválido | Usar expressão neutra/anterior; registrar falha técnica sem bloquear a fala                    |
 
 Texto é recuperação temporária quando a voz falha; não satisfaz o aceite de voz personalizada. Nenhuma dependência gratuita recebe promessa de disponibilidade mensal.
 
 ## 10. Medição e critérios de aceite
 
-| Métrica | Definição | Meta inicial |
-| --- | --- | --- |
-| Resposta audível | Fim real da fala do usuário até primeiro áudio reproduzido; inclui VAD | p50 até 2 s; p95 registrado e investigado, sem teto prometido antes do benchmark |
-| Interrupção | Início da nova fala até silêncio efetivo no dispositivo | p95 até 500 ms em ensaio controlado; todo áudio obsoleto deve ser descartado |
-| Qualidade vocal | Escuta sem avatar: naturalidade, identidade e atuação | Média 4/5 e intenção reconhecida em 80% do conjunto |
-| Persona/visão | 30 cenários comuns por modelo, com rubrica fixa | Média 4/5 em persona e naturalidade; erros factuais e visuais registrados separadamente |
-| Memória | Correção, exclusão, reconstrução e reinício | Nenhum fato apagado reintroduzido nos casos de teste |
+| Métrica          | Definição                                                              | Meta inicial                                                                            |
+| ---------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Resposta audível | Fim real da fala do usuário até primeiro áudio reproduzido; inclui VAD | p50 até 2 s; p95 registrado e investigado, sem teto prometido antes do benchmark        |
+| Interrupção      | Início da nova fala até silêncio efetivo no dispositivo                | p95 até 500 ms em ensaio controlado; todo áudio obsoleto deve ser descartado            |
+| Qualidade vocal  | Escuta sem avatar: naturalidade, identidade e atuação                  | Média 4/5 e intenção reconhecida em 80% do conjunto                                     |
+| Persona/visão    | 30 cenários comuns por modelo, com rubrica fixa                        | Média 4/5 em persona e naturalidade; erros factuais e visuais registrados separadamente |
+| Memória          | Correção, exclusão, reconstrução e reinício                            | Nenhum fato apagado reintroduzido nos casos de teste                                    |
 
 Executar ao menos 100 turnos de latência e 30 interrupções no ambiente-alvo. Registrar aquecimento, uso de fone/alto-falante, rede, ruído, versões, duração das falas, p50/p95, erros e pico de RAM/VRAM. Separar partida fria de operação aquecida e testar Live2D ativo. O relógio do cliente mede a experiência final; durações internas usam relógios monotônicos de cada processo, sem subtrair horários de máquinas não sincronizadas.
 
 Registrar tempo até primeira frase utilizável, tempo de síntese, início da reprodução e capacidade de gerar áudio mais rápido que sua reprodução. Streaming HTTP, geração incremental do modelo e segmentação por frases são capacidades diferentes. Declarar qual foi implementada e medida.
 
-As metas são propostas de aceite; não há resultado de benchmark nesta revisão. Se falharem, otimizar ou trocar componentes preservando voz personalizada e escopo aprovado.
+As metas são propostas de aceite; existem ensaios parciais, mas ainda não há benchmark completo de aceite físico. O coletor usa mediana de 2 s para resposta e p95 de 500 ms para interrupção automática. A duração da pergunta e as paradas manuais são diagnósticos, não gates de resposta. O navegador estima o fim da fala e o agendamento do áudio; nunca confirma sozinho saída física. A interrupção automática medida pelo cliente começa na detecção do VAD, excluindo o atraso anterior de confirmação do início: esse atraso e o silêncio efetivo devem ser medidos externamente. O fluxo atual reconhece palavras em snapshots durante a captura, a partir de 800 ms, preservando a frase completa para a transcrição final. A janela inicial e o tempo de STT ainda não garantem a meta de 500 ms desde o início acústico. O reconhecimento antecipado limita-se à resposta ativa e não acrescenta consultas durante uma pergunta ociosa. A meta original não foi relaxada. Se falharem, otimizar ou trocar componentes preservando voz personalizada e escopo aprovado.
 
 ## 11. Fases revisadas
 
 Não fixar datas antes dos testes de áudio, da disponibilidade do rig Live2D e da seleção da referência vocal. A ordem abaixo define dependências e entregas, não adiamentos de escopo.
 
-| Fase | Trabalho | Saída verificável |
-| --- | --- | --- |
-| 0. Fundação | Monorepo, contratos, health, SQLite, autenticação básica, configuração, capacidades e logs | API e cliente mínimo executam; acesso indevido rejeitado |
-| 1. Voz personalizada de ponta a ponta | Serviço Python, referência vocal, STT, LLM, TTS, VAD, interrupção, reprodução confirmada e medição | Chamada funciona; perfil vocal preservado; baseline de latência/cotas/VRAM documentado |
-| 2. Persona e atuação | Prompt, estado expressivo, segmentos, presets vocais, refinamento de timbre/prosódia/naturalidade da voz provisória e conjunto de avaliação | 30 cenários; gate de voz sem avatar; escolha justificada de TTS/LLM |
-| 3. Memória e recuperação | Checkpoints, jobs duráveis, origem/correção/exclusão de fatos, políticas de envio, retomada | Reinício recupera trabalhos; memória correta e exclusão efetiva |
-| 4. Texto e imagens | Upload, EXIF, mensagens durante chamadas, validação multimodal | Imagem e texto recebem resposta coerente e entram no histórico |
-| 5. Live2D e interface completa | Arte/rig, atuação sincronizada, legendas, histórico, fatos e configurações | Avatar Live2D final funciona com voz, emoção e interrupção |
-| 6. Desktop | Tauri, instalador Windows, configuração e instruções dos serviços | Aplicativo instalado usa microfone, voz personalizada, Live2D e memória |
-| 7. Integração e entrega | Docker, contratos REST/WS, testes de falhas, backup/restauração, ensaio completo | Relatório de aceite, documentação e pacote desktop entregues |
+| Fase                                  | Trabalho                                                                                                                                                                                                                                                                                        | Saída verificável                                                                                                                                                                          |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0. Fundação                           | Monorepo, contratos, health, SQLite, autenticação básica, configuração, capacidades e logs                                                                                                                                                                                                      | API e cliente mínimo executam; acesso indevido rejeitado                                                                                                                                   |
+| 1. Voz personalizada de ponta a ponta | Serviço Python, referência vocal, STT, LLM, TTS, VAD, interrupção, reprodução confirmada e medição                                                                                                                                                                                              | Chamada funciona; perfil vocal preservado; baseline de latência/cotas/VRAM documentado                                                                                                     |
+| 2. Persona e atuação                  | Especificação e prompt versionados da personagem, estado expressivo, segmentos, presets vocais, refinamento de timbre/prosódia/naturalidade da voz provisória e conjunto de avaliação; opcionalmente, curadoria e prova de conceito comparativa de fine-tuning apenas para estilo/comportamento | 30 cenários; gate de voz sem avatar; escolha justificada de TTS/LLM; decisão registrada sobre fine-tuning, sem dependência de pesos ajustados nem treinamento com todo o histórico pessoal |
+| 3. Memória e recuperação              | Histórico separado de resumos e memórias recuperáveis; extração controlada, confirmação, origem, correção, permissão de envio, exportação/exclusão de fatos e derivados, busca seletiva, jobs duráveis e retomada. Detalhar a proteção e retenção antes de habilitar dados pessoais             | Reinício recupera trabalhos; busca usa apenas contexto pertinente; revisão/correção/exclusão e reconstrução efetivas; nenhum conteúdo inelegível enviado a provedor                        |
+| 4. Texto e imagens                    | Upload, EXIF, mensagens durante chamadas, validação multimodal                                                                                                                                                                                                                                  | Imagem e texto recebem resposta coerente e entram no histórico                                                                                                                             |
+| 5. Live2D e interface completa        | Arte/rig, atuação sincronizada, legendas, histórico, fatos e configurações                                                                                                                                                                                                                      | Avatar Live2D final funciona com voz, emoção e interrupção                                                                                                                                 |
+| 6. Desktop                            | Tauri, instalador Windows, configuração e instruções dos serviços                                                                                                                                                                                                                               | Aplicativo instalado usa microfone, voz personalizada, Live2D e memória                                                                                                                    |
+| 7. Integração e entrega               | Docker, contratos REST/WS, testes de falhas, backup/restauração, ensaio completo                                                                                                                                                                                                                | Relatório de aceite, documentação e pacote desktop entregues                                                                                                                               |
 
 Live2D pode ser preparado em paralelo às avaliações de áudio; o projeto não termina na fase 1 ou 2. É necessário concluir as fases 5 e 6 para atender ao escopo aprovado.
+
+A rotina proativa de NPC descrita na seção 7.2 permanece uma extensão proposta, sem requisito ou aceite ativo. Ela só deve ser adicionada ao escopo após sua especificação e aprovação; pode usar a infraestrutura de jobs da fase 3, mas não deve ser presumida como consequência automática da memória.
 
 ### 11.1 Requisitos implementados em cada fase
 
 Os IDs abaixo correspondem à lista de requisitos aprovada em Requisitos_API_Amadeus_v2.pdf. Cada um dos **67 requisitos ativos** tem uma fase responsável por sua implementação principal. Requisitos que atravessam várias funcionalidades são ampliados e revalidados nas fases seguintes, conforme a seção 11.2; sua presença na tabela não significa que todos os testes de integração possam ser concluídos antecipadamente.
 
-| Fase | Requisitos funcionais | Requisitos não funcionais |
-| --- | --- | --- |
-| **0. Fundação** | RF-001, RF-002: autenticação e rejeição de acesso inválido. RF-030: configuração dos adaptadores. RF-031: contratos REST e voz. RF-032: saúde. RF-043: consulta de capacidades e consumo. | RNF-001: isolamento dos dados. RNF-002: segredos. RNF-005: validação. RNF-010: transporte seguro. RNF-011: versionamento. RNF-015: estrutura e primeiros testes automatizados. RNF-021: política de dados. RNF-024: declaração de capacidades reais. |
-| **1. Voz personalizada de ponta a ponta** | RF-004, RF-005: início e encerramento da chamada. RF-006, RF-007, RF-008, RF-009: envio, detecção e transcrição da fala. RF-010, RF-011, RF-012, RF-013, RF-014: geração, síntese, reprodução, interrupção e estados. RF-024: persistência durante a chamada. RF-029: configuração da voz. RF-033: logs e métricas. RF-039: reprodução parcial. RF-041: cotas e alternativas. | RNF-003, RNF-004: latência e interrupção. RNF-008: limites de consumo. RNF-012: continuidade diante de falhas. RNF-019: uso de memória e processamento. RNF-020: prevenção de efeitos duplicados. |
-| **2. Persona e atuação** | RF-018, RF-019: aplicação e configuração da persona. RF-020, RF-021: emoção por segmento e sincronização dos eventos. RF-034: versões dos perfis vocais. RF-035: atuação vocal. RF-044: avaliação dos modelos e da voz. | RNF-017: identidade da voz personalizada. RNF-018: naturalidade e adequação emocional. |
-| **3. Memória e recuperação** | RF-022, RF-023: gerenciamento e histórico das conversas. RF-025, RF-026, RF-027, RF-028: resumos, extração, recuperação, correção e exclusão de fatos. RF-040: recuperação das tarefas de memória. RF-042: controle dos dados enviados à nuvem. RF-045: retomada da chamada. | RNF-009: persistência, backup e restauração completos. RNF-013: reconexão sem duplicação. |
-| **4. Texto e imagens** | RF-015: texto dentro e fora da chamada. RF-016, RF-017: envio e interpretação de imagens. | RNF-006: limites das imagens. RNF-007: remoção de metadados. |
-| **5. Live2D e interface completa** | RF-036: avatar Live2D. RF-037: sincronização da boca. Integração na interface final dos recursos já implementados de legendas, expressão, histórico, fatos e configurações. | RNF-022: fluidez e sincronização do Live2D. |
-| **6. Desktop** | RF-038: aplicativo Windows empacotado com Tauri e instruções dos serviços. | RNF-023: funcionamento após instalação, incluindo dispositivos, chamada e Live2D. |
-| **7. Integração e entrega** | Validação integrada de todos os RF ativos das fases anteriores; consolidação da documentação RF-031 e do relatório de operação RF-033. | RNF-014: execução documentada do backend em contêiner. Validação final de todos os RNF ativos, com testes completos, recuperação, restauração e desempenho. |
+| Fase                                      | Requisitos funcionais                                                                                                                                                                                                                                                                                                                                                         | Requisitos não funcionais                                                                                                                                                                                                                            |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **0. Fundação**                           | RF-001, RF-002: autenticação e rejeição de acesso inválido. RF-030: configuração dos adaptadores. RF-031: contratos REST e voz. RF-032: saúde. RF-043: consulta de capacidades e consumo.                                                                                                                                                                                     | RNF-001: isolamento dos dados. RNF-002: segredos. RNF-005: validação. RNF-010: transporte seguro. RNF-011: versionamento. RNF-015: estrutura e primeiros testes automatizados. RNF-021: política de dados. RNF-024: declaração de capacidades reais. |
+| **1. Voz personalizada de ponta a ponta** | RF-004, RF-005: início e encerramento da chamada. RF-006, RF-007, RF-008, RF-009: envio, detecção e transcrição da fala. RF-010, RF-011, RF-012, RF-013, RF-014: geração, síntese, reprodução, interrupção e estados. RF-024: persistência durante a chamada. RF-029: configuração da voz. RF-033: logs e métricas. RF-039: reprodução parcial. RF-041: cotas e alternativas. | RNF-003, RNF-004: latência e interrupção. RNF-008: limites de consumo. RNF-012: continuidade diante de falhas. RNF-019: uso de memória e processamento. RNF-020: prevenção de efeitos duplicados.                                                    |
+| **2. Persona e atuação**                  | RF-018, RF-019: aplicação e configuração da persona. RF-020, RF-021: emoção por segmento e sincronização dos eventos. RF-034: versões dos perfis vocais. RF-035: atuação vocal. RF-044: avaliação dos modelos e da voz.                                                                                                                                                       | RNF-017: identidade da voz personalizada. RNF-018: naturalidade e adequação emocional.                                                                                                                                                               |
+| **3. Memória e recuperação**              | RF-022, RF-023: gerenciamento e histórico das conversas. RF-025, RF-026, RF-027, RF-028: resumos, extração, recuperação, correção e exclusão de fatos. RF-040: recuperação das tarefas de memória. RF-042: controle dos dados enviados à nuvem. RF-045: retomada da chamada.                                                                                                  | RNF-009: persistência, backup e restauração completos. RNF-013: reconexão sem duplicação.                                                                                                                                                            |
+| **4. Texto e imagens**                    | RF-015: texto dentro e fora da chamada. RF-016, RF-017: envio e interpretação de imagens.                                                                                                                                                                                                                                                                                     | RNF-006: limites das imagens. RNF-007: remoção de metadados.                                                                                                                                                                                         |
+| **5. Live2D e interface completa**        | RF-036: avatar Live2D. RF-037: sincronização da boca. Integração na interface final dos recursos já implementados de legendas, expressão, histórico, fatos e configurações.                                                                                                                                                                                                   | RNF-022: fluidez e sincronização do Live2D.                                                                                                                                                                                                          |
+| **6. Desktop**                            | RF-038: aplicativo Windows empacotado com Tauri e instruções dos serviços.                                                                                                                                                                                                                                                                                                    | RNF-023: funcionamento após instalação, incluindo dispositivos, chamada e Live2D.                                                                                                                                                                    |
+| **7. Integração e entrega**               | Validação integrada de todos os RF ativos das fases anteriores; consolidação da documentação RF-031 e do relatório de operação RF-033.                                                                                                                                                                                                                                        | RNF-014: execução documentada do backend em contêiner. Validação final de todos os RNF ativos, com testes completos, recuperação, restauração e desempenho.                                                                                          |
 
 ### 11.2 Complementos e validações entre fases
 
 - **Segurança, contratos e testes:** RF-001, RF-002, RF-030, RF-031, RF-043 e RNF-001, RNF-002, RNF-005, RNF-010, RNF-011, RNF-015, RNF-021 e RNF-024 começam na fase 0. Cada nova rota, adaptador, modalidade e cliente deve estender essas proteções, contratos e testes na fase em que for acrescentado. Capacidades e consumo inicialmente podem ter dados mínimos, ampliados com a integração real dos provedores.
 - **Encerramento e memória:** na fase 1, RF-005 e RF-024 salvam a chamada e deixam registrado o trabalho de memória pendente. A fase 3 implementa seu processamento e recuperação completos com RF-025 e RF-040; o aceite integral do encerramento com memória ocorre nessa fase.
 - **Contexto da resposta:** RF-010 usa contexto recente e uma persona inicial na fase 1. A fase 2 valida a personalidade; a fase 3 incorpora a memória persistente permitida de RF-027.
+- **Memória versus aprendizado:** RF-025 a RF-028 implementam histórico, resumos, fatos e recuperação explícita; isso não altera pesos do LLM. A prova de conceito opcional de fine-tuning da fase 2 é avaliada separadamente com dados curados e autorizados. A recuperação de memória continua sendo a fonte operacional de fatos pessoais editáveis e removíveis.
+- **Autonomia proativa:** jobs e recuperação de tarefas de memória (RF-040) não implicam que a Amadeus possa iniciar conversas ou executar ações por conta própria. Rotina de NPC é extensão não aprovada, condicionada à especificação de agenda, consentimento, controles, notificações, limites e critérios de segurança.
 - **Privacidade desde a primeira chamada:** a política de RNF-021 já deve impedir envio incompatível na fase 0. A fase 1 usa dados fictícios na avaliação dos provedores. A fase 3 completa RF-042 para histórico, resumos e fatos; a fase 4 estende o controle a imagens e aos fluxos completos de texto. Não esperar pela fase 3 para proteger o conteúdo enviado.
 - **Texto como recuperação:** RNF-012 exige uma entrada mínima de texto e exibição da resposta já na fase 1 para tratar falhas de STT/TTS. RF-015 é concluído na fase 4, com os fluxos completos dentro e fora da chamada.
 - **Cotas, métricas e duplicação:** RF-033, RF-041 e RNF-008, RNF-019, RNF-020 são ampliados na fase 3 para jobs e retomada, na fase 4 para imagens, e nas fases 5 e 6 para os clientes completos.
@@ -371,7 +403,7 @@ Os IDs abaixo correspondem à lista de requisitos aprovada em Requisitos_API_Ama
 
 ### 11.3 Requisitos adiados
 
-**RF-003** (administração completa de múltiplos clientes) e **RNF-016** (garantia de 95% de disponibilidade mensal) não entram em nenhuma fase de implementação desta versão. Continuam identificados na lista para rastreabilidade. Embeddings e banco vetorial também permanecem adiados, sem ID próprio na lista atual; a memória da fase 3 usa busca textual.
+**RF-003** (administração completa de múltiplos clientes) e **RNF-016** (garantia de 95% de disponibilidade mensal) não entram em nenhuma fase de implementação desta versão. Continuam identificados na lista para rastreabilidade. Embeddings e banco vetorial também permanecem adiados, sem ID próprio na lista atual; a memória da fase 3 usa busca textual. Fine-tuning de LLM não é requisito comprometido: a fase 2 pode executar uma prova de conceito, e qualquer uso operacional de pesos ajustados fica condicionado aos gates de qualidade e à capacidade de treinamento/hospedagem.
 
 ## 12. Riscos e decisões ainda dependentes de teste
 
@@ -396,6 +428,10 @@ Mudanças centrais da versão 2.0: voz personalizada obrigatória; pipeline sepa
 
 Atualização 2.1: vinculação dos 67 requisitos ativos às fases, com responsabilidades de implementação e validações posteriores explícitas. Remoção da seção 4.4 e das referências de escopo solicitadas. IDs, prioridades e formato da lista de requisitos preservados.
 
+Atualização 2.4: posiciona fine-tuning do LLM como experimento opcional da fase 2, condicionado a dados autorizados, modelo/plataforma treináveis e avaliação comparativa. Separa esse experimento da memória da fase 3 e da adaptação vocal do TTS; pesos ajustados não são dependência de produção nem bloqueiam o escopo.
+
+Atualização 2.5: explicita a arquitetura de assistente pessoal: memória consultável e controlável não é treinamento do LLM; limita o contexto recuperado ao pertinente, exige controle de envio a provedores e mantém fine-tuning como experimento opcional com conjunto curado. Registra rotina proativa de NPC como extensão a especificar e aprovar, sem alterar os 67 requisitos ativos.
+
 ## 14. Fontes e validade das informações externas
 
 Consultadas em 02/10/2026. Ofertas, modelos, cotas e termos podem mudar. As escolhas de arquitetura e os limiares de qualidade são decisões deste projeto, não garantias dos fornecedores.
@@ -411,12 +447,13 @@ Consultadas em 02/10/2026. Ofertas, modelos, cotas e termos podem mudar. As esco
 - [S9 - faster-whisper: transcrição e integrações](https://github.com/SYSTRAN/faster-whisper)
 - [S10 - Gemini Live: capacidades de referência](https://ai.google.dev/gemini-api/docs/live-api)
 
-
 ## Registro da implementação da fase 1
 
 Foram implementados o pipeline de chamadas, STT/TTS locais, adaptador Gemini, perfil de voz com SHA-256, entrada de texto, interrupção, confirmação de reprodução, histórico e métricas. Há um cliente técnico de áudio sem interface visual. O Gemini entrega texto por SSE a uma fila limitada de frases, permitindo iniciar TTS antes do fim da geração. STT trabalha por fala e TTS por segmento; o adaptador genérico HTTP mantém a alternativa com geração completa.
 
-O aceite operacional permanece pendente: teste real com chave Gemini válida ainda não executado, identidade vocal original ainda não criada, pesos dos motores ainda não instalados/testados e medições reais de 100 turnos/30 interrupções ainda não executadas. Os testes usam serviços controlados e não atestam qualidade vocal, AEC ou metas no hardware.
+Em 04/10/2026, o usuário confirmou que a interrupção funciona e que a latência atual é aceitável para seu uso, autorizando o avanço para a fase 2 (persona e atuação). A fase 1 tem aceite funcional provisório; refinamentos de voz e desempenho continuam nas fases seguintes.
+
+A validação formal das metas no hardware permanece pendente. Os motores locais e os provedores já foram executados em ensaios reais, e há uma referência vocal provisória selecionada. Ainda é necessário registrar 100 turnos e 30 interrupções automáticas durante áudio efetivamente reproduzido, com falhas, latência, ruído e RAM/VRAM. As metas de 2 s para resposta e 500 ms para interrupção não foram alteradas nem comprovadas pelos testes automatizados, que também não atestam naturalidade ou AEC.
 
 As dubladoras citadas pelo usuário são referências artísticas para uma voz própria. Os nove MP3 locais fornecidos foram analisados por medidas acústicas preliminares, com limitações de música, múltiplos falantes e atuação. Não houve avaliação auditiva de timbre nem uso dessas gravações para clonagem. A proposta inicial está em `code/backend/assets/voice-profiles/design.json`.
 
