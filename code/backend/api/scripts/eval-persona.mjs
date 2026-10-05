@@ -17,6 +17,7 @@ import {
   NEUTRAL_EXPRESSION,
 } from '../src/domain/persona/expression.ts';
 import { buildVoiceContext } from '../src/application/voice/context.ts';
+import { buildHistoryContext } from '../src/application/voice/history-context.ts';
 import { streamPersonaSpeech } from '../src/application/persona/speech-recovery.ts';
 import { loadConfig } from '../src/config/index.ts';
 import { openDatabase } from '../src/adapters/database/index.ts';
@@ -28,6 +29,7 @@ import { ProviderSchema } from '../src/domain/providers/model.ts';
 import { providerAttempts } from '../src/application/providers/fallback.ts';
 import { ActivityGate } from '../src/application/runtime/activity-gate.ts';
 import { createConversationStyleGuard } from '../src/application/persona/conversation-style.ts';
+import { createExpressionState } from '../src/domain/persona/expression-policy.ts';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -38,17 +40,27 @@ async function main() {
     throw new Error('Intervalo permitido: 0 a 60000 ms.');
   const dialogue = args.includes('--dialogue');
   const skill = args.includes('--skill');
+  const continuity = args.includes('--continuity');
+  const refinement = args.includes('--refinement');
+  if ([dialogue, skill, continuity, refinement].filter(Boolean).length > 1)
+    throw new Error('Escolha apenas um conjunto de avaliação por execução.');
   const suite = (
-    dialogue || skill ? PersonaDialogueSuiteSchema : PersonaSuiteSchema
+    dialogue || skill || continuity || refinement
+      ? PersonaDialogueSuiteSchema
+      : PersonaSuiteSchema
   ).parse(
     JSON.parse(
       await readFile(
         new URL(
-          skill
-            ? '../../evals/persona/skill-v1.json'
-            : dialogue
-              ? '../../evals/persona/dialogue-v1.json'
-              : '../../evals/persona/scenarios-v1.json',
+          refinement
+            ? '../../evals/persona/refinement-v1.json'
+            : continuity
+              ? '../../evals/persona/continuity-v1.json'
+              : skill
+                ? '../../evals/persona/skill-v1.json'
+                : dialogue
+                  ? '../../evals/persona/dialogue-v1.json'
+                  : '../../evals/persona/scenarios-v1.json',
           import.meta.url,
         ),
         'utf8',
@@ -66,6 +78,10 @@ async function main() {
   if (startIndex < 0) {
     throw new Error('O ID de --from precisa existir no conjunto escolhido.');
   }
+  if (continuity && startIndex !== 0)
+    throw new Error(
+      'Continuidade começa em D01 para preservar as respostas realmente geradas.',
+    );
 
   if (!Number.isInteger(limit) || limit < 1 || limit > 30) {
     throw new Error('Use --limit=1 até --limit=30.');
@@ -76,11 +92,15 @@ async function main() {
       `${suite.cases.length} cenários validados. Persona ${PERSONA_VERSION}.`,
     );
     console.log(
-      skill
-        ? 'Para gerar respostas sintéticas: npm run eval:persona -- --skill --run --limit=12'
-        : dialogue
-          ? 'Para gerar respostas sintéticas: npm run eval:persona -- --dialogue --run --limit=4'
-          : 'Para gerar respostas sintéticas: npm run eval:persona -- --run --limit=30',
+      refinement
+        ? 'Para testar ajustes e transferência: npm run eval:persona -- --refinement --run --limit=12'
+        : continuity
+          ? 'Para gerar um diálogo encadeado: npm run eval:persona -- --continuity --run --limit=12'
+          : skill
+            ? 'Para gerar respostas sintéticas: npm run eval:persona -- --skill --run --limit=12'
+            : dialogue
+              ? 'Para gerar respostas sintéticas: npm run eval:persona -- --dialogue --run --limit=4'
+              : 'Para gerar respostas sintéticas: npm run eval:persona -- --run --limit=30',
     );
     console.log(
       'Escolha opcional: --model=<modelo já configurado>. Consome a cota normal; revisão humana continua necessária.',
@@ -152,6 +172,12 @@ async function main() {
       provider: selected.adapter,
       model: selected.model ?? null,
       dataClass: 'synthetic',
+      evaluationMode: continuity
+        ? 'generated-continuous-dialogue'
+        : 'independent-scenarios',
+      historyConfirmation: continuity
+        ? 'synthetic-text-assumed-complete; no audio played'
+        : 'fixture',
       humanReview: 'pending',
       voiceReview: null,
       results: [],
@@ -160,7 +186,71 @@ async function main() {
     await mkdir(directory, { recursive: true });
     const file = new URL(`${Date.now()}-persona.json`, directory);
 
-    for (const scenario of suite.cases.slice(startIndex, startIndex + limit)) {
+    const generatedHistory = [];
+    const expressionState = createExpressionState();
+    const resumeName = args
+      .find((arg) => arg.startsWith('--resume='))
+      ?.slice('--resume='.length);
+    let resumedTurns = 0;
+    if (resumeName) {
+      if (!continuity || !/^\d+-persona\.json$/.test(resumeName))
+        throw new Error(
+          'Use --resume=<relatório local> apenas em continuidade.',
+        );
+      const prior = JSON.parse(
+        await readFile(new URL(resumeName, directory), 'utf8'),
+      );
+      if (
+        prior.promptSha256 !== report.promptSha256 ||
+        prior.personaVersion !== report.personaVersion ||
+        prior.suiteVersion !== report.suiteVersion ||
+        prior.evaluationMode !== 'generated-continuous-dialogue'
+      )
+        throw new Error('Retomada exige a mesma persona, prompt e conjunto.');
+      const completed = prior.results.filter(
+        (row) => !row.errorCode && row.text,
+      );
+      for (const row of completed) {
+        if (row.id !== suite.cases[resumedTurns]?.id)
+          throw new Error('Retomada exige um prefixo contínuo sem lacunas.');
+        generatedHistory.push({
+          userText: row.inputText,
+          generatedText: row.text,
+          dataClass: 'synthetic',
+          responseStatus: 'completed',
+          partiallyPlayed: false,
+        });
+        expressionState.accept(row.expression);
+        resumedTurns++;
+      }
+      report.resumedFrom = resumeName;
+      report.previousProvider = prior.provider;
+      report.previousModel = prior.model;
+      report.results = completed.map((row, index) => ({
+        ...row,
+        provider:
+          row.provider ??
+          (index < (prior.resumedTurns ?? 0)
+            ? prior.previousProvider
+            : prior.provider),
+        model:
+          row.model ??
+          (index < (prior.resumedTurns ?? 0)
+            ? prior.previousModel
+            : prior.model),
+      }));
+      report.resumedTurns = resumedTurns;
+    }
+    for (const definition of suite.cases.slice(
+      startIndex + resumedTurns,
+      startIndex + resumedTurns + limit,
+    )) {
+      const scenario = continuity
+        ? { ...definition, history: [...generatedHistory] }
+        : definition;
+      const previousExpression = continuity
+        ? expressionState.snapshot()
+        : NEUTRAL_EXPRESSION;
       if (report.results.length && interval) await delay(interval);
       const started = performance.now();
       let expression = { ...NEUTRAL_EXPRESSION };
@@ -169,6 +259,7 @@ async function main() {
       let rawResponse = '';
       let recoveries = 0;
       let errorCode = null;
+      let retryAfterMs = null;
       let firstSegmentMs = null;
       const signal = AbortSignal.timeout(60000);
 
@@ -180,9 +271,13 @@ async function main() {
                 scenario.history,
                 scenario.text,
                 'synthetic',
+                previousExpression,
               ),
               ...(speechOnly
-                ? { systemPrompt: buildSpeechOnlyPersonaPrompt() }
+                ? {
+                    systemPrompt:
+                      buildSpeechOnlyPersonaPrompt(previousExpression),
+                  }
                 : {}),
               maxTokens: 512,
             },
@@ -213,25 +308,44 @@ async function main() {
         }
       } catch (error) {
         errorCode = error.code ?? error.name ?? 'EVALUATION_ERROR';
+        retryAfterMs = Number.isFinite(error.retryAfterMs)
+          ? error.retryAfterMs
+          : null;
       }
 
       const text = spoken.join(' ');
+      const appliedExpression = continuity
+        ? expressionState.accept(expression)
+        : expression;
       report.results.push({
         ...scenario,
+        provider: selected.adapter,
+        model: selected.model ?? null,
         inputText: scenario.text,
+        sentHistory: buildHistoryContext(scenario.history, 3000),
         text,
         rawResponse,
         recoveries,
         expression,
+        appliedExpression,
         metadataValid,
         firstSegmentMs,
         durationMs: performance.now() - started,
         errorCode,
+        retryAfterMs,
         screening: screenPersonaResponse(text, metadataValid, scenario.text),
         scores: null,
         disqualifications: null,
       });
       await writeFile(file, JSON.stringify(report, null, 2) + '\n');
+      if (continuity && !errorCode)
+        generatedHistory.push({
+          userText: scenario.text,
+          generatedText: text,
+          dataClass: 'synthetic',
+          responseStatus: 'completed',
+          partiallyPlayed: false,
+        });
       console.log(
         `${scenario.id}: ${errorCode ?? 'resposta coletada'}; revisão humana pendente.`,
       );
