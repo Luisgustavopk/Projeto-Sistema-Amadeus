@@ -320,7 +320,7 @@ it.each([16000, 24000] as const)(
       intensity: 0.35,
       metadataValid: true,
       deliveryApplied: false,
-      personaVersion: 'kurisu-amadeus-0.4.8',
+      personaVersion: 'kurisu-amadeus-0.4.10',
     });
     expect(f.requests.filter((request) => request.role === 'llm')).toHaveLength(
       1,
@@ -347,6 +347,37 @@ it.each([16000, 24000] as const)(
     ).toBe(true);
   },
 );
+
+it('aplica uma edição de persona no próximo turno da mesma conexão', async () => {
+  const f = await fixture();
+  f.send({ type: 'text.send', turnId: 1, text: 'Primeiro turno.' });
+  await vi.waitFor(() =>
+    expect(
+      f.events.some((e) => e.type === 'reply.done' && e.turnId === 1),
+    ).toBe(true),
+  );
+  const before = f.requests.find((r) => r.role === 'llm')!.content;
+  const edit = await f.app.inject({
+    method: 'PUT',
+    url: '/v1/persona',
+    headers,
+    payload: {
+      expectedRevision: 0,
+      direction: 'Prefira analogias de astronomia quando forem úteis.',
+    },
+  });
+  expect(edit.statusCode).toBe(200);
+  f.send({ type: 'text.send', turnId: 2, text: 'Segundo turno.' });
+  await vi.waitFor(() =>
+    expect(
+      f.events.some((e) => e.type === 'reply.done' && e.turnId === 2),
+    ).toBe(true),
+  );
+  const after = f.requests.filter((r) => r.role === 'llm')[1]!.content;
+  expect(before).not.toContain('analogias de astronomia');
+  expect(after).toContain('analogias de astronomia');
+  expect(after).toContain('FORMATO:');
+});
 
 it('reconectar reinicia a expressão mesmo quando a chamada anterior já acumulou intensidade', async () => {
   const f = await fixture({

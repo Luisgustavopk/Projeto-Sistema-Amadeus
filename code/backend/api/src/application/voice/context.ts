@@ -22,7 +22,7 @@ export function buildVoiceContext(
         ? 'personal'
         : 'synthetic';
   const persona = buildPersonaPrompt(expression);
-  const context = buildHistoryContext(history);
+  const context = buildHistoryContext(history, 3000);
 
   return {
     dataClass: classification,
