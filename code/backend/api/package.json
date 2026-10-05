@@ -25,7 +25,10 @@
     "setup:hybrid": "node --env-file-if-exists=.env scripts/setup-hybrid.mjs",
     "setup:llm-reserve": "node --env-file-if-exists=.env scripts/setup-llm-reserve.mjs",
     "memory": "node --env-file-if-exists=.env scripts/memory.mjs",
-    "backup:memory": "node --env-file-if-exists=.env scripts/backup-memory.mjs"
+    "backup:memory": "node --env-file-if-exists=.env scripts/backup-memory.mjs",
+    "eval:memory": "node scripts/eval-memory.mjs",
+    "eval:memory-semantic": "node --env-file-if-exists=.env scripts/eval-memory-semantic.mjs",
+    "eval:memory-integrated": "node --env-file-if-exists=.env scripts/eval-memory-integrated.mjs"
   },
   "dependencies": {
     "@fastify/swagger": "9.9.1",
