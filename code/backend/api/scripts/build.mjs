@@ -27,6 +27,16 @@ if (result.error) {
 process.exitCode = result.status ?? 1;
 
 if (process.exitCode === 0) {
+  for (const file of [
+    'conversation-directions-v1.md',
+    'reaction-catalog-v0.2.md',
+    'reaction-repertoire-v0.2.md',
+  ]) {
+    await copyFile(
+      new URL('../../assets/persona/' + file, import.meta.url),
+      resolve(output, 'application/persona', file),
+    );
+  }
   await copyFile(
     new URL('../../assets/persona/source-v0.4.md', import.meta.url),
     resolve(output, 'application/persona/source-v0.4.md'),
