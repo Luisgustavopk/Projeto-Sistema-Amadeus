@@ -97,6 +97,22 @@ function getCredentials(
     );
   }
 
+  if (config.adapter === 'mistral' || config.adapter === 'openrouter') {
+    if (config.adapter === 'openrouter' && !config.model.endsWith(':free')) {
+      throw new ProviderConfigurationError(
+        'OpenRouter aceita somente modelos :free.',
+      );
+    }
+
+    return {
+      key,
+      endpoint:
+        config.adapter === 'mistral'
+          ? 'https://api.mistral.ai/v1/chat/completions'
+          : 'https://openrouter.ai/api/v1/chat/completions',
+    };
+  }
+
   if (config.adapter === 'groq') {
     return {
       key,
@@ -238,6 +254,16 @@ export function createOpenAiCompatibleProvider(
           ...(stream && config.adapter === 'groq'
             ? { stream_options: { include_usage: true } }
             : {}),
+          ...(config.adapter === 'openrouter'
+            ? {
+                provider: {
+                  max_price: { prompt: 0, completion: 0 },
+                  data_collection: 'deny',
+                  sort: 'latency',
+                },
+                reasoning: { enabled: false, exclude: true },
+              }
+            : {}),
           stream,
         }),
         redirect: 'error',
@@ -266,7 +292,46 @@ export function createOpenAiCompatibleProvider(
         await response.body?.cancel();
       }
 
-      throw mapHttpFailure(response.status, tokenRateLimited);
+      // Free endpoints can disappear or fail the data-policy filter. Try the
+      // next explicit free model rather than treating this as invalid credentials.
+      const error = mapHttpFailure(
+        config.adapter === 'openrouter' && response.status === 404
+          ? 503
+          : response.status,
+        tokenRateLimited,
+      );
+
+      if (
+        config.adapter === 'openrouter' &&
+        error instanceof QuotaExceededError
+      ) {
+        // Platform rate-limit responses carry X-RateLimit-* headers; an upstream
+        // provider's 429 need not exhaust other providers or free model variants.
+        error.quotaScope =
+          response.status === 402 || response.headers.has('x-ratelimit-limit')
+            ? 'account'
+            : 'model';
+      }
+
+      if (
+        error instanceof QuotaExceededError ||
+        error instanceof ProviderTemporarilyUnavailableError
+      ) {
+        const value = response.headers.get('retry-after');
+
+        if (value) {
+          const seconds = Number(value);
+          const milliseconds = Number.isFinite(seconds)
+            ? seconds * 1000
+            : Date.parse(value) - Date.now();
+
+          if (Number.isFinite(milliseconds) && milliseconds >= 0) {
+            error.retryAfterMs = Math.min(milliseconds, 31 * 86400000);
+          }
+        }
+      }
+
+      throw error;
     }
 
     return response;
@@ -324,6 +389,19 @@ export function createOpenAiCompatibleProvider(
       try {
         for await (const value of decodeServerSentEvents(response)) {
           signal?.throwIfAborted();
+
+          if (config.adapter === 'openrouter') {
+            const failure = z
+              .object({ error: z.object({ code: z.number().int() }) })
+              .safeParse(value);
+
+            if (failure.success) {
+              throw mapHttpFailure(
+                failure.data.error.code === 404 ? 503 : failure.data.error.code,
+              );
+            }
+          }
+
           const chunk = (
             config.adapter === 'cloudflare-ai'
               ? CloudflareStreamChunk

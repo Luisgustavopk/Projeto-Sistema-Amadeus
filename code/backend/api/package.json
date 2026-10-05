@@ -22,7 +22,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
-    "setup:hybrid": "node --env-file-if-exists=.env scripts/setup-hybrid.mjs"
+    "setup:hybrid": "node --env-file-if-exists=.env scripts/setup-hybrid.mjs",
+    "setup:llm-reserve": "node --env-file-if-exists=.env scripts/setup-llm-reserve.mjs"
   },
   "dependencies": {
     "@fastify/swagger": "9.9.1",

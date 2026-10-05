@@ -29,6 +29,7 @@ export function providerAttempts(
   const { fallbackModel, fallbackProviders, speechFallback, ...primary } =
     config;
   delete primary.localProvider;
+  delete primary.localRouting;
 
   if (role !== 'llm') {
     return [
@@ -51,7 +52,7 @@ export function providerAttempts(
   }
 
   for (const fallback of fallbackProviders ?? []) {
-    attempts.push({ ...fallback, limits: config.limits });
+    attempts.push({ ...fallback, limits: fallback.limits ?? config.limits });
   }
 
   return attempts;

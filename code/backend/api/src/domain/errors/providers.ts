@@ -1,6 +1,8 @@
 import { ApplicationError } from './application-error.ts';
 
 export class QuotaExceededError extends ApplicationError {
+  retryAfterMs?: number;
+  quotaScope?: 'account' | 'model';
   constructor(
     message = 'O orçamento configurado para o adaptador foi esgotado.',
   ) {
@@ -15,6 +17,7 @@ export class ProviderUnavailableError extends ApplicationError {
 }
 
 export class ProviderTemporarilyUnavailableError extends ApplicationError {
+  retryAfterMs?: number;
   constructor(
     message = 'O provedor está temporariamente indisponível. Tente novamente mais tarde.',
   ) {

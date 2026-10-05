@@ -44,11 +44,19 @@ export function createProviderFactory(
       return createOpenAiCompatibleProvider(config, secrets);
     }
 
-    if (config.adapter === 'groq' || config.adapter === 'cloudflare-ai') {
+    if (
+      ['groq', 'cloudflare-ai', 'mistral', 'openrouter'].includes(
+        config.adapter,
+      )
+    ) {
       if (role !== 'llm') {
         throw new ProviderConfigurationError(
           'Groq e Cloudflare Workers AI são adaptadores de LLM.',
         );
+      }
+
+      if (config.adapter === 'mistral' || config.adapter === 'openrouter') {
+        return createOpenAiCompatibleProvider(config, secrets);
       }
 
       return config.adapter === 'groq'

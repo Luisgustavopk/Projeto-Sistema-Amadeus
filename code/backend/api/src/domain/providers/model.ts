@@ -16,9 +16,22 @@ const LocalSpeechFallbackSchema = z.strictObject({
 });
 const LlmFallbackSchema = z
   .strictObject({
-    adapter: z.enum(['gemini', 'groq', 'cloudflare-ai']),
+    adapter: z.enum([
+      'gemini',
+      'groq',
+      'cloudflare-ai',
+      'mistral',
+      'openrouter',
+    ]),
     model: ModelSchema,
     apiKeyEnv: ApiKeyEnvSchema,
+    limits: z
+      .strictObject({
+        requestsPerDay: z.number().int().min(0).max(100000).default(0),
+        tokensPerDay: z.number().int().min(0).max(100000000).default(0),
+        source: z.enum(['operator', 'provider']).default('operator'),
+      })
+      .optional(),
     dataPolicy: z
       .enum(['synthetic-only', 'personal-approved'])
       .default('synthetic-only'),
@@ -31,6 +44,16 @@ const LlmFallbackSchema = z
       .optional(),
   })
   .superRefine((provider, ctx) => {
+    if (
+      provider.adapter === 'openrouter' &&
+      !provider.model.endsWith(':free')
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'OpenRouter exige um modelo explícito com sufixo :free.',
+      });
+    }
+
     if (provider.adapter === 'cloudflare-ai' && !provider.accountId) {
       ctx.addIssue({
         code: 'custom',
@@ -83,6 +106,8 @@ export const ProviderSchema = z
       'gemini',
       'groq',
       'cloudflare-ai',
+      'mistral',
+      'openrouter',
       'deepgram',
       'cartesia',
     ]),
@@ -101,8 +126,9 @@ export const ProviderSchema = z
       .string()
       .regex(/^[a-zA-Z0-9._-]{1,128}$/)
       .optional(),
-    fallbackProviders: z.array(LlmFallbackSchema).max(2).optional(),
+    fallbackProviders: z.array(LlmFallbackSchema).max(8).optional(),
     localProvider: LocalLlmSchema.optional(),
+    localRouting: z.enum(['hybrid', 'cloud-first']).optional(),
     dataPolicy: z
       .enum(['synthetic-only', 'personal-approved', 'local-approved'])
       .default('synthetic-only'),
@@ -117,6 +143,13 @@ export const ProviderSchema = z
       .default({ requestsPerDay: 0, tokensPerDay: 0, source: 'operator' }),
   })
   .superRefine((p, ctx) => {
+    if (p.localRouting && !p.localProvider) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'localRouting exige um provedor local configurado.',
+      });
+    }
+
     if (
       p.fallbackModel &&
       (p.adapter !== 'gemini' || p.fallbackModel === p.model)
@@ -166,7 +199,9 @@ export const ProviderSchema = z
 
     if (
       p.localProvider &&
-      !['gemini', 'groq', 'cloudflare-ai'].includes(p.adapter)
+      !['gemini', 'groq', 'cloudflare-ai', 'mistral', 'openrouter'].includes(
+        p.adapter,
+      )
     ) {
       ctx.addIssue({
         code: 'custom',
@@ -184,13 +219,20 @@ export const ProviderSchema = z
     }
 
     if (
-      (p.adapter === 'groq' || p.adapter === 'cloudflare-ai') &&
+      ['groq', 'cloudflare-ai', 'mistral', 'openrouter'].includes(p.adapter) &&
       (!p.model || !p.apiKeyEnv || p.endpoint)
     ) {
       ctx.addIssue({
         code: 'custom',
         message:
           'Provedores LLM remotos exigem modelo e variável de chave, sem endpoint customizado.',
+      });
+    }
+
+    if (p.adapter === 'openrouter' && !p.model?.endsWith(':free')) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'OpenRouter exige um modelo explícito com sufixo :free.',
       });
     }
 
@@ -312,7 +354,9 @@ export const ProvidersSchema = z
     if (
       (providers.llm.fallbackModel ||
         providers.llm.fallbackProviders?.length) &&
-      !['gemini', 'groq', 'cloudflare-ai'].includes(providers.llm.adapter)
+      !['gemini', 'groq', 'cloudflare-ai', 'mistral', 'openrouter'].includes(
+        providers.llm.adapter,
+      )
     ) {
       ctx.addIssue({
         code: 'custom',

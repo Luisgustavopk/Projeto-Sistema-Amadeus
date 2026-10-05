@@ -156,7 +156,7 @@ function receive(event) {
       event.code === "PROVIDER_TEMPORARILY_UNAVAILABLE"
         ? "Os provedores LLM estão temporariamente indisponíveis. Aguarde e tente outra mensagem; sua conexão continua ativa."
         : event.code === "QUOTA_EXCEEDED"
-          ? "Não foi possível reservar cota para esta operação nos provedores elegíveis para os dados enviados. Confira GET /v1/usage e os limites na conta do serviço indicado em quota.warning."
+          ? "Esta operação atingiu um orçamento local ou um limite do provedor. Confira GET /v1/usage e o serviço indicado em quota.warning; o limite pode ser por minuto, por modelo ou pela conta."
           : event.code === "PROVIDER_BUSY"
             ? "O serviço de fala ainda está ocupado. Aguarde um momento e tente outra frase."
             : event.code === "NO_SPEECH_DETECTED"

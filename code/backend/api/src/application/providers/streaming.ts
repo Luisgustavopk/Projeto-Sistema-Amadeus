@@ -1,3 +1,7 @@
+import {
+  createProviderCooldowns,
+  type ProviderCooldowns,
+} from './cooldowns.ts';
 import { selectProviderAttempts } from './routing.ts';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { ProviderConfigurationRepository } from '../../ports/provider-configuration-repository.ts';
@@ -12,6 +16,7 @@ import { assertProviderCanExecute } from '../../domain/providers/data-policy.ts'
 import {
   DataPolicyBlockedError,
   ProviderInvalidError,
+  ProviderTemporarilyUnavailableError,
   QuotaExceededError,
 } from '../../domain/errors/providers.ts';
 import { validateProviderInput, estimateProviderBudget } from './input.ts';
@@ -29,6 +34,7 @@ export function createProviderStreaming(
   factory: ProviderFactory,
   gate: ExecutionGate,
   onFallback?: NotifyProviderFallback,
+  cooldowns: ProviderCooldowns = createProviderCooldowns(),
 ) {
   return {
     async *executeStream(
@@ -69,6 +75,22 @@ export function createProviderStreaming(
           signal?.throwIfAborted();
           const config = attempts[index]!;
           assertProviderCanExecute(config, input.dataClass);
+          const blocked =
+            retriedLastAttempt && index === attempts.length - 1
+              ? undefined
+              : cooldowns.blocked(config);
+
+          if (blocked) {
+            const next = attempts[index + 1];
+
+            if (!next) {
+              throw blocked;
+            }
+
+            notifyFallback(config, next, blocked, onFallback);
+            continue;
+          }
+
           let reservation: string;
 
           try {
@@ -140,8 +162,14 @@ export function createProviderStreaming(
             settled = true;
             await usage.settle(reservation, output);
 
+            cooldowns.clear(config);
+
             return;
           } catch (error) {
+            if (!settled) {
+              cooldowns.record(config, error, signal);
+            }
+
             const next = attempts[index + 1];
 
             if (settled || !canUseFallback(error, signal, delivered)) {
@@ -154,7 +182,8 @@ export function createProviderStreaming(
             retrySameProvider =
               !next &&
               !retriedLastAttempt &&
-              !(error instanceof QuotaExceededError);
+              error instanceof ProviderTemporarilyUnavailableError &&
+              (error.retryAfterMs ?? 0) <= 400;
 
             if (!next && !retrySameProvider) {
               throw error;

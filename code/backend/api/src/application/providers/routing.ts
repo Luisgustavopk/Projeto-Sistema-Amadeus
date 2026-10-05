@@ -60,6 +60,10 @@ export function selectProviderAttempts(
     return [local];
   }
 
+  if (config.localRouting === 'cloud-first') {
+    return [...cloud, local];
+  }
+
   return isCasualConversation(currentUtterance(input.content))
     ? [local, ...cloud]
     : cloud;

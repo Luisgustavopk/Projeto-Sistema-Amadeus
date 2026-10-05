@@ -592,11 +592,9 @@ it('não envia dados pessoais a um fallback sintético após falha do provedor a
   reserve.mockClear();
   expect(await services.execute('llm', personalInput)).toEqual(output);
   expect(factory.mock.calls.map(([, provider]) => provider.adapter)).toEqual([
-    'groq',
     'cloudflare-ai',
   ]);
   expect(reserve.mock.calls.map(([, , provider]) => provider.adapter)).toEqual([
-    'groq',
     'cloudflare-ai',
   ]);
 });
@@ -684,7 +682,7 @@ it('valida configuração e limita reservas a LLMs remotos', () => {
       adapter: 'groq',
       model: 'groq-model',
       apiKeyEnv: 'GROQ_API_KEY',
-      fallbackProviders: [validGroq, validCloudflare, validGroq],
+      fallbackProviders: Array.from({ length: 9 }, () => validGroq),
     }).success,
   ).toBe(false);
   expect(
@@ -882,3 +880,30 @@ for (const mode of ['stream', 'execute'] as const) {
     expect(test.settle).not.toHaveBeenCalled();
   });
 }
+
+it('pula um provedor em pausa entre turnos de streaming e execucao', async () => {
+  const test = setup(temporaryFailure, {
+    executeError: new ProviderTemporarilyUnavailableError(),
+  });
+  await collect(test.services.executeStream(input));
+  test.factory.mockClear();
+  test.reserve.mockClear();
+  await test.services.execute('llm', input);
+  expect(test.factory.mock.calls.map(([, config]) => config.model)).toEqual([
+    'gemini-3.6-flash',
+  ]);
+  expect(test.reserve).toHaveBeenCalledOnce();
+});
+
+it('não repete a última reserva antes do Retry-After explícito', async () => {
+  const error = new ProviderTemporarilyUnavailableError();
+  error.retryAfterMs = 120000;
+  const test = setup(
+    async function* () {
+      yield await Promise.reject(error);
+    },
+    { fallback: false },
+  );
+  await expect(collect(test.services.executeStream(input))).rejects.toBe(error);
+  expect(test.factory).toHaveBeenCalledOnce();
+});

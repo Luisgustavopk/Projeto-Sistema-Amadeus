@@ -1,3 +1,4 @@
+import { createProviderCooldowns } from './cooldowns.ts';
 import type { NotifyProviderFallback } from './fallback.ts';
 import type { ProviderConfigurationRepository } from '../../ports/provider-configuration-repository.ts';
 import type { ProviderUsageRepository } from '../../ports/provider-usage-repository.ts';
@@ -22,6 +23,8 @@ export function createProviderServices(dependencies: {
   const { configuration, usage, ownerId, factory, gate, onFallback } =
     dependencies;
 
+  const cooldowns = createProviderCooldowns();
+
   return {
     ...createProviderConfiguration(configuration, ownerId, factory, gate),
     ...createProviderExecution(
@@ -31,6 +34,7 @@ export function createProviderServices(dependencies: {
       factory,
       gate,
       onFallback,
+      cooldowns,
     ),
     ...createProviderStreaming(
       configuration,
@@ -39,6 +43,7 @@ export function createProviderServices(dependencies: {
       factory,
       gate,
       onFallback,
+      cooldowns,
     ),
     ...createProviderQueries(configuration, usage, ownerId, factory),
   };

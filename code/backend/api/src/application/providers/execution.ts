@@ -4,6 +4,10 @@ import {
   notifyFallback,
   type NotifyProviderFallback,
 } from './fallback.ts';
+import {
+  createProviderCooldowns,
+  type ProviderCooldowns,
+} from './cooldowns.ts';
 import { selectProviderAttempts } from './routing.ts';
 import type { Role } from '../../domain/providers/model.ts';
 import { validateProviderInput, estimateProviderBudget } from './input.ts';
@@ -28,6 +32,7 @@ export function createProviderExecution(
   factory: ProviderFactory,
   gate: ExecutionGate,
   onFallback?: NotifyProviderFallback,
+  cooldowns: ProviderCooldowns = createProviderCooldowns(),
 ) {
   return {
     async execute(role: Role, input: ProviderInput, signal?: AbortSignal) {
@@ -63,6 +68,20 @@ export function createProviderExecution(
           signal?.throwIfAborted();
           const config = attempts[index]!;
           assertProviderCanExecute(config, input.dataClass);
+          const blocked =
+            role === 'llm' ? cooldowns.blocked(config) : undefined;
+
+          if (blocked) {
+            const next = attempts[index + 1];
+
+            if (!next) {
+              throw blocked;
+            }
+
+            notifyFallback(config, next, blocked, onFallback);
+            continue;
+          }
+
           let reservation: string;
 
           try {
@@ -92,6 +111,10 @@ export function createProviderExecution(
           try {
             result = await factory(role, config).execute(input, signal);
           } catch (error) {
+            if (role === 'llm') {
+              cooldowns.record(config, error, signal);
+            }
+
             await usage.settle(reservation, null);
             const next = attempts[index + 1];
 
@@ -105,6 +128,10 @@ export function createProviderExecution(
 
           // Failed persistence must never cause a second model to generate again.
           await usage.settle(reservation, result);
+
+          if (role === 'llm') {
+            cooldowns.clear(config);
+          }
 
           return result;
         }
