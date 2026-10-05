@@ -4,7 +4,7 @@ Interface temporária da fase 1, independente da interface definitiva. Usa o cli
 
 ## Iniciar
 
-Mantenha API, STT e TTS em execução. No `.env` da API, inclua `http://127.0.0.1:8080,http://localhost:8080` em `ALLOWED_ORIGINS` (lista separada por vírgulas) e reinicie a API após alterar esse valor.
+Mantenha API, STT e TTS em execução. No `.env` da API, inclua `http://127.0.0.1:5173,http://localhost:5173` em `ALLOWED_ORIGINS` (lista separada por vírgulas) e reinicie a API após alterar esse valor.
 
 Na raiz do repositório:
 
@@ -13,7 +13,7 @@ cd code/frontend/voice-test
 npm run dev
 ```
 
-Abra http://127.0.0.1:8080. A classificação começa em **Personal**; informe o `API_ACCESS_TOKEN` da API, clique em **Conectar** e depois em **Iniciar microfone**. A página consulta `/v1/capabilities`, mostra a política de cada reserva e bloqueia entrada pessoal se nenhum provedor LLM puder processá-la. A API exclui fallbacks sem aprovação antes de enviar conteúdo ou reservar uso. Revise os termos de cada provedor separadamente e configure `personal-approved`, `policyReviewedAt` e `policyReference` apenas nos provedores aprovados. Gemini exige `geminiTier: "paid"` e um plano pago elegível; sem isso, permanece inelegível para dados pessoais. Não altere as políticas apenas para fazer o teste.
+Abra http://127.0.0.1:5173. A classificação começa em **Personal**; informe o `API_ACCESS_TOKEN` da API, clique em **Conectar** e depois em **Iniciar microfone**. A página consulta `/v1/capabilities`, mostra a política de cada reserva e bloqueia entrada pessoal se nenhum provedor LLM puder processá-la. A API exclui fallbacks sem aprovação antes de enviar conteúdo ou reservar uso. Revise os termos de cada provedor separadamente e configure `personal-approved`, `policyReviewedAt` e `policyReference` apenas nos provedores aprovados. Gemini exige `geminiTier: "paid"` e um plano pago elegível; sem isso, permanece inelegível para dados pessoais. Não altere as políticas apenas para fazer o teste.
 
 **Synthetic** é reservado a entradas inteiramente artificiais e desabilita o microfone. Não selecione essa opção para disfarçar voz real, transcrições, mensagens ou dados pessoais. A chave do provedor permanece no backend; o token da API fica somente na memória da página.
 
@@ -47,4 +47,12 @@ node --test ../call-client/tests/*.test.mjs
 
 Reinicie `npm run dev` da interface e recarregue a página após atualizar a branch. O painel **Comparação do reconhecimento de fala** funciona sem conexão com a API. Encerre a chamada, clique em **Gravar amostra**, diga “Hum, então me conta uma história legal” e clique em **Parar**. Baixe o WAV e o manifesto na mesma pasta, conferindo que o texto corresponde ao que você disse.
 
-A captura inteira fica apenas em memória nesta página até você baixar. Ela não entra no relatório normal de medições nem é enviada a provedores. Regravar substitui a amostra anterior. O limite é 30 s; a gravação usa PCM16 mono de 16 kHz e preserva a fala sem o VAD da chamada. O comparador local está documentado no README do STT.
+A captura inteira fica apenas em memória nesta página. Ela não entra no relatório normal de medições. Baixar o WAV não o envia a provedores; um envio só ocorre ao executar o teste Deepgram com a confirmação específica. Regravar substitui a amostra anterior. O limite é 30 s; a gravação usa PCM16 mono de 16 kHz e preserva a fala sem o VAD da chamada. O comparador local está documentado no README do STT.
+
+### Comparar modelos de STT e TTS
+
+Depois de gravar uma amostra, ouça o WAV, ajuste a transcrição esperada e marque que ela está correta antes de executar a comparação. Selecione **Whisper local** para usar o serviço STT ativo ou **Deepgram nova-3/nova-2** para enviar a amostra à nuvem; para Deepgram, marque também a confirmação de envio. Os resultados mostram texto reconhecido, WER, erros de palavra e latência. Cada tentativa usa a mesma gravação; isso avalia o reconhecedor, não o VAD da conversa.
+
+No painel de TTS, selecione **Qwen3-TTS Base local** ou **Cartesia sonic-3.6**, use o mesmo texto e ouça cada WAV. Qwen usa o perfil de voz local ativo e exige o token da API informado no formulário de conexão. Cartesia usa a chave `CARTESIA_API_KEY` já configurada em `code/backend/api/.env` e o ID de voz informado no painel. Marque a confirmação para autorizar o envio do texto ao Cartesia. A chave não é enviada ao navegador. A geração Cartesia só ocorre ao clicar em **Gerar amostra**; o backend local faz a chamada e devolve o áudio.
+
+O modo de avaliação é separado da chamada: não troca o provedor ativo nem o perfil de produção. A gravação só é enviada a Deepgram mediante seleção explícita e confirmação; Whisper e Qwen são executados pelos serviços locais. Deepgram exige `DEEPGRAM_API_KEY` no `.env` da API. A página fala apenas com o servidor de teste local, limitado a loopback; esse servidor lê as credenciais dos arquivos `.env` locais e não as inclui em respostas ou logs. Mantenha esses arquivos privados. Os testes de comparação não alteram configuração nem dados de produção.

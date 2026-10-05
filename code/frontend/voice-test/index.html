@@ -30,11 +30,30 @@
     </section>
     <section class="panel" aria-labelledby="stt-title">
       <h2 id="stt-title">Comparação do reconhecimento de fala</h2>
-      <p class="hint">Encerre a chamada para gravar uma amostra completa, sem os cortes do VAD. A captura fica nesta página; o download só ocorre ao clicar nos botões. Nenhum áudio é enviado à nuvem por este painel.</p>
+      <p class="hint">Encerre a chamada para gravar uma amostra completa, sem os cortes do VAD. A gravação fica nesta página. O Whisper é executado localmente; Deepgram recebe o áudio somente quando você escolhe esse modelo e confirma o envio.</p>
       <label>Fala correta para comparar<input id="stt-expected" value="Hum, então me conta uma história legal." maxlength="4000"></label>
       <label><input id="stt-verified" type="checkbox"> Conferi que esse texto corresponde ao que falei na gravação.</label>
       <div class="actions"><button id="stt-record" type="button">Gravar amostra</button><button id="stt-stop" type="button" class="secondary" disabled>Parar</button><button id="stt-wav" type="button" class="secondary" disabled>Baixar WAV</button><button id="stt-manifest" type="button" class="secondary" disabled>Baixar manifesto</button></div>
+      <div class="evaluation-controls">
+        <label>Modelo STT<select id="stt-model"><option value="faster-whisper">Whisper local (modelo ativo)</option><option value="deepgram-nova-3">Deepgram nova-3 (nuvem)</option><option value="deepgram-nova-2">Deepgram nova-2 (nuvem)</option></select></label>
+        <label id="deepgram-consent" class="consent" hidden><input id="stt-cloud-consent" type="checkbox"> Autorizo enviar esta gravação ao Deepgram para a transcrição de teste.</label>
+        <button id="stt-evaluate" type="button" disabled>Transcrever com o modelo selecionado</button>
+      </div>
       <p id="stt-record-status" class="muted" role="status">Grave a frase, confira o texto e baixe os dois arquivos na mesma pasta.</p>
+      <div id="stt-result" class="evaluation-result" role="status" hidden></div>
+    </section>
+    <section class="panel" aria-labelledby="tts-title">
+      <h2 id="tts-title">Comparação de síntese de voz</h2>
+      <p class="hint">Gere a mesma frase no Qwen local ou no Cartesia. A chamada de conversa e o provedor de produção não são alterados. Qwen usa o perfil de voz ativo na API; Cartesia usa o ID da voz clonada informado abaixo.</p>
+      <label>Texto para sintetizar<textarea id="tts-text" maxlength="220" rows="3">Hoje eu tive uma ideia diferente. Se a hipótese estiver certa, a primeira medição deve mostrar alguma coisa. Tá, você tinha razão dessa vez.</textarea></label>
+      <div class="evaluation-controls">
+        <label>Modelo TTS<select id="tts-model"><option value="qwen-base">Qwen3-TTS Base local</option><option value="cartesia-sonic-3.6">Cartesia sonic-3.6 (nuvem)</option></select></label>
+        <label id="cartesia-voice-field" hidden>ID da voz clonada no Cartesia<input id="cartesia-voice-id" value="dd8e6bee-2225-418a-9e68-753f3ec73b6b" maxlength="36" autocomplete="off"></label>
+        <label id="cartesia-tts-consent" class="consent" hidden><input id="tts-cloud-consent" type="checkbox"> Autorizo enviar este texto ao Cartesia para a síntese de teste.</label>
+        <button id="tts-generate" type="button">Gerar amostra</button>
+      </div>
+      <p id="tts-status" class="muted" role="status">A geração só começa quando você clicar no botão.</p>
+      <audio id="tts-audio" controls hidden></audio>
     </section>
     <section class="panel" aria-labelledby="timing-title">
       <div class="section-heading"><h2 id="timing-title">Medições</h2><button id="export" class="secondary">Exportar JSON</button></div>
