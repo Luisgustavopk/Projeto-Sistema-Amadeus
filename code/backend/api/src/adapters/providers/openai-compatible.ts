@@ -49,6 +49,26 @@ const StreamChunk = z.object({
     .optional(),
 });
 
+// Workers AI sometimes emits a numeric text fragment as a JSON number.
+// Normalize only that provider's content field; never stringify metadata.
+const CloudflareStreamChunk = StreamChunk.extend({
+  choices: z
+    .array(
+      z.object({
+        finish_reason: z.string().nullable().optional(),
+        delta: z
+          .object({
+            content: z
+              .union([z.string(), z.number().finite().transform(String)])
+              .nullable()
+              .optional(),
+          })
+          .optional(),
+      }),
+    )
+    .optional(),
+});
+
 function getCredentials(
   config: ProviderConfig,
   secrets: NodeJS.ProcessEnv,
@@ -304,7 +324,11 @@ export function createOpenAiCompatibleProvider(
       try {
         for await (const value of decodeServerSentEvents(response)) {
           signal?.throwIfAborted();
-          const chunk = StreamChunk.parse(value);
+          const chunk = (
+            config.adapter === 'cloudflare-ai'
+              ? CloudflareStreamChunk
+              : StreamChunk
+          ).parse(value);
           const choice = chunk.choices?.[0];
           throwIfTruncated(choice?.finish_reason);
 

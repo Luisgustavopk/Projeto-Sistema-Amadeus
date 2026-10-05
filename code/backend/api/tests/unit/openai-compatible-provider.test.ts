@@ -4,6 +4,55 @@ import { ProviderSchema } from '../../src/domain/providers/model.ts';
 
 afterEach(() => vi.unstubAllGlobals());
 
+it('preserva fragmentos numéricos do Workers AI sem sintetizar metadados', async () => {
+  const events = [
+    { choices: [{ delta: { content: 'Uma hipótese em ' } }] },
+    { choices: [{ delta: { content: 10 } }] },
+    { choices: [{ delta: { content: ' segundos.' } }] },
+    {
+      choices: [{ delta: {}, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 12, completion_tokens: 4 },
+    },
+  ];
+  vi.stubGlobal(
+    'fetch',
+    async () =>
+      new Response(
+        events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('') +
+          'data: [DONE]\n\n',
+      ),
+  );
+  const provider = createProviderFactory({
+    CLOUDFLARE_AI_TOKEN: 'test-secret',
+  })(
+    'llm',
+    ProviderSchema.parse({
+      adapter: 'cloudflare-ai',
+      model: 'test-model',
+      apiKeyEnv: 'CLOUDFLARE_AI_TOKEN',
+      accountId: 'c'.repeat(32),
+    }),
+  );
+  const chunks = [];
+
+  for await (const chunk of provider.stream!({
+    content: 'teste',
+    dataClass: 'synthetic',
+    maxTokens: 64,
+  })) {
+    chunks.push(chunk);
+  }
+
+  expect(chunks.map((c) => c.content).join('')).toBe(
+    'Uma hipótese em 10 segundos.',
+  );
+  expect(chunks.at(-1)).toMatchObject({
+    content: '',
+    inputTokens: 12,
+    outputTokens: 4,
+  });
+});
+
 it('desabilita raciocínio do Qwen para não sintetizar o bloco interno como fala', async () => {
   const fetch = vi.fn<typeof globalThis.fetch>(
     async () =>
