@@ -72,6 +72,10 @@ def test_global_errors_do_not_expose_private_details(client):
     response = client.post("/execute", json=payload(content="failure"), headers=HEADERS)
     assert response.status_code == 503
     assert "private" not in response.text
+    metrics = client.get("/metrics", headers=HEADERS).json()
+    assert metrics["failureReasons"] == {"INFERENCE_UNAVAILABLE": 1}
+    assert metrics["busy"] is False
+    assert "private" not in str(metrics)
 
 
 def test_body_limit(client):

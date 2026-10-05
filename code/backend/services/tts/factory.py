@@ -4,7 +4,7 @@ import os
 
 
 def load_engine():
-    engine = os.environ.get("TTS_ENGINE", "chatterbox")
+    engine = os.environ.get("TTS_ENGINE", "")
 
     if engine == "qwen-base":
         from .qwen.engine import QwenEngine

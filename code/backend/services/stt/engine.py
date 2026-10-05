@@ -54,7 +54,8 @@ class WhisperEngine:
             segments, _ = self.model.transcribe(
                 samples,
                 language="pt",
-                vad_filter=True,
+                vad_filter=self.config.vad_filter,
+                hotwords=self.config.hotwords or None,
                 beam_size=self.config.beam_size,
                 temperature=0.0,
                 condition_on_previous_text=False,
@@ -77,6 +78,8 @@ class WhisperEngine:
         return {
             "engine": "faster-whisper",
             "beamSize": self.config.beam_size,
+            "vadFilter": self.config.vad_filter,
+            "hotwordsConfigured": bool(self.config.hotwords),
             "model": os.environ.get("STT_MODEL", "small"),
             "device": os.environ.get("STT_DEVICE", "cpu"),
             "computeType": os.environ.get("STT_COMPUTE_TYPE", "int8"),

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from collections.abc import Callable
 from contextlib import asynccontextmanager
@@ -9,6 +10,7 @@ from fastapi.responses import JSONResponse
 
 from .contracts import Execute
 from .errors import NoSpeechDetected
+from .inference import await_inference
 from .security import SpeechSecurityMiddleware
 
 
@@ -20,6 +22,7 @@ def create_service(role: str, loader: Callable, custom_voice: bool = False):
     engine = None
     busy = False
     waiting = 0
+    failures = {}
     inference_lock = asyncio.Lock()
 
     @asynccontextmanager
@@ -76,6 +79,7 @@ def create_service(role: str, loader: Callable, custom_voice: bool = False):
             "residentMemoryBytes": psutil.Process().memory_info().rss,
             "busy": busy,
             "queuedInferences": waiting,
+            "failureReasons": dict(failures),
         }
         if engine is not None and hasattr(engine, "metrics"):
             values.update(engine.metrics())
@@ -114,16 +118,25 @@ def create_service(role: str, loader: Callable, custom_voice: bool = False):
             if await request.is_disconnected():
                 return Response(status_code=499)
             task = asyncio.create_task(asyncio.to_thread(engine.execute, data))
-            return await asyncio.shield(task)
-        except asyncio.CancelledError:
-            if task is not None:
-                await task
-            raise
+            return await await_inference(task)
         except NoSpeechDetected:
             return JSONResponse(status_code=422, content={"code": "NO_SPEECH_DETECTED"})
-        except ValueError:
+        except ValueError as error:
+            failures["INVALID_INPUT"] = failures.get("INVALID_INPUT", 0) + 1
+            logging.getLogger(__name__).error(
+                "%s input failure (%s)", role, type(error).__name__
+            )
             raise HTTPException(400, "Invalid speech input") from None
-        except Exception:  # noqa: BLE001 - sanitize errors from third-party engines
+        except Exception as error:  # noqa: BLE001 - sanitize errors from third-party engines
+            code = (
+                "RESOURCE_EXHAUSTED"
+                if type(error).__name__ == "OutOfMemoryError"
+                else "INFERENCE_UNAVAILABLE"
+            )
+            failures[code] = failures.get(code, 0) + 1
+            logging.getLogger(__name__).error(
+                "%s inference failure (%s)", role, type(error).__name__
+            )
             raise HTTPException(503, "Inference unavailable") from None
         finally:
             busy = False

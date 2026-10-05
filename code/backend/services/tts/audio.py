@@ -6,7 +6,11 @@ import numpy as np
 from scipy.signal import resample_poly
 
 
-def encode_pcm(samples: np.ndarray, sample_rate: int) -> bytes:
+def encode_pcm(
+    samples: np.ndarray, sample_rate: int, output_rate: int = 16000
+) -> bytes:
+    if output_rate not in {16000, 24000}:
+        raise ValueError("Unsupported PCM output rate")
     if sample_rate <= 0 or samples.ndim != 1:
         raise ValueError("Invalid synthesis waveform")
 
@@ -17,10 +21,10 @@ def encode_pcm(samples: np.ndarray, sample_rate: int) -> bytes:
     ):
         raise ValueError("Synthesis output invalid")
 
-    divisor = gcd(sample_rate, 16000)
-    converted = resample_poly(samples, 16000 // divisor, sample_rate // divisor)
+    divisor = gcd(sample_rate, output_rate)
+    converted = resample_poly(samples, output_rate // divisor, sample_rate // divisor)
 
-    if not np.isfinite(converted).all() or len(converted) > 16000 * 90:
+    if not np.isfinite(converted).all() or len(converted) > output_rate * 90:
         raise ValueError("Converted synthesis output invalid")
 
     # Resampling can produce peaks above full scale. Reduce the whole waveform
