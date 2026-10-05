@@ -22,6 +22,9 @@ import { createTicketService } from '../application/calls/tickets.ts';
 import { createCallAuthorization } from '../application/calls/authorization.ts';
 import { ActivityGate } from '../application/runtime/activity-gate.ts';
 import { createHealthService } from '../application/diagnostics/health.ts';
+import { createRevisionRepository } from '../adapters/database/revision-repository.ts';
+import { createPersonaConfiguration } from '../application/persona/configuration.ts';
+import { createVoiceVersions } from '../application/voice/versions.ts';
 
 export async function createContext(
   options: AppOptions,
@@ -84,6 +87,15 @@ export async function createContext(
     config.OWNER_ID,
   );
   const voiceMetrics = createVoiceMetrics();
+  const revisions = createRevisionRepository(database.client);
+  const persona = createPersonaConfiguration(revisions, config.OWNER_ID);
+  const voiceVersions = createVoiceVersions(
+    revisions,
+    config.OWNER_ID,
+    providers,
+    voiceProfiles,
+    { beginConfiguration: () => activity.beginProviderConfiguration() },
+  );
   const voiceCapabilities = createVoiceCapabilities(providers, voiceProfiles);
   const voiceSessions = createVoiceSessions({
     providers,
@@ -92,6 +104,7 @@ export async function createContext(
     gate: activity,
     metrics: voiceMetrics,
     ownerId: config.OWNER_ID,
+    persona,
   });
 
   return {
@@ -99,6 +112,8 @@ export async function createContext(
     context: {
       providers,
       voiceProfiles,
+      persona,
+      voiceVersions,
       voiceMetrics,
       voiceCapabilities,
       voiceSessions,

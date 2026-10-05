@@ -17,6 +17,11 @@ export function createVoiceSessions(dependencies: {
   gate: ExecutionGate;
   metrics: VoiceMetrics;
   ownerId: string;
+  persona?: {
+    get: () => Promise<
+      import('../persona/configuration.ts').PersonaConfiguration
+    >;
+  };
 }) {
   const runtimes = new Set<CallRuntime>();
   const openings = new Set<Promise<CallRuntime>>();
@@ -87,6 +92,7 @@ export function createVoiceSessions(dependencies: {
             dependencies.providers,
             dependencies.history,
             dependencies.metrics,
+            dependencies.persona,
           ),
           gate: dependencies.gate,
           metrics: dependencies.metrics,

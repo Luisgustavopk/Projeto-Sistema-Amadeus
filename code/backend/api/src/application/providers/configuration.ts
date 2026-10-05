@@ -14,6 +14,28 @@ export function createProviderConfiguration(
   gate: ConfigurationGate,
 ) {
   return {
+    async configureTts(
+      tts: ProvidersConfig['tts'],
+      verify?: () => Promise<void>,
+    ) {
+      const release = gate.beginConfiguration();
+
+      try {
+        await verify?.();
+        const current = await repository.get(ownerId);
+        const config = ProvidersSchema.parse({ ...current, tts });
+
+        for (const attempt of configuredProviderAttempts('tts', config.tts)) {
+          factory('tts', attempt);
+        }
+
+        await repository.save(ownerId, config);
+
+        return config;
+      } finally {
+        release();
+      }
+    },
     async configure(input: ProvidersConfig) {
       const release = gate.beginConfiguration();
 

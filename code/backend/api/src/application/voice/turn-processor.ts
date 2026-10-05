@@ -10,6 +10,10 @@ import { VoiceInputError } from '../../domain/errors/voice.ts';
 import { streamPersonaSpeech } from '../persona/speech-recovery.ts';
 import { buildSpeechOnlyPersonaPrompt } from '../persona/prompt.ts';
 import { buildVoiceContext } from './context.ts';
+import {
+  applyPersonaConfiguration,
+  type PersonaConfiguration,
+} from '../persona/configuration.ts';
 import { measureVoiceAudio } from './audio-observations.ts';
 import { createConversationStyleGuard } from '../persona/conversation-style.ts';
 import { createExpressionState } from '../../domain/persona/expression-policy.ts';
@@ -37,6 +41,7 @@ export function createTurnProcessor(
   providers: Pick<ProviderServices, 'execute' | 'executeStream'>,
   history: CallHistoryRepository,
   metrics: VoiceMetrics,
+  persona?: { get: () => Promise<PersonaConfiguration> },
 ) {
   const expressionState = createExpressionState();
 
@@ -162,6 +167,11 @@ export function createTurnProcessor(
         turn.audioObservations ??
           (turn.audio ? measureVoiceAudio(turn.audio, text) : undefined),
       );
+      const personaConfiguration = await persona?.get();
+      context.systemPrompt = applyPersonaConfiguration(
+        context.systemPrompt,
+        personaConfiguration,
+      );
       let proposal = expressionState.snapshot();
       let metadataValid = false;
       let expression = proposal;
@@ -177,7 +187,10 @@ export function createTurnProcessor(
             {
               ...context,
               systemPrompt: speechOnly
-                ? buildSpeechOnlyPersonaPrompt(expressionState.snapshot())
+                ? applyPersonaConfiguration(
+                    buildSpeechOnlyPersonaPrompt(expressionState.snapshot()),
+                    personaConfiguration,
+                  )
                 : context.systemPrompt,
               maxTokens: 512,
             },

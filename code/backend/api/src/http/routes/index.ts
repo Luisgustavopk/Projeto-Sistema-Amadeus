@@ -4,6 +4,7 @@ import { registerVoiceProfileRoutes } from './voice-profile.ts';
 import { registerSystemRoutes } from './system.ts';
 import { registerProvidersRoutes } from './providers.ts';
 import { registerConversationsRoutes } from './conversations.ts';
+import { registerPersonaRoutes } from './persona.ts';
 
 export function registerHttpRoutes(
   app: FastifyInstance,
@@ -13,4 +14,5 @@ export function registerHttpRoutes(
   registerVoiceProfileRoutes(app, context);
   registerProvidersRoutes(app, context);
   registerConversationsRoutes(app, context);
+  registerPersonaRoutes(app, context);
 }
