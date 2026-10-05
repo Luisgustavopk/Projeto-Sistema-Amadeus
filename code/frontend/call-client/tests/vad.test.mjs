@@ -64,7 +64,20 @@ test("ignores noise bursts shorter than 160 ms and preserves speech onset", () =
   }
   const onset = vad.accept(speech);
   assert.equal(onset.start, true);
-  assert.equal(onset.frames.length, 8);
+  assert.equal(onset.frames.length, 20);
+});
+
+test("retains quiet consonants before the onset confirmation without delaying onset", () => {
+  const vad = new VoiceActivityDetector();
+  const consonant = new Int16Array(320).fill(500);
+  const vowel = new Int16Array(320).fill(2000);
+  for (let index = 0; index < 12; index++) vad.accept(consonant);
+  for (let index = 0; index < 7; index++) vad.accept(vowel);
+  const onset = vad.accept(vowel);
+  assert.equal(onset.start, true);
+  assert.equal(onset.frames.length, 20);
+  assert.equal(onset.frames[0][0], 500);
+  assert.equal(onset.frames[12][0], 2000);
 });
 
 test("ignores sustained low-level noise below the speech threshold", () => {

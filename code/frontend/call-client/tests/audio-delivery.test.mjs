@@ -99,6 +99,7 @@ async function fixture(t) {
         responseId: "response",
         segmentId,
         sampleCount: 640,
+        sampleRate: 16000,
         frameCount: 2,
       });
     },
