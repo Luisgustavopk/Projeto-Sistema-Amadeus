@@ -29,7 +29,7 @@ O estado volta a `idle` quando a geração termina e `playback.ended` é recebid
 
 ## Quadros
 
-648 bytes: uint32 little-endian de sequência no offset 0, uint32 de turnId no offset 4, seguido de 640 bytes de PCM. A sequência começa em zero por fala de entrada ou segmento de saída. `audio.segment` associa responseId e segmentId à sequência binária imediatamente seguinte. O último quadro de saída pode ter zeros adicionais: sampleCount informa a duração real, sem preenchimento.
+Entrada: 648 bytes: uint32 little-endian de sequência no offset 0, uint32 de turnId no offset 4, seguido de 640 bytes de PCM. A sequência começa em zero por fala de entrada ou segmento de saída. `audio.segment` associa responseId e segmentId à sequência binária imediatamente seguinte. O último quadro de saída pode ter zeros adicionais: sampleCount informa a duração real, sem preenchimento.
 
 Entrada: 5 a 1500 quadros (100 ms a 30 s). Controle JSON: até 8192 bytes; o limite de bytes vale mesmo para textos com até 4000 caracteres. Conexão: até 30 minutos; controles: 600/min; confirmações: 180/min. Limites e backpressure protegem RAM e transporte.
 
@@ -44,3 +44,7 @@ Falha STT permite continuar enviando texto. Falha TTS mantém `reply.text` e emi
 O histórico mantém texto gerado, quantidade de áudio e amostras reproduzidas. Somente segmentos inteiros confirmados entram no contexto de fala; um trecho parcialmente reproduzido permanece registrado, mas é excluído desse contexto para não inventar palavras ouvidas.
 
 Quando uma resposta inválida chega antes de qualquer fala validada, o backend tenta uma única recuperação em texto simples, mantendo persona, contexto, política de dados e limites de uso. A recuperação é contabilizada em `personaRecoveries`; pode consumir uma chamada adicional e aumentar a latência desse turno. Depois de entregar qualquer trecho, não regenera, para evitar duplicação. Cancelamento, cota e configuração não ativam essa recuperação. Se a segunda tentativa falhar, o erro é mantido e a conexão permite outro turno.
+
+### Saída de voz em 24 kHz
+
+A captura continua em 16 kHz. Cada `audio.segment.sampleRate` define a taxa da saída: 16000 para os serviços locais ou 24000 para Cartesia. Os quadros de saída continuam com 20 ms e cabeçalho de 8 bytes: 320 amostras/648 bytes em 16 kHz; 480 amostras/968 bytes em 24 kHz. O player usa essa taxa para duração, reprodução e confirmações, descartando o preenchimento final conforme `sampleCount`. Atualize/recarregue o cliente junto com a API; clientes antigos com saída fixa em 16 kHz não reproduzem os quadros de 24 kHz.
