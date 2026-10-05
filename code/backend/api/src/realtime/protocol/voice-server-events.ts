@@ -49,6 +49,13 @@ const event = z.discriminatedUnion('type', [
   }),
   z.strictObject({ type: z.literal('reply.start'), turnId, responseId }),
   z.strictObject({
+    type: z.literal('reply.wait'),
+    turnId,
+    responseId,
+    reason: z.literal('provider-fallback'),
+    text: z.string().max(120),
+  }),
+  z.strictObject({
     type: z.literal('reply.text'),
     turnId,
     responseId,

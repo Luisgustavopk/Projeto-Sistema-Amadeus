@@ -54,6 +54,15 @@ export const VOICE_PIPELINE_PROTOCOL = {
   },
   generation:
     'LLM stream to bounded speech blocks up to 220 characters; short replies synthesized together; TTS buffered per block',
+  providerFallback: {
+    waitEvent: 'reply.wait',
+    waitScope:
+      'At most once per turn; optional preset uses normal text/audio segments',
+    continuation:
+      'One bounded recovery after quota/temporary failure; already emitted speech is passed as continuation context',
+    preserves:
+      'turnId, responseId, data classification, provider policies and budgets',
+  },
   playback:
     'Monotonic playedSamples bound to session/response/segment; only fully acknowledged segments enter spoken context',
   privacy:

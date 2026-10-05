@@ -43,7 +43,15 @@ Falha STT permite continuar enviando texto. Falha TTS mantém `reply.text` e emi
 
 O histórico mantém texto gerado, quantidade de áudio e amostras reproduzidas. Somente segmentos inteiros confirmados entram no contexto de fala; um trecho parcialmente reproduzido permanece registrado, mas é excluído desse contexto para não inventar palavras ouvidas.
 
-Quando uma resposta inválida chega antes de qualquer fala validada, o backend tenta uma única recuperação em texto simples, mantendo persona, contexto, política de dados e limites de uso. A recuperação é contabilizada em `personaRecoveries`; pode consumir uma chamada adicional e aumentar a latência desse turno. Depois de entregar qualquer trecho, não regenera, para evitar duplicação. Cancelamento, cota e configuração não ativam essa recuperação. Se a segunda tentativa falhar, o erro é mantido e a conexão permite outro turno.
+Quando uma resposta inválida chega antes de qualquer fala validada, o backend tenta uma única recuperação em texto simples, mantendo persona, contexto, política de dados e limites de uso. A recuperação é contabilizada em `personaRecoveries`; pode consumir uma chamada adicional e aumentar a latência desse turno. Depois de entregar qualquer trecho, não regenera, para evitar duplicação. Cancelamento e configuração não ativam essa recuperação de formato. Cota e indisponibilidade temporária usam a recuperação de provedor descrita abaixo. Se a segunda tentativa falhar, o erro é mantido e a conexão permite outro turno.
+
+### Troca de modelo durante o turno
+
+Cota ou indisponibilidade temporária aciona a cadeia de modelos permitidos para a classificação, preservando `turnId` e `responseId`. `reply.wait` informa `{turnId, responseId, reason: "provider-fallback", text}`. Quando habilitada, a frase de espera usa `reply.text`, expressão neutra, `audio.segment` e PCM normais, com posição e segmento próprios, no máximo uma vez por turno. Não requer LLM para gerar o texto; usa o TTS/clone ativo e os mesmos controles de reprodução e interrupção.
+
+O preset está em `code/backend/api/src/application/voice/provider-wait-presets.json`: a primeira frase de `phrases` é utilizada; `enabled: false` desliga a fala. O evento de espera continua disponível nesse caso, com texto vazio. Frases têm até 120 caracteres. O arquivo é lido na inicialização e copiado pelo build; sua edição exige reinício da API.
+
+Se a falha ocorre depois de fragmentos brutos, mas antes de uma fala validada, a recuperação reinicia a leitura do prefixo pelo próximo candidato. Se já houve fala validada, o contexto da nova geração inclui apenas o trecho fornecido ao cliente e uma direção para continuar sem repeti-lo; fragmentos não fornecidos são descartados. Existe uma recuperação de provedor adicional por turno, separada da recuperação de formato, e cancelamento interrompe ambas. A continuação natural depende da resposta do modelo e não é garantia de equivalência textual perfeita. Cotas, contabilização de cada tentativa, política de dados e bloqueios temporários continuam aplicados; quando todos os candidatos estão indisponíveis, o erro é mantido e a conexão aceita outro turno. Ouvir apenas o preset não produz `reply.done` nem conclui o turno.
 
 ### Saída de voz em 24 kHz
 

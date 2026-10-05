@@ -37,6 +37,13 @@ export type VoiceEvent =
       sampleRate: 16000 | 24000;
     }
   | { type: 'reply.done'; turnId: number; responseId: string }
+  | {
+      type: 'reply.wait';
+      turnId: number;
+      responseId: string;
+      reason: 'provider-fallback';
+      text: string;
+    }
   | { type: 'interrupted'; turnId: number; responseId: string }
   | { type: 'quota.warning'; turnId: number; role: 'llm' | 'stt' | 'tts' }
   | {

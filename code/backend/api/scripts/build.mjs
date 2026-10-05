@@ -29,6 +29,13 @@ process.exitCode = result.status ?? 1;
 if (process.exitCode === 0) {
   await copyFile(
     new URL(
+      '../src/application/voice/provider-wait-presets.json',
+      import.meta.url,
+    ),
+    resolve(output, 'application/voice/provider-wait-presets.json'),
+  );
+  await copyFile(
+    new URL(
       '../src/application/memory/memory-extraction-v1.md',
       import.meta.url,
     ),

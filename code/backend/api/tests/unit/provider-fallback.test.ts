@@ -131,6 +131,39 @@ it('usa reserva após 503 antes de qualquer chunk e contabiliza cada modelo', as
   });
   expect(test.release).toHaveBeenCalledOnce();
 });
+
+it('aguarda o aviso da chamada antes de iniciar a reserva e conserva o callback global', async () => {
+  const test = setup(temporaryFailure);
+  const order: string[] = [];
+  const result = await collect(
+    test.services.executeStream(input, undefined, {
+      onFallback: async (notice) => {
+        expect(notice.reason).toBe('PROVIDER_TEMPORARILY_UNAVAILABLE');
+        expect(test.factory).toHaveBeenCalledOnce();
+        await Promise.resolve();
+        order.push('wait-delivered');
+      },
+    }),
+  );
+  expect(result).toEqual([output]);
+  expect(order).toEqual(['wait-delivered']);
+  expect(test.notify).toHaveBeenCalledOnce();
+});
+
+it('não inicia a reserva se o turno for interrompido durante o aviso', async () => {
+  const test = setup(temporaryFailure);
+  const abort = new AbortController();
+  await expect(
+    collect(
+      test.services.executeStream(input, abort.signal, {
+        onFallback: async () => {
+          abort.abort();
+        },
+      }),
+    ),
+  ).rejects.toBeDefined();
+  expect(test.factory).toHaveBeenCalledOnce();
+});
 it('também usa reserva na execução sem streaming', async () => {
   const test = setup(temporaryFailure, {
     executeError: new ProviderTemporarilyUnavailableError(),

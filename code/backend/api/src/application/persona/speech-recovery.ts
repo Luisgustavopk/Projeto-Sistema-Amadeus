@@ -1,4 +1,8 @@
-import { ProviderInvalidError } from '../../domain/errors/providers.ts';
+import {
+  ProviderInvalidError,
+  QuotaExceededError,
+  ProviderTemporarilyUnavailableError,
+} from '../../domain/errors/providers.ts';
 import {
   NEUTRAL_EXPRESSION,
   type Expression,
@@ -9,23 +13,35 @@ import {
   validateSpokenSegment,
 } from './response-stream.ts';
 
-/** Recover once, only before any validated speech leaves this boundary. */
+/** Repair format before speech; optionally resume once after a provider failure. */
 export async function* streamPersonaSpeech(
-  source: (signal: AbortSignal, speechOnly: boolean) => AsyncIterable<string>,
+  source: (
+    signal: AbortSignal,
+    speechOnly: boolean,
+    continuation?: string,
+  ) => AsyncIterable<string>,
   signal: AbortSignal,
   onExpression: (value: Expression, valid: boolean) => void,
   onRecovery: () => void,
   validateStyle?: (text: string, delivered: boolean) => void,
+  onProviderRecovery?: () => Promise<void>,
 ): AsyncIterable<string> {
   let delivered = false;
+  const spoken: string[] = [];
+  let speechOnly = false;
+  let providerRecovered = false;
+  let formatRecovered = false;
 
-  for (const speechOnly of [false, true]) {
+  while (true) {
     let usable = false;
 
     try {
       for await (const segment of streamSpeech(
         (streamSignal) =>
-          readPersonaResponse(source(streamSignal, speechOnly), onExpression),
+          readPersonaResponse(
+            source(streamSignal, speechOnly, spoken.join(' ')),
+            onExpression,
+          ),
         signal,
       )) {
         const text = validateSpokenSegment(segment);
@@ -34,6 +50,7 @@ export async function* streamPersonaSpeech(
           validateStyle?.(text, delivered);
           usable = true;
           delivered = true;
+          spoken.push(text);
           yield text;
         }
       }
@@ -45,8 +62,23 @@ export async function* streamPersonaSpeech(
       return;
     } catch (error) {
       if (
+        !signal.aborted &&
+        !providerRecovered &&
+        onProviderRecovery &&
+        (error instanceof QuotaExceededError ||
+          error instanceof ProviderTemporarilyUnavailableError)
+      ) {
+        providerRecovered = true;
+        await onProviderRecovery();
+        signal.throwIfAborted();
+        speechOnly ||= delivered;
+        continue;
+      }
+
+      if (
         signal.aborted ||
         delivered ||
+        formatRecovered ||
         speechOnly ||
         !(error instanceof ProviderInvalidError)
       ) {
@@ -55,6 +87,8 @@ export async function* streamPersonaSpeech(
 
       onExpression({ ...NEUTRAL_EXPRESSION }, false);
       onRecovery();
+      formatRecovered = true;
+      speechOnly = true;
     }
   }
 }

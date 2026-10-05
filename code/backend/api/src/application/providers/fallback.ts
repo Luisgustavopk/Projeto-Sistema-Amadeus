@@ -86,7 +86,7 @@ export function notifyFallback(
   error: unknown,
   notify?: NotifyProviderFallback,
 ) {
-  notify?.({
+  const notice: ProviderFallbackNotice = {
     fromProvider: from.adapter,
     fromModel: from.model!,
     toProvider: to.adapter,
@@ -97,5 +97,8 @@ export function notifyFallback(
         : error instanceof QuotaExceededError
           ? 'QUOTA_EXCEEDED'
           : 'PROVIDER_TEMPORARILY_UNAVAILABLE',
-  });
+  };
+  notify?.(notice);
+
+  return notice;
 }

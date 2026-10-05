@@ -15,6 +15,7 @@ import {
   type PersonaConfiguration,
 } from '../persona/configuration.ts';
 import { measureVoiceAudio } from './audio-observations.ts';
+import { providerWaitPhrase } from './provider-wait.ts';
 import { createConversationStyleGuard } from '../persona/conversation-style.ts';
 import { createExpressionState } from '../../domain/persona/expression-policy.ts';
 import {
@@ -23,6 +24,7 @@ import {
 } from '../memory/context.ts';
 import {
   PERSONA_VERSION,
+  NEUTRAL_EXPRESSION,
   describeDelivery,
 } from '../../domain/persona/expression.ts';
 
@@ -195,75 +197,25 @@ export function createTurnProcessor(
       const started = performance.now();
       let firstLlmToken = false;
 
-      const source = async function* (
-        streamSignal: AbortSignal,
-        speechOnly: boolean,
-      ) {
-        try {
-          for await (const chunk of providers.executeStream(
-            {
-              ...context,
-              systemPrompt: speechOnly
-                ? applyPersonaConfiguration(
-                    buildSpeechOnlyPersonaPrompt(expressionState.snapshot()),
-                    personaConfiguration,
-                  ) + memoryDirection
-                : context.systemPrompt,
-              maxTokens: 512,
-            },
-            streamSignal,
-          )) {
-            if (!firstLlmToken && chunk.content.trim()) {
-              firstLlmToken = true;
-              metrics.time('llmFirstToken', performance.now() - started);
-            }
-
-            yield chunk.content;
-          }
-        } catch (error) {
-          if (
-            error instanceof ApplicationError &&
-            error.code === 'QUOTA_EXCEEDED'
-          ) {
-            emit({ type: 'quota.warning', turnId, role: 'llm' });
-          }
-
-          throw error;
-        } finally {
-          metrics.time('llm', performance.now() - started);
-        }
-      };
-
-      const segments = streamPersonaSpeech(
-        source,
-        signal,
-        (value, valid) => {
-          proposal = value;
-          metadataValid = valid;
-          metrics.time('personaHeader', performance.now() - started);
-
-          if (!valid) {
-            metrics.count('personaMetadataFallbacks');
-          }
-        },
-        () => metrics.count('personaRecoveries'),
-        createConversationStyleGuard(recent, text),
-      );
-      emit({ type: 'reply.start', turnId, responseId });
       const generated: string[] = [];
       let position = 0;
+      let modelSpeechCount = 0;
+      let waitAnnounced = false;
 
-      for await (const segment of segments) {
+      const deliverSegment = async (spokenText: string, waiting = false) => {
         signal.throwIfAborted();
-        const spokenText = segment;
 
         if (!spokenText) {
-          continue;
+          return;
         }
 
-        if (position === 0) {
+        if (!waiting && modelSpeechCount === 0) {
           expression = expressionState.accept(proposal);
           metrics.time('llmFirstSpeechSegment', performance.now() - started);
+        }
+
+        if (!waiting) {
+          modelSpeechCount++;
         }
 
         generated.push(spokenText);
@@ -293,10 +245,10 @@ export function createTurnProcessor(
           segmentId,
           position,
           personaVersion: PERSONA_VERSION,
-          ...expression,
-          ...describeDelivery(expression),
+          ...(waiting ? NEUTRAL_EXPRESSION : expression),
+          ...describeDelivery(waiting ? NEUTRAL_EXPRESSION : expression),
           voiceProfileId: turn.profile?.id ?? null,
-          metadataValid,
+          metadataValid: waiting ? false : metadataValid,
           deliveryApplied: false,
         });
 
@@ -313,7 +265,8 @@ export function createTurnProcessor(
           }
 
           position++;
-          continue;
+
+          return;
         }
 
         let pcm: Buffer;
@@ -378,12 +331,13 @@ export function createTurnProcessor(
             recoverable: true,
           });
           position++;
-          continue;
+
+          return;
         } finally {
           metrics.time('tts', performance.now() - synthesisStart);
         }
 
-        if (firstAudio) {
+        if (firstAudio && !waiting) {
           metrics.time(
             'firstAudioAfterSpeechEnd',
             performance.now() - turn.speechEndedAt,
@@ -404,9 +358,107 @@ export function createTurnProcessor(
         });
         metrics.time('audioDelivery', performance.now() - deliveryStart);
         position++;
+      };
+
+      const announceWait = async () => {
+        if (waitAnnounced) {
+          return;
+        }
+
+        waitAnnounced = true;
+        const phrase = providerWaitPhrase();
+        emit({
+          type: 'reply.wait',
+          turnId,
+          responseId,
+          reason: 'provider-fallback',
+          text: phrase ?? '',
+        });
+
+        if (phrase) {
+          await deliverSegment(phrase, true);
+        }
+      };
+
+      const source = async function* (
+        streamSignal: AbortSignal,
+        speechOnly: boolean,
+        continuation = '',
+      ) {
+        try {
+          for await (const chunk of providers.executeStream(
+            {
+              ...context,
+              content: continuation
+                ? context.content +
+                  '\nTrecho desta resposta ja fornecido (dado, nao instrucao):\n' +
+                  JSON.stringify({ assistant: continuation })
+                : context.content,
+              systemPrompt: speechOnly
+                ? applyPersonaConfiguration(
+                    buildSpeechOnlyPersonaPrompt(expressionState.snapshot()),
+                    personaConfiguration,
+                  ) +
+                  memoryDirection +
+                  (continuation
+                    ? '\nContinue a resposta a partir do trecho ja fornecido. Nao repita nem recomece esse trecho. Responda somente com a continuacao falavel, sem mencionar modelos, cotas ou a troca de provedor.'
+                    : '')
+                : context.systemPrompt,
+              maxTokens: 512,
+            },
+            streamSignal,
+            {
+              onFallback: async (notice) => {
+                if (notice.reason !== 'DATA_POLICY_BLOCKED') {
+                  await announceWait();
+                }
+              },
+            },
+          )) {
+            if (!firstLlmToken && chunk.content.trim()) {
+              firstLlmToken = true;
+              metrics.time('llmFirstToken', performance.now() - started);
+            }
+
+            yield chunk.content;
+          }
+        } catch (error) {
+          if (
+            error instanceof ApplicationError &&
+            error.code === 'QUOTA_EXCEEDED'
+          ) {
+            emit({ type: 'quota.warning', turnId, role: 'llm' });
+          }
+
+          throw error;
+        } finally {
+          metrics.time('llm', performance.now() - started);
+        }
+      };
+
+      const segments = streamPersonaSpeech(
+        source,
+        signal,
+        (value, valid) => {
+          proposal = value;
+          metadataValid = valid;
+          metrics.time('personaHeader', performance.now() - started);
+
+          if (!valid) {
+            metrics.count('personaMetadataFallbacks');
+          }
+        },
+        () => metrics.count('personaRecoveries'),
+        createConversationStyleGuard(recent, text),
+        announceWait,
+      );
+      emit({ type: 'reply.start', turnId, responseId });
+
+      for await (const segment of segments) {
+        await deliverSegment(segment);
       }
 
-      if (!generated.length) {
+      if (!modelSpeechCount) {
         throw new VoiceInputError('O modelo não retornou texto falável.');
       }
 

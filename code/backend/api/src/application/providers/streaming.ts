@@ -25,7 +25,12 @@ import {
   canUseFallback,
   notifyFallback,
   type NotifyProviderFallback,
+  type ProviderFallbackNotice,
 } from './fallback.ts';
+
+export type ProviderStreamOptions = {
+  onFallback?: (notice: ProviderFallbackNotice) => void | Promise<void>;
+};
 
 export function createProviderStreaming(
   configuration: ProviderConfigurationRepository,
@@ -40,6 +45,7 @@ export function createProviderStreaming(
     async *executeStream(
       input: ProviderInput,
       signal?: AbortSignal,
+      options: ProviderStreamOptions = {},
     ): AsyncIterable<ProviderOutput> {
       validateProviderInput('llm', input);
       const release = gate.beginExecution();
@@ -56,16 +62,25 @@ export function createProviderStreaming(
           input.dataClass,
         );
 
+        const fallback = async (
+          from: typeof providerConfig,
+          to: typeof providerConfig,
+          error: unknown,
+        ) => {
+          const notice = notifyFallback(from, to, error, onFallback);
+          await options.onFallback?.(notice);
+          signal?.throwIfAborted();
+        };
+
         if (!attempts.length) {
           assertProviderCanExecute(configuredAttempts[0]!, input.dataClass);
         }
 
         if (attempts[0] !== configuredAttempts[0]) {
-          notifyFallback(
+          await fallback(
             configuredAttempts[0]!,
             attempts[0]!,
             new DataPolicyBlockedError(),
-            onFallback,
           );
         }
 
@@ -87,7 +102,7 @@ export function createProviderStreaming(
               throw blocked;
             }
 
-            notifyFallback(config, next, blocked, onFallback);
+            await fallback(config, next, blocked);
             continue;
           }
 
@@ -111,7 +126,7 @@ export function createProviderStreaming(
               throw error;
             }
 
-            notifyFallback(config, next, error, onFallback);
+            await fallback(config, next, error);
             continue;
           }
 
@@ -205,12 +220,7 @@ export function createProviderStreaming(
           }
 
           if (retry) {
-            notifyFallback(
-              config,
-              attempts[index + 1]!,
-              fallbackError,
-              onFallback,
-            );
+            await fallback(config, attempts[index + 1]!, fallbackError);
           }
         }
       } finally {
