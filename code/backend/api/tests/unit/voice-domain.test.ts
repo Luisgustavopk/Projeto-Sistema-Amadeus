@@ -58,17 +58,17 @@ it('mantém a classificação mais restritiva do histórico', () => {
     ).dataClass,
   ).toBe('local-only');
 });
-it('limita o contexto de voz a doze turnos recentes e mensagens curtas', () => {
+it('limita o contexto de voz a doze turnos recentes sem perder mensagens curtas', () => {
   const history = Array.from({ length: 14 }, (_, index) => ({
-    userText: String(index).repeat(700),
-    generatedText: String(index + 1).repeat(700),
+    userText: `Turno ${index}.`,
+    generatedText: `Resposta ${index}.`,
     dataClass: 'synthetic' as const,
   }));
   const context = buildVoiceContext(history, 'nova fala', 'synthetic').content;
-  expect(context).not.toContain('"user":"0');
-  expect(context).toContain('"user":"2');
-  expect(context).toContain('2'.repeat(600));
-  expect(context).not.toContain('2'.repeat(601));
+  expect(context).not.toContain('"user":"Turno 0.');
+  expect(context).not.toContain('"user":"Turno 1.');
+  expect(context).toContain('"user":"Turno 2.');
+  expect(context).toContain('"assistantConfirmed":"Resposta 13.');
 });
 it('troca provedores com chamada ociosa e bloqueia durante um turno', () => {
   const gate = new ActivityGate(1);

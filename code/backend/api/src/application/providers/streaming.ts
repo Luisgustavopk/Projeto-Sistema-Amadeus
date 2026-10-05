@@ -1,4 +1,5 @@
 import { selectProviderAttempts } from './routing.ts';
+import { setTimeout as delay } from 'node:timers/promises';
 import type { ProviderConfigurationRepository } from '../../ports/provider-configuration-repository.ts';
 import type { ProviderUsageRepository } from '../../ports/provider-usage-repository.ts';
 import type {
@@ -62,6 +63,8 @@ export function createProviderStreaming(
           );
         }
 
+        let retriedLastAttempt = false;
+
         for (let index = 0; index < attempts.length; index++) {
           signal?.throwIfAborted();
           const config = attempts[index]!;
@@ -93,6 +96,7 @@ export function createProviderStreaming(
           let settled = false;
           let delivered = false;
           let retry = false;
+          let retrySameProvider = false;
           let fallbackError: unknown;
 
           try {
@@ -140,7 +144,19 @@ export function createProviderStreaming(
           } catch (error) {
             const next = attempts[index + 1];
 
-            if (settled || !next || !canUseFallback(error, signal, delivered)) {
+            if (settled || !canUseFallback(error, signal, delivered)) {
+              throw error;
+            }
+
+            // The last eligible provider may be the only one approved for
+            // personal data. Retry it once, with a new budget reservation,
+            // only on temporary failure before any chunk was delivered.
+            retrySameProvider =
+              !next &&
+              !retriedLastAttempt &&
+              !(error instanceof QuotaExceededError);
+
+            if (!next && !retrySameProvider) {
               throw error;
             }
 
@@ -150,6 +166,13 @@ export function createProviderStreaming(
             if (!settled) {
               await usage.settle(reservation, null);
             }
+          }
+
+          if (retrySameProvider) {
+            retriedLastAttempt = true;
+            await delay(400, undefined, { signal });
+            index--;
+            continue;
           }
 
           if (retry) {

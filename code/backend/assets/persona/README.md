@@ -1,10 +1,30 @@
 # Persona
 
-Persona de execução: **kurisu-amadeus-0.4.6**. A personalidade define padrões de atuação; não contém fatos privados do usuário nem depende de memória pessoal.
+Persona de execução: **kurisu-amadeus-0.4.8**. A personalidade define padrões de atuação; não contém fatos privados do usuário nem depende de memória pessoal.
+
+Em 05/10/2026, o usuário declarou a avaliação vocal concluída e aprovou a qualidade atual da voz para avançar. Esse aceite substitui a pendência de escuta para a transição de fase, sem atribuir notas numéricas ou alegar a execução do benchmark de 30 falas × três gerações. As fichas antigas preservam o estado registrado na coleta; controles emocionais nativos continuam sem validação específica.
 
 ## Fonte e decisões
 
 [source-v0.4.md](source-v0.4.md) preserva a análise fornecida pelo usuário. É material de referência, não um arquivo de instruções executado nem conteúdo enviado integralmente aos provedores. Observações textuais, quadros visuais e hipóteses de atuação mantêm as limitações de método registradas pelo autor; esta implementação não comprova uma análise acústica ou fidelidade canônica.
+
+O documento completo está salvo no projeto, sem alterações em relação ao original fornecido. Desde a versão 0.4.7, [document-reference.ts](../../api/src/application/persona/document-reference.ts) lê diretamente as seções **3.12, 5.2–5.6 e 14.5** como complemento: síntese comportamental, fala em pt-BR e exemplos condicionais. Os trechos são incluídos no prompt de cada turno, inclusive na recuperação em fala simples, separados do histórico real. O prompt estruturado continua tendo prioridade sobre o documento; identidade, recorte, memória, capacidades e formato de saída permanecem definidos pelo código existente.
+
+A leitura ocorre uma vez na inicialização; reinicie a API após editar o documento. O build inclui uma cópia integral em `api/dist/application/persona/source-v0.4.md`, permitindo executar a API compilada sem depender do arquivo em Downloads. Seções ausentes ou complemento acima de 6000 caracteres são recusados sem truncamento silencioso. O prompt completo, incluindo a skill, está sujeito ao limite de 32768 caracteres da API. O aumento de contexto pode elevar consumo e latência; a fidelidade comportamental exige avaliação comparativa.
+
+## Skill de conversa — versão 0.4.8
+
+[skill-amadeus-kurisu.md](../../api/src/application/persona/skill-amadeus-kurisu.md) é carregada diretamente em cada prompt, inclusive na recuperação. Suas seções 0–2 e 4–10 orientam percepção contextual, naturalidade, familiaridade, cuidado e expressão. A seção 13 registra as decisões D1, D3–D7, D12 e D13 aprovadas pelo usuário. O formato técnico, os limites de memória e as decisões de execução resolvem conflitos entre documentos. O build leva uma cópia da skill junto com a API.
+
+Ficção solicitada permite narrar em primeira pessoa dentro do enquadramento imaginário. Isso não autoriza alegar vida real, converter uma história em memória ou manter uma falsa identidade humana diante de pergunta sincera. A morte da original pode ser discutida como informação da obra.
+
+Familiaridade deriva somente do histórico confirmado da mesma conversa: F0 (0–2 turnos completos), F1 (3–9), F2 (10 ou mais disponíveis). Cinco aberturas/fechos acompanham o contexto; uma abertura longa idêntica ou automatismo pode iniciar uma única recuperação antes da fala. Repetição solicitada é permitida. Isso não é um detector infalível de repetição semântica.
+
+Com entrada de voz, o backend calcula duração, RMS, pico, fração de quadros de baixa energia e ritmo estimado da transcrição. Os números acompanham a mesma classificação de dados da fala; não há classificador de emoção, inferência de pressa ou acesso ao tom com entrada apenas textual.
+
+Avaliação: `npm run eval:persona -- --skill --run --limit=12`, com opção de `--model` para cada candidato já configurado. A triagem registra tiques de assistente e excesso de perguntas, sem reprovar automaticamente uma atividade fictícia explicitamente pedida. `npm run check:skill-voice` prepara quatro WAVs sintéticos e uma ficha de escuta, contabilizando o uso normal. Até aprovação auditiva dos resultados, os presets permanecem direções de redação/pontuação; controles emocionais nativos continuam desativados e `deliveryApplied` permanece `false`.
+
+Ensaio inicial da 0.4.8: quatro respostas sintéticas foram coletadas com Cloudflare, incluindo narrativa fictícia direta, ausência de rotina real, identidade de IA e discussão da morte como ficção. A triagem estrutural não apontou falhas nesses quatro casos; isso não comprova naturalidade nem é revisão cega. Groq falhou no primeiro caso; Cloudflare e Gemini tiveram indisponibilidade antes de completar os demais cenários. Foram geradas as quatro amostras vocais de direção artística, todas em 24 kHz, com revisão auditiva pendente. Relatórios locais ficam em `api/data/persona-evals/` e `api/data/skill-voice/`; nenhuma decisão aprovou automaticamente a qualidade não avaliada.
 
 Em 04/10/2026, o usuário aprovou o recorte anterior à viagem de Kurisu ao Japão. O prompt distingue a biografia ficcional da personagem de vivências reais da IA. Não há lembranças próprias de Okabe, D-Mail, laboratório posterior ou morte, nem identificação do usuário com personagens. A biografia usada é mínima: neurociência, memória/cognição, contexto acadêmico nos EUA e projeto Amadeus com Maho e Leskinen. Detalhes incertos de idade, família, gostos e eventos não foram acrescentados.
 

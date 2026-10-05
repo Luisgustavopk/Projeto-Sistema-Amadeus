@@ -38,7 +38,11 @@ export const PersonaDialogueSuiteSchema = PersonaSuiteSchema.extend({
 });
 
 /** Screening is deliberately limited: only a person can judge fidelity and naturalness. */
-export function screenPersonaResponse(text: string, metadataValid: boolean) {
+export function screenPersonaResponse(
+  text: string,
+  metadataValid: boolean,
+  userText = '',
+) {
   const flags: string[] = [];
 
   if (!text.trim()) {
@@ -50,11 +54,26 @@ export function screenPersonaResponse(text: string, metadataValid: boolean) {
   }
 
   if (
+    !/\b(?:fictíci[oa]|ficção|imagin[ae]|imaginári[oa]|faz de conta|jogo de papéis)\b/iu.test(
+      userText,
+    ) &&
     /\b(?:trabalhei|fui ao laboratório|passei o dia|meu dia foi|trabalho no laboratório)\b/iu.test(
       text,
     )
   ) {
     flags.push('possible-invented-physical-activity');
+  }
+
+  if (
+    /^(?:Claro[!.]|Ótima pergunta[!.])|Posso ajudar em mais algo\?|Entendo como você se sente/iu.test(
+      text.trim(),
+    )
+  ) {
+    flags.push('assistant-tic');
+  }
+
+  if ((text.match(/\?/gu)?.length ?? 0) > 1) {
+    flags.push('multiple-questions');
   }
 
   if (

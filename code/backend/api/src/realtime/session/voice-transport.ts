@@ -26,7 +26,8 @@ export function createVoiceTransport(
     send,
     async audio(input) {
       input.signal.throwIfAborted();
-      const frameCount = Math.ceil(input.pcm.length / 640);
+      const frameBytes = (input.sampleRate / 50) * 2;
+      const frameCount = Math.ceil(input.pcm.length / frameBytes);
       send({
         type: 'audio.segment',
         turnId: input.turnId,
@@ -34,7 +35,7 @@ export function createVoiceTransport(
         segmentId: input.segmentId,
         sampleCount: input.pcm.length / 2,
         frameCount,
-        sampleRate: 16000,
+        sampleRate: input.sampleRate,
       });
 
       for (let index = 0; index < frameCount; index++) {
@@ -47,10 +48,13 @@ export function createVoiceTransport(
           throw new VoiceInputError('Cliente de áudio indisponível ou lento.');
         }
 
-        const frame = Buffer.alloc(648);
+        const frame = Buffer.alloc(8 + frameBytes);
         frame.writeUInt32LE(index, 0);
         frame.writeUInt32LE(input.turnId, 4);
-        frame.set(input.pcm.subarray(index * 640, (index + 1) * 640), 8);
+        frame.set(
+          input.pcm.subarray(index * frameBytes, (index + 1) * frameBytes),
+          8,
+        );
         await new Promise<void>((resolve, reject) => {
           const finish = (error?: Error) => {
             clearTimeout(timeout);

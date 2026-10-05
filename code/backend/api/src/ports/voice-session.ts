@@ -34,7 +34,7 @@ export type VoiceEvent =
       segmentId: string;
       sampleCount: number;
       frameCount: number;
-      sampleRate: 16000;
+      sampleRate: 16000 | 24000;
     }
   | { type: 'reply.done'; turnId: number; responseId: string }
   | { type: 'interrupted'; turnId: number; responseId: string }
@@ -53,6 +53,7 @@ export interface VoiceSink {
     responseId: string;
     segmentId: string;
     pcm: Uint8Array;
+    sampleRate: 16000 | 24000;
     signal: AbortSignal;
   }): Promise<void>;
 }

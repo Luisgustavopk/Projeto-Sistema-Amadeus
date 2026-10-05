@@ -5,6 +5,8 @@ export type StoredTurn = {
   userText: string;
   generatedText: string;
   dataClass: DataClass;
+  responseStatus?: TurnStatus;
+  partiallyPlayed?: boolean;
 };
 export interface CallHistoryRepository {
   startSession(input: {

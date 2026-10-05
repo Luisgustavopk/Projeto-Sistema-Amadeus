@@ -4,7 +4,7 @@ import { createTurnProcessor } from '../../src/application/voice/turn-processor.
 import { createVoiceMetrics } from '../../src/application/voice/metrics.ts';
 import type { CallHistoryRepository } from '../../src/ports/call-history-repository.ts';
 
-it('entrega uma frase antes do fim da geração', async () => {
+it('entrega um bloco longo antes do fim da geração', async () => {
   let finish = () => {};
 
   const pending = new Promise<void>((resolve) => {
@@ -12,7 +12,9 @@ it('entrega uma frase antes do fim da geração', async () => {
   });
 
   const source = async function* () {
-    yield 'Olá. ';
+    yield 'Uma frase completa com contexto suficiente para manter a voz. '.repeat(
+      4,
+    );
     await pending;
     yield 'Estou aqui.';
   };
@@ -22,9 +24,18 @@ it('entrega uma frase antes do fim da geração', async () => {
   ]();
 
   try {
-    expect(await stream.next()).toEqual({ value: 'Olá.', done: false });
+    expect(await stream.next()).toEqual({
+      value: 'Uma frase completa com contexto suficiente para manter a voz. '
+        .repeat(3)
+        .trim(),
+      done: false,
+    });
     finish();
-    expect(await stream.next()).toEqual({ value: 'Estou aqui.', done: false });
+    expect(await stream.next()).toEqual({
+      value:
+        'Uma frase completa com contexto suficiente para manter a voz. Estou aqui.',
+      done: false,
+    });
     expect((await stream.next()).done).toBe(true);
   } finally {
     finish();
@@ -59,10 +70,10 @@ it('preserva a frase completa quando uma vírgula chega antes da continuação',
     expect(delivered).toBe(false);
     finish();
     expect(await first).toEqual({
-      value: 'Histórias requerem narração, o que já estamos fazendo aqui.',
+      value:
+        'Histórias requerem narração, o que já estamos fazendo aqui. Outra frase.',
       done: false,
     });
-    expect(await stream.next()).toEqual({ value: 'Outra frase.', done: false });
     expect((await stream.next()).done).toBe(true);
   } finally {
     finish();
@@ -105,7 +116,9 @@ it('cancela a leitura pendente quando o consumidor interrompe', async () => {
   let aborted = false;
 
   const source = async function* (signal: AbortSignal) {
-    yield 'Olá. ';
+    yield 'Uma frase completa com contexto suficiente para manter a voz. '.repeat(
+      4,
+    );
     await new Promise<void>((resolve) => {
       signal.addEventListener(
         'abort',
@@ -169,7 +182,10 @@ it('inicia TTS enquanto a geração ainda está aberta e mantém ordem', async (
       async *executeStream(input) {
         expect(input.maxTokens).toBe(512);
         yield {
-          content: 'Primeira frase. ',
+          content:
+            'Uma frase completa com contexto suficiente para manter a voz. '.repeat(
+              4,
+            ),
           inputTokens: null,
           outputTokens: null,
         };
@@ -203,6 +219,25 @@ it('inicia TTS enquanto a geração ainda está aberta e mantém ordem', async (
     },
     { send: (event) => events.push(event.type), audio: async () => {} },
   );
-  expect(spoken).toEqual(['Primeira frase.', 'Segunda frase.']);
+  expect(spoken).toEqual([
+    'Uma frase completa com contexto suficiente para manter a voz. '
+      .repeat(3)
+      .trim(),
+    'Uma frase completa com contexto suficiente para manter a voz. Segunda frase.',
+  ]);
   expect(events.at(-1)).toBe('reply.done');
+});
+
+it('keeps short sentences in one synthesis block', async () => {
+  const segments: string[] = [];
+
+  for await (const segment of streamSpeech(async function* () {
+    yield 'Sim. ';
+    yield 'Vamos conferir? ';
+    yield 'Agora faz sentido!';
+  }, new AbortController().signal)) {
+    segments.push(segment);
+  }
+
+  expect(segments).toEqual(['Sim. Vamos conferir? Agora faz sentido!']);
 });

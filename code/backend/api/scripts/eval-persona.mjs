@@ -26,19 +26,23 @@ import { createProviderStreaming } from '../src/application/providers/streaming.
 import { ProviderSchema } from '../src/domain/providers/model.ts';
 import { providerAttempts } from '../src/application/providers/fallback.ts';
 import { ActivityGate } from '../src/application/runtime/activity-gate.ts';
+import { createConversationStyleGuard } from '../src/application/persona/conversation-style.ts';
 
 async function main() {
   const args = process.argv.slice(2);
   const dialogue = args.includes('--dialogue');
+  const skill = args.includes('--skill');
   const suite = (
-    dialogue ? PersonaDialogueSuiteSchema : PersonaSuiteSchema
+    dialogue || skill ? PersonaDialogueSuiteSchema : PersonaSuiteSchema
   ).parse(
     JSON.parse(
       await readFile(
         new URL(
-          dialogue
-            ? '../../evals/persona/dialogue-v1.json'
-            : '../../evals/persona/scenarios-v1.json',
+          skill
+            ? '../../evals/persona/skill-v1.json'
+            : dialogue
+              ? '../../evals/persona/dialogue-v1.json'
+              : '../../evals/persona/scenarios-v1.json',
           import.meta.url,
         ),
         'utf8',
@@ -66,9 +70,11 @@ async function main() {
       `${suite.cases.length} cenários validados. Persona ${PERSONA_VERSION}.`,
     );
     console.log(
-      dialogue
-        ? 'Para gerar respostas sintéticas: npm run eval:persona -- --dialogue --run --limit=4'
-        : 'Para gerar respostas sintéticas: npm run eval:persona -- --run --limit=30',
+      skill
+        ? 'Para gerar respostas sintéticas: npm run eval:persona -- --skill --run --limit=12'
+        : dialogue
+          ? 'Para gerar respostas sintéticas: npm run eval:persona -- --dialogue --run --limit=4'
+          : 'Para gerar respostas sintéticas: npm run eval:persona -- --run --limit=30',
     );
     console.log(
       'Escolha opcional: --model=<modelo já configurado>. Consome a cota normal; revisão humana continua necessária.',
@@ -190,6 +196,7 @@ async function main() {
           () => {
             recoveries++;
           },
+          createConversationStyleGuard(scenario.history, scenario.text),
         )) {
           const text = segment;
           if (text) {
@@ -213,7 +220,7 @@ async function main() {
         firstSegmentMs,
         durationMs: performance.now() - started,
         errorCode,
-        screening: screenPersonaResponse(text, metadataValid),
+        screening: screenPersonaResponse(text, metadataValid, scenario.text),
         scores: null,
         disqualifications: null,
       });

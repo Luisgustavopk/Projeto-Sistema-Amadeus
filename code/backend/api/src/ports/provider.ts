@@ -24,7 +24,7 @@ export type ProviderOutput = {
   content: string;
   inputTokens: number | null;
   outputTokens: number | null;
-  audio?: { pcmBase64: string; sampleRate: 16000; channels: 1 };
+  audio?: { pcmBase64: string; sampleRate: 16000 | 24000; channels: 1 };
 };
 
 export interface Provider {

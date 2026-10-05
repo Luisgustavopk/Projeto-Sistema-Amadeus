@@ -35,7 +35,7 @@ const Output = z.strictObject({
   audio: z
     .strictObject({
       pcmBase64: z.string().max(4194304),
-      sampleRate: z.literal(16000),
+      sampleRate: z.union([z.literal(16000), z.literal(24000)]),
       channels: z.literal(1),
     })
     .optional(),

@@ -31,7 +31,13 @@ it.each([
   '<expression>{"intent":"conversar"}',
   '{"spokenText":"oi"}',
   '*suspira*',
+  'expression',
+  '  EXPRESSION. ',
+  'intent:',
   '(expression)["intent":"conversar"] Olá.',
+  '<think>Vou analisar antes de responder.</think> Olá.',
+  '<thinking>Texto interno. Outro passo.</thinking> Olá.',
+  '<analysis>Conteúdo interno.</analysis> Olá.',
 ])('recupera uma vez antes da fala para saída inválida %s', async (invalid) => {
   const attempts: boolean[] = [];
   const result = await collect(async function* (_signal, speechOnly) {
@@ -45,10 +51,14 @@ it.each([
 
 it('não regenera depois de entregar uma frase nem repete fala', async () => {
   const attempts: boolean[] = [];
+  const first =
+    'Primeira frase com contexto suficiente para uma fala contínua. '
+      .repeat(4)
+      .trim();
   const stream = streamPersonaSpeech(
     async function* (_signal, speechOnly) {
       attempts.push(speechOnly);
-      yield 'Primeira frase. ';
+      yield first;
 
       throw new ProviderInvalidError();
     },
@@ -56,7 +66,9 @@ it('não regenera depois de entregar uma frase nem repete fala', async () => {
     vi.fn(),
     vi.fn(),
   )[Symbol.asyncIterator]();
-  expect((await stream.next()).value).toBe('Primeira frase.');
+  expect((await stream.next()).value).toBe(
+    first.split('. ').slice(0, 3).join('. ') + '.',
+  );
   await expect(stream.next()).rejects.toBeInstanceOf(ProviderInvalidError);
   expect(attempts).toEqual([false]);
 });
@@ -102,4 +114,15 @@ it('recuperação conserva a persona e remove instruções de metadados', () => 
   expect(prompt).toContain('REFERÊNCIA CURADA:');
   expect(prompt).not.toContain('<expression>');
   expect(prompt).not.toContain('EXPRESSÃO:');
+});
+
+it('ênfase em Markdown e numeração simples não causam regeneração da resposta', async () => {
+  const result = await collect(async function* () {
+    yield '1. **Teste cego**: compare as duas gravações. ';
+    yield '2. **Depois**, avalie a naturalidade.';
+  });
+  expect(result.text).toEqual([
+    'Teste cego: compare as duas gravações. Depois, avalie a naturalidade.',
+  ]);
+  expect(result.recover).not.toHaveBeenCalled();
 });

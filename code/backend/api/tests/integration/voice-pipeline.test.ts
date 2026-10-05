@@ -48,6 +48,7 @@ async function fixture(
     noVoiceProfile?: boolean;
     llmResponse?: string;
     llmResponses?: string[];
+    ttsSampleRate?: 16000 | 24000;
   } = {},
 ) {
   const requests: { role: string; content: string }[] = [];
@@ -136,7 +137,7 @@ async function fixture(
           ? {
               audio: {
                 pcmBase64: Buffer.alloc(1280).toString('base64'),
-                sampleRate: 16000,
+                sampleRate: options.ttsSampleRate ?? 16000,
                 channels: 1,
               },
             }
@@ -177,6 +178,7 @@ async function fixture(
       {
         adapter: 'http-json',
         endpoint: base + '/' + role,
+        ...(role === 'stt' ? { dataPolicy: 'local-approved' } : {}),
         limits: { requestsPerDay: 1000, tokensPerDay: 10000000 },
       },
     ]),
@@ -280,52 +282,71 @@ async function fixture(
   };
 }
 
-it('expressão validada acompanha cada segmento sem alterar o payload de síntese', async () => {
-  const f = await fixture({
-    llmResponse:
-      '<expression>{"intent":"explorar","emotion":"curiosidade","intensity":0.4}</expression>Vamos testar. A hipótese é interessante.',
-  });
-  f.send({ type: 'text.send', turnId: 1, text: 'Uma hipótese sintética.' });
-  await vi.waitFor(() =>
-    expect(f.events.some((event) => event.type === 'reply.done')).toBe(true),
-  );
-  const directions = f.events.filter(
-    (event) => event.type === 'reply.expression',
-  );
-  const texts = f.events.filter((event) => event.type === 'reply.text');
-  expect(directions.length).toBe(texts.length);
-  expect(directions.length).toBeGreaterThan(0);
-  expect(directions[0]).toMatchObject({
-    emotion: 'curiosidade',
-    intensity: 0.35,
-    metadataValid: true,
-    deliveryApplied: false,
-    personaVersion: 'kurisu-amadeus-0.4.6',
-  });
-  expect(f.requests.filter((request) => request.role === 'llm')).toHaveLength(
-    1,
-  );
-  expect(
-    f.requests
-      .filter((request) => request.role === 'tts')
-      .map((request) => request.content)
-      .join(' '),
-  ).toBe(texts.map((event) => event.text).join(' '));
-  expect(
-    f.requests
-      .filter((request) => request.role === 'tts')
-      .every((request) => !request.content.includes('expression')),
-  ).toBe(true);
-  expect(
-    directions.every((event) =>
-      texts.some(
-        (text) =>
-          text.segmentId === event.segmentId &&
-          text.responseId === event.responseId,
+it.each([16000, 24000] as const)(
+  'expressão e áudio de %i Hz acompanham cada segmento sem alterar o payload de síntese',
+  async (sampleRate) => {
+    const f = await fixture({
+      ttsSampleRate: sampleRate,
+      llmResponse:
+        '<expression>{"intent":"explorar","emotion":"curiosidade","intensity":0.4}</expression>Vamos testar. A hipótese é interessante.',
+    });
+    f.send({ type: 'text.send', turnId: 1, text: 'Uma hipótese sintética.' });
+    await vi.waitFor(() =>
+      expect(f.events.some((event) => event.type === 'reply.done')).toBe(true),
+    );
+    const directions = f.events.filter(
+      (event) => event.type === 'reply.expression',
+    );
+    const texts = f.events.filter((event) => event.type === 'reply.text');
+    expect(f.requests.filter((request) => request.role === 'tts')).toHaveLength(
+      1,
+    );
+    expect(texts.map((event) => event.text)).toEqual([
+      'Vamos testar. A hipótese é interessante.',
+    ]);
+    expect(
+      f.events
+        .filter((event) => event.type === 'audio.segment')
+        .every((event) => event.sampleRate === sampleRate),
+    ).toBe(true);
+    expect(f.frames.length).toBeGreaterThan(0);
+    expect(
+      f.frames.every((frame) => frame.length === 8 + (sampleRate / 50) * 2),
+    ).toBe(true);
+    expect(directions.length).toBe(texts.length);
+    expect(directions.length).toBeGreaterThan(0);
+    expect(directions[0]).toMatchObject({
+      emotion: 'curiosidade',
+      intensity: 0.35,
+      metadataValid: true,
+      deliveryApplied: false,
+      personaVersion: 'kurisu-amadeus-0.4.8',
+    });
+    expect(f.requests.filter((request) => request.role === 'llm')).toHaveLength(
+      1,
+    );
+    expect(
+      f.requests
+        .filter((request) => request.role === 'tts')
+        .map((request) => request.content)
+        .join(' '),
+    ).toBe(texts.map((event) => event.text).join(' '));
+    expect(
+      f.requests
+        .filter((request) => request.role === 'tts')
+        .every((request) => !request.content.includes('expression')),
+    ).toBe(true);
+    expect(
+      directions.every((event) =>
+        texts.some(
+          (text) =>
+            text.segmentId === event.segmentId &&
+            text.responseId === event.responseId,
+        ),
       ),
-    ),
-  ).toBe(true);
-});
+    ).toBe(true);
+  },
+);
 
 it('reconectar reinicia a expressão mesmo quando a chamada anterior já acumulou intensidade', async () => {
   const f = await fixture({
@@ -591,11 +612,14 @@ it('percorre PCM → STT → LLM → voz personalizada e persiste reprodução c
     stt: { samples: 1 },
     llmFirstToken: { samples: 1 },
     llmFirstSpeechSegment: { samples: 1 },
-    tts: { samples: 2 },
-    audioDelivery: { samples: 2 },
+    tts: { samples: 1 },
+    audioDelivery: { samples: 1 },
   });
-  expect(f.requests.map((r) => r.role)).toEqual(['stt', 'llm', 'tts', 'tts']);
-  expect(f.frames).toHaveLength(4);
+  expect(f.requests.map((r) => r.role)).toEqual(['stt', 'llm', 'tts']);
+  expect(
+    f.requests.find((request) => request.role === 'llm')?.content,
+  ).toContain('Medições acústicas, sem inferência emocional');
+  expect(f.frames).toHaveLength(2);
   expect(f.frames[0]?.readUInt32LE(0)).toBe(0);
   expect(f.frames[1]?.readUInt32LE(0)).toBe(1);
   const meta = f.events.find((e) => e.type === 'audio.segment')!;
@@ -611,13 +635,6 @@ it('percorre PCM → STT → LLM → voz personalizada e persiste reprodução c
     );
     expect(result.rows[0]?.played_samples).toBe(640);
   });
-  const other = f.events.filter((e) => e.type === 'audio.segment')[1]!;
-  f.send({
-    type: 'playback.progress',
-    responseId: other.responseId,
-    segmentId: other.segmentId,
-    playedSamples: 640,
-  });
   await vi.waitFor(async () =>
     expect(
       (
@@ -625,7 +642,7 @@ it('percorre PCM → STT → LLM → voz personalizada e persiste reprodução c
           'SELECT SUM(played_samples) AS played FROM speech_segments',
         )
       ).rows[0]?.played,
-    ).toBe(1280),
+    ).toBe(640),
   );
   const history = createSqliteCallHistory(f.database.client);
   expect(await history.recent(f.id, 'primary', 6)).toEqual([
@@ -633,6 +650,25 @@ it('percorre PCM → STT → LLM → voz personalizada e persiste reprodução c
       userText: 'Olá, Amadeus.',
       generatedText: 'Olá. Estou ouvindo.',
       dataClass: 'synthetic',
+      responseStatus: 'completed',
+      partiallyPlayed: false,
+    },
+  ]);
+  await f.database.client.execute({
+    sql: "UPDATE call_turns SET status = 'interrupted' WHERE response_id = ?",
+    args: [String(meta.responseId)],
+  });
+  await f.database.client.execute({
+    sql: 'UPDATE speech_segments SET played_samples = 320 WHERE id = ?',
+    args: [String(meta.segmentId)],
+  });
+  expect(await history.recent(f.id, 'primary', 6)).toEqual([
+    {
+      userText: 'Olá, Amadeus.',
+      generatedText: '',
+      dataClass: 'synthetic',
+      responseStatus: 'interrupted',
+      partiallyPlayed: true,
     },
   ]);
   const close = once(f.ws, 'close');
@@ -679,6 +715,9 @@ it('mantém texto quando o TTS falha', async () => {
   expect(
     f.events.some((e) => e.code === 'TTS_UNAVAILABLE_TEXT_AVAILABLE'),
   ).toBe(true);
+  expect(
+    f.events.find((e) => e.code === 'TTS_UNAVAILABLE_TEXT_AVAILABLE')?.turnId,
+  ).toBe(1);
   expect(f.events.some((e) => e.type === 'reply.text')).toBe(true);
   expect(f.frames).toHaveLength(0);
 });
@@ -693,7 +732,7 @@ it('avisa que a resposta ficará sem áudio quando não há perfil de voz ativo'
   expect(f.events.some((e) => e.type === 'audio.segment')).toBe(false);
   expect(
     (await f.app.inject({ url: '/v1/metrics', headers })).json().voice,
-  ).toMatchObject({ failureReasons: { VOICE_NOT_READY: 1 }, textFallbacks: 2 });
+  ).toMatchObject({ failureReasons: { VOICE_NOT_READY: 1 }, textFallbacks: 1 });
 });
 it('informa fala não reconhecida e volta ao estado ocioso sem chamar o LLM', async () => {
   const f = await fixture({ noSpeech: true });
@@ -933,7 +972,7 @@ it('recupera cabeçalho incompleto antes da fala, sem duplicar áudio ou reinici
   expect(f.events.filter((e) => e.type === 'error')).toHaveLength(0);
   expect(
     f.requests.filter((r) => r.role === 'tts').map((r) => r.content),
-  ).toEqual(['Olá.', 'Estou ouvindo.']);
+  ).toEqual(['Olá. Estou ouvindo.']);
   expect(
     f.events
       .filter((e) => e.type === 'reply.expression')

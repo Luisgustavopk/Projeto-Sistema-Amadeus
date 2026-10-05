@@ -1,4 +1,4 @@
-import { rm } from 'node:fs/promises';
+import { copyFile, rm } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -25,3 +25,17 @@ if (result.error) {
 }
 
 process.exitCode = result.status ?? 1;
+
+if (process.exitCode === 0) {
+  await copyFile(
+    new URL('../../assets/persona/source-v0.4.md', import.meta.url),
+    resolve(output, 'application/persona/source-v0.4.md'),
+  );
+  await copyFile(
+    new URL(
+      '../src/application/persona/skill-amadeus-kurisu.md',
+      import.meta.url,
+    ),
+    resolve(output, 'application/persona/skill-amadeus-kurisu.md'),
+  );
+}

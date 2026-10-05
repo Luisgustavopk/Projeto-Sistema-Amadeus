@@ -37,6 +37,53 @@ export async function* readPersonaResponse(
       continue;
     }
 
+    // Some compatible models return the specified expression object without
+    // its XML wrapper. Only the three known metadata keys may form this prefix.
+    if (pending.startsWith('{')) {
+      const end = pending.indexOf('}');
+
+      if (end < 0) {
+        if (pending.length > MAX_HEADER) {
+          throw new ProviderInvalidError('Cabeçalho de expressão excessivo.');
+        }
+
+        continue;
+      }
+
+      let parsed: unknown;
+
+      try {
+        parsed = JSON.parse(pending.slice(0, end + 1));
+      } catch {
+        throw new ProviderInvalidError('Cabeçalho de expressão inválido.');
+      }
+
+      if (
+        end + 1 > MAX_HEADER ||
+        !parsed ||
+        typeof parsed !== 'object' ||
+        Object.keys(parsed).sort().join(',') !== 'emotion,intensity,intent'
+      ) {
+        throw new ProviderInvalidError('Objeto desconhecido no lugar de fala.');
+      }
+
+      const result = ExpressionSchema.safeParse(parsed);
+      onExpression(
+        result.success ? result.data : { ...NEUTRAL_EXPRESSION },
+        result.success,
+      );
+      header = false;
+      const text = pending.slice(end + 1).trimStart();
+      pending = '';
+
+      if (text) {
+        bodyStarted = true;
+        yield text;
+      }
+
+      continue;
+    }
+
     if (!pending.startsWith(OPEN)) {
       header = false;
       onExpression({ ...NEUTRAL_EXPRESSION }, false);
@@ -90,7 +137,11 @@ export async function* readPersonaResponse(
   if (header) {
     onExpression({ ...NEUTRAL_EXPRESSION }, false);
 
-    if (pending.startsWith(OPEN) || (pending && OPEN.startsWith(pending))) {
+    if (
+      pending.startsWith('{') ||
+      pending.startsWith(OPEN) ||
+      (pending && OPEN.startsWith(pending))
+    ) {
       throw new ProviderInvalidError('Cabeçalho de expressão incompleto.');
     }
 
@@ -108,7 +159,7 @@ export async function* readPersonaResponse(
 /** Reject structural leakage before either displaying or synthesizing a segment. */
 export function validateSpokenSegment(text: string) {
   if (
-    /<\/?expression\b|```|[{}]|["'](?:intent|emotion|intensity)["']\s*:/iu.test(
+    /<\/?(?:expression|think(?:ing)?|analysis|reasoning)\b|```|[{}]|["'](?:intent|emotion|intensity)["']\s*:/iu.test(
       text,
     )
   ) {
@@ -118,13 +169,25 @@ export function validateSpokenSegment(text: string) {
   }
 
   const spoken = text
-    .replace(/\*[^*]{1,120}\*/gu, '')
+    .replace(/\*\*([^*]{1,220})\*\*/gu, '$1')
+    .replace(
+      /\*(?:suspira|sorri|sorrindo|ri|rindo|pausa|voz|tom|irônico|irônica|sussurra)\b[^*]{0,100}\*/giu,
+      '',
+    )
+    .replace(/\*([^*]{1,220})\*/gu, '$1')
     .replace(
       /\((?:suspira|sorrindo|ri|rindo|pausa|voz|tom|irônico|irônica|sussurra)[^)]{0,100}\)/giu,
       '',
     )
     .replace(/\s+/gu, ' ')
+    .replace(/(^|[.!?]\s+)\d{1,2}[.)]\s+/gu, '$1')
     .trim();
+
+  if (/^(?:expression|intent|emotion|intensity)\s*[.!?:;]*$/iu.test(spoken)) {
+    throw new ProviderInvalidError(
+      'O modelo retornou somente um nome de metadado.',
+    );
+  }
 
   if (
     /\*|\((?:suspira|sorrindo|ri\b|rindo|pausa|voz\b|tom\b|irônico|irônica|sussurra)/iu.test(

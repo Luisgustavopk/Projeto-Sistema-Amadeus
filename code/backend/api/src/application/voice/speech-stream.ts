@@ -44,11 +44,17 @@ export async function* streamSpeech(
 
         text += chunk;
 
-        while (text.trim()) {
-          const sentenceEnd = text.search(/[.!?]\s/);
-          let end = sentenceEnd >= 0 ? sentenceEnd + 1 : 0;
+        // Keep short replies in one synthesis request: punctuation is a pause,
+        // not a reason to restart the voice. Long replies still stream in order.
+        while (text.length > 220) {
+          const sentences = [...text.slice(0, 221).matchAll(/(?<!\d)[.!?]\s/g)];
+          const sentenceEnd = sentences.at(-1)?.index;
+          let end =
+            sentenceEnd !== undefined && sentenceEnd >= 40
+              ? sentenceEnd + 1
+              : 0;
 
-          if (end > 220 || (!end && text.length >= 220)) {
+          if (!end) {
             const prefix = text.slice(0, 220);
             const clauses = [...prefix.matchAll(/[,;]\s/g)];
             const clause = clauses.at(-1)?.index;
@@ -59,10 +65,6 @@ export async function* streamSpeech(
                 : word > 0
                   ? word
                   : 220;
-          }
-
-          if (!end) {
-            break;
           }
 
           const value = text.slice(0, end).replace(/\s+/g, ' ').trim();

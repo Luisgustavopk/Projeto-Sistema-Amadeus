@@ -29,6 +29,8 @@ export const CapabilitiesSchema = z.object({
         'gemini',
         'groq',
         'cloudflare-ai',
+        'deepgram',
+        'cartesia',
       ]),
       model: z.string().nullable(),
       dataPolicy: z.enum([
@@ -47,9 +49,20 @@ export const CapabilitiesSchema = z.object({
         .optional(),
       fallbacks: z.array(
         z.object({
-          adapter: z.enum(['gemini', 'groq', 'cloudflare-ai']),
+          adapter: z.enum([
+            'gemini',
+            'groq',
+            'cloudflare-ai',
+            'http-json',
+            'deepgram',
+            'cartesia',
+          ]),
           model: z.string().nullable(),
-          dataPolicy: z.enum(['synthetic-only', 'personal-approved']),
+          dataPolicy: z.enum([
+            'synthetic-only',
+            'personal-approved',
+            'local-approved',
+          ]),
         }),
       ),
       available: z.boolean(),
