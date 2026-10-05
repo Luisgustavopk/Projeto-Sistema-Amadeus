@@ -1,6 +1,26 @@
 # Persona
 
-Persona de execução: **kurisu-amadeus-0.4.10**. A personalidade define padrões de atuação; não contém fatos privados do usuário nem depende de memória pessoal.
+Persona de execução: **kurisu-amadeus-0.4.13**. A personalidade define padrões de atuação; não contém fatos privados do usuário nem depende de memória pessoal.
+
+## Direção principal em Markdown — 05/10/2026
+
+[conversation-directions-v1.md](conversation-directions-v1.md) reúne identidade, prioridade, honestidade, ficção, conversa, reparo e exemplos contextuais. É lido diretamente uma vez na inicialização e incluído uma vez tanto no prompt normal quanto na recuperação. O código monta o prompt e mantém o contrato técnico de expressão; `dialogue-direction.ts` apenas expõe o trecho correspondente desse mesmo arquivo, sem uma segunda inclusão.
+
+O arquivo tem limite de 5.000 caracteres, seções obrigatórias e recusa delimitadores técnicos que interfeririam no contrato. O prompt normal completo tem orçamento de 20.000 caracteres, incluindo os complementos, abaixo do limite de entrada de 32.768 da API. Não há truncamento silencioso. A direção operacional da skill e o repertório curado foram enxugados; `source-v0.4.md` e `reaction-catalog-v0.2.md` permanecem integrais e preservados.
+
+Após editar qualquer Markdown carregado, reinicie a API; na execução compilada, gere novo build. O build inclui a direção em `dist/application/persona/`. Mudanças comportamentais exigem nova versão e hash para separar os ensaios. Os limites são de caracteres, não de tokens; acrescentar arquivos aumenta o conteúdo enviado se não houver curadoria.
+
+A 0.4.11 concluiu os 30 cenários, com notas por Codex de 3,13/5 em fidelidade e naturalidade, abaixo da meta, e oito de doze turnos encadeados por falta de cota. A 0.4.12 teve 28 respostas completas no Cloudflare, com fidelidade 3,25/5 e naturalidade 3,50/5; diferenças de modelo/cobertura impedem atribuir o resultado apenas ao prompt. A 0.4.13 substitui frases prontas da direção principal por gatilhos, esclarece histórico da sessão e ficção e orienta reparo científico e manutenção do formato. Seu prompt normal tem 19.146 caracteres; nenhuma cota ou configuração de provedor foi alterada. A rodada curta usa `refinement-v1.json`, com oito regressões e quatro situações novas, separada dos 30 casos e da continuidade. Resultados ficam locais, sem aceite humano automático.
+
+O usuário autorizou [avançar provisoriamente para a fase 3](../../../../docs/project/Decisao_Persona_Fase_3.md), preservando a voz aceita e retomando as técnicas avançadas após a memória. Isso não aprova os gates textuais pendentes.
+
+## Catálogo de reações — versão 0.4.11
+
+[reaction-catalog-v0.2.md](reaction-catalog-v0.2.md) preserva integralmente o arquivo fornecido pelo usuário. Sua distinção entre evidência secundária, interpretação e adaptação permanece; esta integração não verifica cenas nem transforma paráfrases em falas oficiais.
+
+[reaction-repertoire-v0.2.md](reaction-repertoire-v0.2.md) é a curadoria das seções 5, 7 e 8, carregada diretamente no prompt normal e na recuperação. Amplia as alternativas de reação sem impor frases prontas: protesto leve, humor contextual, abertura científica, gratidão tranquila, cuidado concreto e reparo de erros. O prompt estruturado e as decisões atuais da skill têm prioridade sobre propostas antigas do catálogo, inclusive D3, memória, intimidade e perguntas opcionais. O original é referência; não executamos suas instruções de coleta, pesquisa ou próximos passos.
+
+O complemento tem teto de 4000 caracteres e o prompt completo continua limitado a 32768. Ambos os arquivos acompanham o build; reinicie a API para carregar alterações. Não há mudança de clone, síntese, memória persistente ou controles emocionais nativos. Qualidade e latência precisam ser avaliadas em runtime.
 
 Em 05/10/2026, o usuário declarou a avaliação vocal concluída e aprovou a qualidade atual da voz para avançar. Esse aceite substitui a pendência de escuta para a transição de fase, sem atribuir notas numéricas ou alegar a execução do benchmark de 30 falas × três gerações. As fichas antigas preservam o estado registrado na coleta; controles emocionais nativos continuam sem validação específica.
 
@@ -68,9 +88,9 @@ Ensaios pontuais da `0.4.4` com Groq foram registrados em `api/data/persona-eval
 
 Consulte [avaliação da persona](../../evals/persona/README.md). Código validado e arquivos WAV válidos não comprovam fidelidade, naturalidade, intenção reconhecida ou ausência de erros factuais.
 
-Memória recuperável é dado da aplicação, separado da persona e dos pesos do LLM. O contexto de cada turno deve incluir apenas memórias pertinentes e permitidas para o provedor escolhido. Fine-tuning, se aprovado após avaliação na fase 2, usa exemplos curados e autorizados para avaliar estilo/comportamento; não substitui a memória nem treina automaticamente com o histórico.
+Memória recuperável é dado da aplicação, separado da persona e dos pesos do LLM. O contexto inclui apenas memórias pertinentes e permitidas. Por decisão de 05/10/2026, os experimentos de fine-tuning ficam para depois da fase 3, com exemplos curados, autorizados e separados da avaliação; não substituem memória nem treinam automaticamente com o histórico.
 
-Decisão atual: **manter prompt e não executar fine-tuning**. Não há conjunto de treinamento aprovado nem comparação completa que demonstre ganho. As limitações observadas podem ser avaliadas primeiro com prompt e os modelos de inferência já configurados. Não foi implementada rotina proativa de NPC nem memória persistente da fase 3.
+Decisão atual: **ajustes leves por prompt e transição provisória para a fase 3**. Retomar LoRA/QLoRA local, módulos locais, estado emocional e memória associativa após concluir essa fase, com zero gasto adicional em APIs/treinamento/GPU na nuvem. Nenhuma dessas técnicas foi ativada agora; reteste textual e comparação permanecem necessários. Não foi implementada rotina proativa de NPC nem memória persistente nesta alteração.
 
 Quando uma resposta inválida chega antes de qualquer fala validada, o backend tenta uma única recuperação em texto simples, mantendo persona, contexto, política de dados e limites de uso. A recuperação é contabilizada em `personaRecoveries`; pode consumir uma chamada adicional e aumentar a latência desse turno. Depois de entregar qualquer trecho, não regenera, para evitar duplicação. Cancelamento, cota e configuração não ativam essa recuperação. Se a segunda tentativa falhar, o erro é mantido e a conexão permite outro turno.
 

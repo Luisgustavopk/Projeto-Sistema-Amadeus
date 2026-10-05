@@ -6,7 +6,9 @@
 
 `POST /v1/voice/versions` recebe `{"name":"Voz aprovada"}` e registra clone/referência/hash, modelo, configuração TTS, formato PCM, accent, segmentação e presets artísticos, sem valores de credenciais. `GET /v1/voice/versions` lista até 256 versões preservadas. `POST /v1/voice/versions/:id/restore` restaura somente o TTS, preservando LLM/STT. Uma voz local exige reativar sua referência original antes da restauração; a operação respeita o bloqueio de configuração. As versões registram o contrato da API; configurações internas de um serviço local externo e pesos não são reinstalados por esse endpoint.
 
-Persona 0.4.10: a seção operacional concisa da skill reduz redundância, preservando o arquivo completo e as regras estruturadas. O histórico confirmado enviado tem orçamento de 3.000 caracteres; entradas omitidas continuam influenciando a política de dados. O prompt menor resolveu o 413 de tamanho observado no Groq. Chamadas longas e consumo acumulado continuam sujeitos às cotas da conta. `npm run eval:persona -- --run --interval-ms=60000` espaça os cenários por um minuto sem alterar limites ou faturamento.
+Persona 0.4.13: a direção principal está em `backend/assets/persona/conversation-directions-v1.md`, carregada diretamente no prompt normal e na recuperação. Reações são orientadas por gatilhos, sem frases prontas nessa direção; correção científica, identidade ficcional, memória da sessão e formato recebem ajustes após o reteste. O código mantém montagem e contrato expressivo. Limite do arquivo: 5.000 caracteres; orçamento do prompt normal completo: 20.000, com rejeição sem truncamento; versão atual: 19.146 caracteres. Reinicie a API após editar Markdown; para `dist`, gere novo build. A skill completa e as fontes originais permanecem preservadas. O histórico confirmado continua limitado a 3.000 caracteres. `npm run eval:persona -- --refinement` valida a rodada curta de oito regressões e quatro situações novas; `--run` consulta o modelo configurado e consome cota. Isso não substitui os 30 casos, continuidade ou revisão humana. [Decisão de avançar para a fase 3 e experimentar técnicas avançadas depois](../../../docs/project/Decisao_Persona_Fase_3.md).
+
+A redução anterior da 0.4.10 resolveu o 413 observado no Groq; cotas continuam valendo. `npm run eval:persona -- --run --interval-ms=60000` espaça os cenários por um minuto sem alterar limites ou faturamento.
 
 O usuário aprovou a qualidade vocal atual em 05/10/2026. O gate aceita `voiceAcceptance` com `source: "user"`, `approved: true`, `approvedAt` e `reason`, sem exigir notas vocais inventadas; isso não dispensa a revisão textual. Foram coletados 30 cenários no Cloudflare na 0.4.9 e encontrados problemas de resposta ao pedido atual. A 0.4.10 reforça esses comportamentos, mas seu reteste completo permanece pendente por cotas/disponibilidade. A correção do streaming Cloudflare aceita fragmentos numéricos como texto, evitando a falsa classificação de indisponibilidade temporária.
 
@@ -18,7 +20,7 @@ O Groq também pode responder HTTP 413 quando o prompt excede o limite de tokens
 
 No streaming, uma falha temporária do último provedor elegível permite uma única nova tentativa no mesmo provedor, após 400 ms e antes de qualquer fragmento entregue. Ela recebe nova reserva de uso e respeita cancelamento, política de dados e orçamento. Cota, erro de configuração, falha de persistência e conteúdo parcial não permitem essa repetição. Se a segunda tentativa também falhar, o erro é reportado; disponibilidade externa não é garantida.
 
-`llm.fallbackProviders` aceita até dois provedores alternativos ordenados. Exemplo parcial para mesclar à configuração atual:
+`llm.fallbackProviders` aceita até oito provedores alternativos ordenados. Exemplo parcial para mesclar à configuração atual:
 
 ```json
 {
@@ -105,7 +107,7 @@ Os serviços locais têm limite operacional de 500 pedidos diários nesta instal
 
 ## Persona e atuação — fase 2
 
-A persona versionada usa a análise fornecida pelo usuário e o recorte aprovado anterior à viagem de Kurisu ao Japão. Curiosidade, humor contextual, cuidado e limites de identidade ficam em `src/application/persona/prompt.ts`; regras e vocabulário expressivos ficam em `src/domain/persona`. A biografia ficcional é separada do histórico confirmado e de fatos pessoais. Não há memória persistente da fase 3.
+A persona versionada usa a análise fornecida pelo usuário e o recorte aprovado anterior à viagem de Kurisu ao Japão. Curiosidade, humor contextual, cuidado e limites de identidade são dirigidos por `../assets/persona/conversation-directions-v1.md`, montado com os complementos por `src/application/persona/prompt.ts`; regras e vocabulário expressivos ficam em `src/domain/persona`. A biografia ficcional é separada do histórico confirmado e de fatos pessoais. Não há memória persistente da fase 3.
 
 O documento original completo está preservado em `../assets/persona/source-v0.4.md`. A versão 0.4.7 inclui diretamente suas seções 3.12, 5.2–5.6 e 14.5 como referência complementar, mantendo prioridade das regras estruturadas. O conteúdo é lido ao iniciar e também incluído na recuperação em fala simples; alterações no Markdown exigem reinício. O build leva uma cópia integral do documento para `dist/application/persona/`. Consulte `../assets/persona/README.md` para limites e organização.
 
@@ -186,3 +188,88 @@ Na chamada, execuções sucessivas da mesma sessão aguardam o cancelamento e a 
 ## Qualidade da saída Cartesia
 
 Cartesia usa PCM16 mono de 24 kHz e `accent: "brazilian-portuguese"`, como a comparação isolada. A API preserva a taxa em `audio.segment` até o player, sem reduzir para 16 kHz. Os fallbacks locais e a captura/STT continuam em 16 kHz. Reinicie a API e recarregue a página de chamada para usar o contrato de saída atualizado. A equivalência de parâmetros não substitui a avaliação auditiva de prosódia e continuidade entre frases.
+
+## Reserva de LLMs: Mistral e OpenRouter
+
+Os adaptadores `mistral` e `openrouter` usam Chat Completions com streaming,
+preservando o prompt da persona. `fallbackProviders` aceita até oito reservas,
+percorridas na ordem configurada, somente antes da entrega da resposta. Falhas
+de autenticação e parâmetros continuam sendo reportadas como configuração inválida.
+
+Para ativar na instalação existente:
+
+1. Crie uma chave em [OpenRouter](https://openrouter.ai/settings/keys). O campo
+   `Credit limit` limita o gasto autorizado pela chave; não é uma compra de créditos.
+   `No limit` remove esse teto, mas não remove as cotas dos modelos gratuitos.
+   O Amadeus restringe esse adaptador a modelos `:free` e preço máximo zero.
+   Não é necessário comprar créditos para começar a usar esses modelos.
+   A Mistral é opcional: use-a somente se sua conta permitir criar uma chave sem
+   pagamento. Embora a documentação descreva acesso gratuito, a conta do usuário
+   exibiu bloqueio de chaves no plano Free e exigência de upgrade. Nesse caso,
+   deixe `MISTRAL_API_KEY` ausente e prossiga somente com OpenRouter.
+2. Adicione ao `.env` da API, sem aspas e sem enviar as chaves ao Git:
+
+   ```dotenv
+   MISTRAL_API_KEY=sua_chave
+   OPENROUTER_API_KEY=sua_chave
+   ```
+
+3. Reinicie a API com `npm run dev` para carregar as variáveis novas. Em outro
+   terminal, na mesma pasta `code/backend/api`, confira a proposta:
+
+   ```powershell
+   npm run setup:llm-reserve
+   ```
+
+4. Após revisar e aprovar as políticas de dados da
+   [Mistral](https://mistral.ai/terms) e do
+   [OpenRouter](https://openrouter.ai/privacy), ative para conversas pessoais:
+
+   ```powershell
+   npm run setup:llm-reserve -- --personal --apply
+   ```
+
+   Sem `--personal`, os novos provedores ficam `synthetic-only` e não participam
+   das conversas pessoais. OpenRouter envia `data_collection: deny`, que pode
+   reduzir a disponibilidade de endpoints gratuitos.
+
+O comando mantém o principal atual, STT, TTS e as reservas anteriores. Insere
+Mistral Small, Qwen3.8 27B Free, Nemotron 3.5 Lightning Free e Nemotron 3 Super Free
+antes das reservas antigas, usando somente os provedores com chave no ambiente.
+Salva uma cópia da configuração anterior em `data/llm-reserve/`. Se uma LLM local
+já estiver configurada, passa a usá-la por último com `localRouting: cloud-first`.
+Não instala nem ativa um runtime local novo. O modo híbrido anterior continua
+disponível com `localRouting: hybrid`.
+
+OpenRouter exige um modelo explícito terminado em `:free`; os routers aleatórios
+e os modelos pagos são recusados. Cada pedido também limita os preços de entrada
+e saída a zero. O instalador define um orçamento local conservador de 50 pedidos
+por dia UTC, **compartilhado entre os modelos que usam a mesma variável de chave**.
+Pedidos que falham também contam. Em `/v1/usage`, esses modelos exibem a mesma
+contagem agregada; não some suas linhas. Esse orçamento não mede a cota restante
+real do provedor, nem outras aplicações usando a conta.
+
+Erros de cota e indisponibilidade temporária colocam o modelo em pausa entre
+turnos, compartilhada por execução comum e streaming. `Retry-After` é respeitado;
+sem esse cabeçalho, a pausa é de 60 segundos para cota e 15 segundos para falha
+temporária. Limites confirmados da conta OpenRouter (402 ou 429 com cabeçalhos
+`X-RateLimit-*`) pausam os modelos dessa credencial em conjunto. Um 429 sem esses
+cabeçalhos pausa somente o modelo, permitindo tentar a próxima reserva gratuita.
+As pausas ficam em memória e são apagadas ao reiniciar a API; a contagem
+de orçamento permanece no SQLite. Falhas após texto entregue nunca iniciam uma
+segunda geração. A API não retoma automaticamente uma fala que já falhou.
+
+Para verificar os novos modelos com um cenário sintético por vez:
+
+```powershell
+npm run eval:persona -- --run --limit=1 --model=mistral-small-latest
+npm run eval:persona -- --run --limit=1 --model=qwen/qwen3.8-27b:free
+```
+
+Esses comandos consomem cota e salvam relatórios locais. A integração não implica
+aprovação da qualidade da persona: compare as respostas e a latência antes de
+alterar a prioridade. Para remover as novas reservas, use
+`npm run setup:llm-reserve -- --disable --apply`; o comando preserva a configuração
+local atual. Os limites e o catálogo dos provedores podem mudar:
+[Mistral](https://docs.mistral.ai/admin/billing-usage/usage-limits),
+[OpenRouter](https://openrouter.ai/docs/api-reference/limits).
