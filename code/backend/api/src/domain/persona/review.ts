@@ -13,6 +13,14 @@ export const PersonaScoresSchema = z.strictObject({
 });
 
 export const PersonaReviewSchema = z.object({
+  voiceAcceptance: z
+    .object({
+      source: z.literal('user'),
+      approved: z.literal(true),
+      approvedAt: z.iso.datetime(),
+      reason: z.string().min(1),
+    })
+    .optional(),
   results: z
     .array(
       z.object({
@@ -49,14 +57,20 @@ export function reviewPersonaReport(input: unknown) {
     ? reviewed.reduce((total, row) => total + row.scores!.naturalness, 0) /
       reviewed.length
     : null;
-  const complete = reviewed.length === 30 && report.voiceReview !== null;
+  const voicePassed =
+    report.voiceAcceptance?.approved === true ||
+    (report.voiceReview !== null &&
+      report.voiceReview.meanQuality >= 4 &&
+      report.voiceReview.intentRecognitionRate >= 0.8);
+  const complete =
+    reviewed.length === 30 &&
+    (report.voiceReview !== null || report.voiceAcceptance !== undefined);
   const passed =
     complete &&
     disqualifications.length === 0 &&
     meanFidelity! >= 4 &&
     meanNaturalness! >= 4 &&
-    report.voiceReview!.meanQuality >= 4 &&
-    report.voiceReview!.intentRecognitionRate >= 0.8;
+    voicePassed;
 
   return {
     status: disqualifications.length
@@ -71,5 +85,6 @@ export function reviewPersonaReport(input: unknown) {
     meanNaturalness,
     disqualifications,
     voiceReview: report.voiceReview,
+    voiceAcceptance: report.voiceAcceptance ?? null,
   };
 }

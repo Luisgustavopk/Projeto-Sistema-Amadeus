@@ -33,6 +33,27 @@ it('aprova somente 30 cenários revisados e gate vocal completo', () => {
   ).toBe('pending');
 });
 
+it('aceite vocal explícito do usuário dispensa notas vocais sem dispensar revisão textual', () => {
+  const voiceAcceptance = {
+    source: 'user',
+    approved: true,
+    approvedAt: '2026-10-05T03:00:00.000Z',
+    reason: 'O usuário aprovou a qualidade vocal atual.',
+  };
+  expect(
+    reviewPersonaReport({ ...report(), voiceReview: null, voiceAcceptance })
+      .status,
+  ).toBe('passed');
+  expect(
+    reviewPersonaReport({
+      ...report(),
+      results: [],
+      voiceReview: null,
+      voiceAcceptance,
+    }).status,
+  ).toBe('pending');
+});
+
 it('uma nota ausente ou erro de provedor mantém o aceite pendente', () => {
   const value = report();
   expect(

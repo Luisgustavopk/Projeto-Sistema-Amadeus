@@ -1,6 +1,7 @@
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
+import { setTimeout as delay } from 'node:timers/promises';
 import { createHash } from 'node:crypto';
 import {
   buildPersonaPrompt,
@@ -30,6 +31,11 @@ import { createConversationStyleGuard } from '../src/application/persona/convers
 
 async function main() {
   const args = process.argv.slice(2);
+  const interval = Number(
+    args.find((arg) => arg.startsWith('--interval-ms='))?.split('=')[1] ?? 0,
+  );
+  if (!Number.isInteger(interval) || interval < 0 || interval > 60000)
+    throw new Error('Intervalo permitido: 0 a 60000 ms.');
   const dialogue = args.includes('--dialogue');
   const skill = args.includes('--skill');
   const suite = (
@@ -155,6 +161,7 @@ async function main() {
     const file = new URL(`${Date.now()}-persona.json`, directory);
 
     for (const scenario of suite.cases.slice(startIndex, startIndex + limit)) {
+      if (report.results.length && interval) await delay(interval);
       const started = performance.now();
       let expression = { ...NEUTRAL_EXPRESSION };
       let metadataValid = false;
