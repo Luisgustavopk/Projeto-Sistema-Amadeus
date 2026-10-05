@@ -33,6 +33,7 @@ export function createProviderExecution(
   gate: ExecutionGate,
   onFallback?: NotifyProviderFallback,
   cooldowns: ProviderCooldowns = createProviderCooldowns(),
+  options: { reserveConversationCapacity?: boolean } = {},
 ) {
   return {
     async execute(role: Role, input: ProviderInput, signal?: AbortSignal) {
@@ -93,14 +94,26 @@ export function createProviderExecution(
               }
 
               const current = await usage.usage(ownerId, role, config);
-              const requestReserve = Math.min(
-                config.limits.requestsPerDay,
-                Math.max(5, Math.ceil(config.limits.requestsPerDay * 0.2)),
-              );
-              const tokenReserve = Math.min(
-                config.limits.tokensPerDay,
-                Math.max(3000, Math.ceil(config.limits.tokensPerDay * 0.2)),
-              );
+              const requestReserve =
+                options.reserveConversationCapacity === false
+                  ? 0
+                  : Math.min(
+                      config.limits.requestsPerDay,
+                      Math.max(
+                        5,
+                        Math.ceil(config.limits.requestsPerDay * 0.2),
+                      ),
+                    );
+              const tokenReserve =
+                options.reserveConversationCapacity === false
+                  ? 0
+                  : Math.min(
+                      config.limits.tokensPerDay,
+                      Math.max(
+                        3000,
+                        Math.ceil(config.limits.tokensPerDay * 0.2),
+                      ),
+                    );
 
               if (
                 current.requests + 1 >

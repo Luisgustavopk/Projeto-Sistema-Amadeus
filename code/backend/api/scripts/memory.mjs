@@ -2,7 +2,11 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, relative, resolve, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../src/config/index.ts';
-import { memoryReview, renderMemoryReview } from './memory-review.mjs';
+import {
+  memoryReview,
+  renderMemoryReview,
+  renderMemoryProcessing,
+} from './memory-review.mjs';
 
 async function main() {
   if (process.argv.includes('--help') || process.argv[2] === 'help') {
@@ -226,10 +230,25 @@ async function main() {
     const out = value('--out');
 
     if (command === 'review') {
+      const statusResponse = await fetch(base + '/v1/memory/status', {
+        headers,
+      });
+      const status = statusResponse.ok ? await statusResponse.json() : null;
       console.log(
         argumentsList.includes('--json')
-          ? JSON.stringify({ review: memoryReview(result.facts) }, null, 2)
-          : renderMemoryReview(result.facts),
+          ? JSON.stringify(
+              {
+                review: memoryReview(result.facts),
+                processing: status
+                  ? { policy: status.policy, jobs: status.jobs }
+                  : null,
+              },
+              null,
+              2,
+            )
+          : [renderMemoryProcessing(status), renderMemoryReview(result.facts)]
+              .filter(Boolean)
+              .join('\n\n'),
       );
     } else if (command === 'export' && out) {
       const dataDirectory = fileURLToPath(new URL('../data/', import.meta.url));

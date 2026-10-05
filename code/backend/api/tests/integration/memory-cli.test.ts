@@ -11,6 +11,7 @@ const env = {
   ...process.env,
   API_ACCESS_TOKEN: 'synthetic-cli-credential-over-32-characters',
 };
+
 const fact = {
   id: '22222222-2222-4222-8222-222222222222',
   text: 'Prefiro chá.',
@@ -109,6 +110,13 @@ it('mostra comandos com IDs reais e conserva a permissão na confirmação padr�
 
       confirmed = JSON.parse(raw);
       res.end(JSON.stringify({ ...fact, ...confirmed }));
+    } else if (req.url === '/v1/memory/status') {
+      res.end(
+        JSON.stringify({
+          policy: { autoApprove: true },
+          jobs: [{ status: 'pending', lastError: 'QUOTA_EXCEEDED' }],
+        }),
+      );
     } else {
       res.end(JSON.stringify({ facts: [fact] }));
     }
@@ -134,8 +142,10 @@ it('mostra comandos com IDs reais e conserva a permissão na confirmação padr�
       `confirm --id=${fact.id} --permission=eligible`,
     );
     expect(review.stdout).toContain('ainda não entra no contexto');
+    expect(review.stdout).toContain('aguardando cota do extrator');
     const json = JSON.parse((await run('review', '--json')).stdout);
     expect(json.review[0].state).toBe('needs-confirmation');
+    expect(json.processing.jobs[0].lastError).toBe('QUOTA_EXCEEDED');
     await run('confirm', '--id=' + fact.id);
     expect(confirmed).toMatchObject({
       expectedVersion: 7,

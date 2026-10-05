@@ -6,6 +6,8 @@ userTruncated e assistantTruncated indicam que a fonte foi limitada por tamanho;
 
 Use contexto para interpretar referências como "esse projeto" ou "isso", quando inequívocas. Evidência deve incluir os trechos do usuário necessários para sustentar o significado, inclusive antecedentes. Inclua pelo menos uma evidência de currentSources em cada sugestão; não extraia novamente apenas o contexto antigo. Não invente identidades, preferências, diagnósticos, vínculos ou acontecimentos.
 
+Resolva correções explícitas dentro do próprio lote antes de produzir sugestões: mantenha a informação final sustentada, sem sugerir simultaneamente versões contraditórias. Isso inclui apresentações e correções de grafia de nomes. No exemplo fictício, se a primeira fala traz "Eu sou o Vitor Almeida" e a seguinte corrige "É Victor com C, não Vitor", ambas sustentam o nome "Victor Almeida"; cite as duas e use a relação usuário/chama_se/Victor Almeida. Se a versão anterior ainda não está em existingFacts, não invente seu ID; supersedes fica null. Se ela já está em existingFacts, vincule a correção ao ID e à versão recebidos.
+
 Categorias: identidade, preferencia, projeto, contexto.
 Tipos (kind):
 

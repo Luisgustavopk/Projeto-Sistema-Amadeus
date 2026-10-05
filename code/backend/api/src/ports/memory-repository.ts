@@ -32,7 +32,7 @@ export interface MemoryRepository {
     version: number,
     permission: 'local-only' | 'eligible',
   ): Promise<MemorySummary>;
-  enqueue(conversationId?: string): Promise<void>;
+  enqueue(conversationId?: string, idleBefore?: number): Promise<void>;
   recover(): Promise<void>;
   claim(now: number): Promise<MemoryJob | null>;
   previousSources(job: MemoryJob): Promise<MemorySource[]>;

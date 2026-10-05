@@ -110,6 +110,38 @@ it('falhas do extrator não acionam os modelos da conversa', async () => {
   ]);
   expect((await f.service.describeMemory()).usage.requests).toBe(1);
 });
+
+it('usa o orçamento dedicado integral sem reservar 20% para conversa e conserva o teto', async () => {
+  const f = await fixture();
+  const previous = await f.deps.usage.reserve(
+    'primary:memory',
+    'llm',
+    f.provider,
+    170000,
+  );
+  await f.deps.usage.settle(previous, null);
+  await expect(
+    f.service.execute('llm', {
+      content: 'Teste sintético',
+      maxTokens: 10,
+      dataClass: 'synthetic',
+      purpose: 'memory',
+    }),
+  ).resolves.toMatchObject({ content: '{"facts":[]}' });
+  expect(f.execute).toHaveBeenCalledOnce();
+  await expect(
+    f.service.execute('llm', {
+      content: 'x'.repeat(32000),
+      maxTokens: 10,
+      dataClass: 'synthetic',
+      purpose: 'memory',
+    }),
+  ).rejects.toMatchObject({ code: 'QUOTA_EXCEEDED' });
+  expect(f.execute).toHaveBeenCalledOnce();
+  expect(
+    (await f.deps.usage.usage('primary', 'llm', f.conversation)).requests,
+  ).toBe(0);
+});
 it('persiste o perfil Z.ai com chave e orçamento próprios sem modificar a conversa', async () => {
   const f = await fixture();
   await f.service.configure({

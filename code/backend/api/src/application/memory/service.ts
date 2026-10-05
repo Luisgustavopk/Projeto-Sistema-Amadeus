@@ -32,13 +32,13 @@ export function createMemoryService(
   providers: Pick<ProviderServices, 'execute'> &
     Partial<Pick<MemoryProvider, 'describeMemory'>>,
   isBusy: () => boolean,
-  hasActiveCall: () => boolean = () => false,
 ) {
   let running: Promise<void> | undefined;
   let timer: NodeJS.Timeout | undefined;
   let abort: AbortController | undefined;
   let stopped = false;
   let lastPurge = 0;
+  let lastForegroundAt = 0;
   const measurements = {
     retrievals: 0,
     totalRetrievalMs: 0,
@@ -80,7 +80,7 @@ export function createMemoryService(
       !policy.enabled ||
       stopped ||
       isBusy() ||
-      (policy.extraction === 'llm' && hasActiveCall())
+      now - lastForegroundAt < 15000
     ) {
       return;
     }
@@ -90,7 +90,7 @@ export function createMemoryService(
       lastPurge = now;
     }
 
-    await repository.enqueue();
+    await repository.enqueue(undefined, now - 15000);
     const job = await repository.claim(now);
 
     if (!job) {
@@ -108,7 +108,7 @@ export function createMemoryService(
       );
       await requirePersonalPolicy(dataClass, policy);
 
-      if (isBusy() || (policy.extraction === 'llm' && hasActiveCall())) {
+      if (isBusy() || now - lastForegroundAt < 15000) {
         await repository.defer(job, 'ACTIVE_CONVERSATION', now + 5000, false);
 
         return;
@@ -250,6 +250,7 @@ export function createMemoryService(
       await running;
     },
     interruptBackground() {
+      lastForegroundAt = Date.now();
       abort?.abort();
     },
     async runOnce(now = Date.now()) {

@@ -97,6 +97,79 @@ const input = (text: string, overrides = {}) =>
     ...overrides,
   });
 
+it('retoma extração adiada por cota em chamada aberta e recupera nome corrigido após reinício', async () => {
+  const f = await fixture();
+  await f.service.configure({
+    expectedRevision: 0,
+    enabled: true,
+    personalEnabled: false,
+    extraction: 'llm',
+    retentionDays: null,
+    autoApprove: true,
+  });
+  const first = await f.add('Eu sou a Nora Costa.');
+  const second = await f.add('É Nara com A, não Nora.');
+  f.execute.mockRejectedValueOnce(new QuotaExceededError());
+  f.service.interruptBackground();
+  await f.service.runOnce(Date.now() + 1000);
+  expect(f.execute).not.toHaveBeenCalled();
+  await f.service.runOnce(Date.now() + 20000);
+  expect((await f.repo.jobs())[0]).toMatchObject({
+    status: 'pending',
+    lastError: 'QUOTA_EXCEEDED',
+    attempts: 0,
+  });
+  await f.service.stop();
+  const restarted = createMemoryService(
+    f.repo,
+    { execute: f.execute },
+    () => false,
+  );
+  cleanup.push(() => restarted.stop());
+  await restarted.start();
+  f.execute.mockResolvedValueOnce({
+    content: JSON.stringify({
+      facts: [
+        {
+          text: 'Usuário se chama Nara Costa.',
+          category: 'identidade',
+          kind: 'fact',
+          relation: {
+            subject: 'usuário',
+            predicate: 'chama_se',
+            object: 'Nara Costa',
+          },
+          evidence: [
+            { turnId: first.id, quote: 'Eu sou a Nora Costa.' },
+            { turnId: second.id, quote: 'É Nara com A, não Nora.' },
+          ],
+        },
+      ],
+    }),
+    inputTokens: 10,
+    outputTokens: 10,
+  });
+  await restarted.runOnce(Date.now() + 90000);
+  const facts = await f.repo.facts();
+  expect(facts).toHaveLength(1);
+  expect(facts[0]).toMatchObject({
+    status: 'confirmed',
+    permission: 'eligible',
+    category: 'identidade',
+  });
+  expect(facts[0]!.sources).toHaveLength(2);
+  expect(
+    await restarted.retrieve(randomUUID(), 'Qual é meu nome?', 'synthetic'),
+  ).toContain('Nara Costa');
+  expect(
+    await restarted.retrieve(
+      randomUUID(),
+      'Você sabe quem eu sou?',
+      'synthetic',
+    ),
+  ).toContain('Nara Costa');
+});
+
 async function enableSemantic(f: Awaited<ReturnType<typeof fixture>>) {
   const policy = await f.repo.policy();
   await f.service.configure({

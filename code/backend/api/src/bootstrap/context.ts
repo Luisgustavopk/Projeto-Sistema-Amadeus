@@ -115,7 +115,6 @@ export async function createContext(
     createMemoryRepository(database.client, config.OWNER_ID),
     memoryProvider,
     () => activity.activeExecutions > 0,
-    () => activity.activeCalls > 0,
   );
   await memory.start();
   const voiceSessions = createVoiceSessions({

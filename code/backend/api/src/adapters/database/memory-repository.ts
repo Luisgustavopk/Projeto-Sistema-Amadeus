@@ -820,14 +820,14 @@ export function createMemoryRepository(
         });
       });
     },
-    async enqueue(conversationId) {
+    async enqueue(conversationId, idleBefore) {
       await write(async (tx) => {
         if (conversationId) {
           await requireConversation(tx, conversationId);
         }
 
         const { rows: sessions } = await tx.execute({
-          sql: "SELECT s.* FROM call_sessions s WHERE owner_id = ? AND (? IS NULL OR conversation_id = ?) AND EXISTS (SELECT 1 FROM call_turns t WHERE t.session_id = s.id AND t.status <> 'processing' AND t.user_text <> '' AND NOT EXISTS (SELECT 1 FROM memory_job_sources WHERE turn_id = t.id) AND NOT EXISTS (SELECT 1 FROM memory_blocked_turns WHERE turn_id = t.id AND owner_id = s.owner_id)) ORDER BY started_at LIMIT 200",
+          sql: "SELECT s.*, (SELECT MAX(t.created_at) FROM call_turns t WHERE t.session_id = s.id) AS last_turn_at FROM call_sessions s WHERE owner_id = ? AND (? IS NULL OR conversation_id = ?) AND EXISTS (SELECT 1 FROM call_turns t WHERE t.session_id = s.id AND t.status <> 'processing' AND t.user_text <> '' AND NOT EXISTS (SELECT 1 FROM memory_job_sources WHERE turn_id = t.id) AND NOT EXISTS (SELECT 1 FROM memory_blocked_turns WHERE turn_id = t.id AND owner_id = s.owner_id)) ORDER BY started_at LIMIT 200",
           args: [ownerId, conversationId ?? null, conversationId ?? null],
         });
         let queued = 0;
@@ -841,7 +841,10 @@ export function createMemoryRepository(
 
             if (
               !rows.length ||
-              (rows.length < 8 && session.ended_at === null)
+              (rows.length < 8 &&
+                session.ended_at === null &&
+                (idleBefore === undefined ||
+                  Number(session.last_turn_at) > idleBefore))
             ) {
               break;
             }

@@ -36,10 +36,25 @@ export function memoryReview(facts, now = Date.now()) {
   });
 }
 
+export function renderMemoryProcessing(status) {
+  const pending = (status?.jobs ?? []).filter(
+    (job) => job.status !== 'completed',
+  );
+  if (!pending.length) return '';
+  const blocked = pending.filter((job) => job.lastError === 'QUOTA_EXCEEDED');
+  return (
+    `Memória em processamento: ${pending.length} trabalho(s) ainda sem concluir.` +
+    (blocked.length
+      ? ` ${blocked.length} aguardando cota do extrator. Aprovação automática não elimina essa espera.`
+      : '') +
+    '\nDetalhes: npm run memory -- status'
+  );
+}
+
 export function renderMemoryReview(facts) {
   const entries = memoryReview(facts);
   if (!entries.length)
-    return 'Nenhum fato para revisar. Encerre a conversa e aguarde o processamento da memória.';
+    return 'Nenhum fato para revisar. Aguarde o processamento da memória nas pausas ou após encerrar a conversa.';
   const labels = {
     expired: 'Vencido; não será recuperado.',
     superseded: 'Substituído por uma correção; não será recuperado.',

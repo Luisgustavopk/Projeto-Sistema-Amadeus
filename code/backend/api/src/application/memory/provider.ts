@@ -93,6 +93,9 @@ export function createMemoryProvider(dependencies: {
     usageOwner,
     factory,
     gate,
+    undefined,
+    undefined,
+    { reserveConversationCapacity: false },
   );
 
   return {

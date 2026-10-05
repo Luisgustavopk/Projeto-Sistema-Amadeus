@@ -9,12 +9,18 @@ const STOP_WORDS = new Set(
 const HUBS = new Set(['usuario']);
 
 export function memoryTerms(text: string) {
+  const normalized = normalizeMemory(text);
+  const identity = /\b(meu nome|me chamo|quem sou|quem eu sou|sou eu)\b/u.test(
+    normalized,
+  );
+
   return [
     ...new Set(
-      normalizeMemory(text)
+      normalized
         .split(' ')
         .filter((word) => word.length > 2 && !STOP_WORDS.has(word)),
     ),
+    ...(identity ? ['chama_se', 'identidade'] : []),
   ].slice(0, 24);
 }
 
