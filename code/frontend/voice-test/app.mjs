@@ -13,6 +13,8 @@ const transcripts = new Map();
 const responsesWithAudio = new Set();
 const log = [];
 let client;
+let pendingResume;
+let activeConnectionSettings;
 let generation = 0;
 let microphone = false;
 let microphonePending = false;
@@ -171,6 +173,9 @@ function receive(event) {
     showError(new Error(message));
   }
   if (event.type === "connection.closed") {
+    if (client && event.code !== 1000 && event.code !== 4001) {
+      pendingResume = { ...client.resumeState(), ...activeConnectionSettings };
+    }
     client = undefined;
     microphone = false;
     state = "disconnected";
@@ -352,10 +357,20 @@ element("connect-form").addEventListener("submit", async (event) => {
   const current = ++generation;
   try {
     const options = settings();
+    activeConnectionSettings = {
+      apiUrl: options.apiUrl,
+      dataClass: options.dataClass,
+    };
+    const resumeOptions =
+      pendingResume?.apiUrl === options.apiUrl &&
+      pendingResume?.dataClass === options.dataClass
+        ? { conversationId: pendingResume.conversationId, resume: pendingResume.resume }
+        : {};
     state = "connecting";
     renderControls();
     client = await createCallClient({
       ...options,
+      ...resumeOptions,
       onEvent: (value) => {
         if (current === generation) receive(value);
       },
@@ -365,6 +380,7 @@ element("connect-form").addEventListener("submit", async (event) => {
       },
     });
     state = "idle";
+    pendingResume = undefined;
     receive(client.session);
     void inspect();
   } catch (error) {
@@ -384,6 +400,7 @@ element("connect-form").addEventListener("submit", async (event) => {
 
 element("disconnect").addEventListener("click", async () => {
   const previous = client;
+  pendingResume = undefined;
   generation++;
   client = undefined;
   microphone = false;

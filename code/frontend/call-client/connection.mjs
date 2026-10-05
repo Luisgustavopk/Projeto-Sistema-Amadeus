@@ -2,8 +2,12 @@ export async function openCall({
   apiUrl,
   credential,
   conversationId,
+  resume,
   dataClass = "personal",
 }) {
+  if (resume && !conversationId) {
+    throw new Error("Retomada exige a conversa anterior.");
+  }
   const base = new URL(apiUrl);
   if (
     base.protocol !== "https:" &&
@@ -83,7 +87,10 @@ export async function openCall({
   });
   socket.send(
     JSON.stringify({
-      type: "session.start",
+      type: resume ? "session.resume" : "session.start",
+      ...(resume
+        ? { previousSessionId: resume.previousSessionId, lastSeq: resume.lastSeq }
+        : {}),
       protocolVersion: "1.1",
       dataClass,
       audio: {

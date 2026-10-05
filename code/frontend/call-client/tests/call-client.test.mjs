@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createCallClient } from "../index.mjs";
+import { openCall } from "../connection.mjs";
 
 async function fixture(t) {
   let callbacks,
@@ -35,7 +36,7 @@ async function fixture(t) {
     {
       AudioContext,
       now: () => clock,
-      openCall: async () => ({ socket }),
+      openCall: async () => ({ socket, conversationId: "conversation-fixture", session: { sessionId: "session-fixture" } }),
       createPlayback: (_context, _send, _error, onStart) => {
         started = onStart;
         return {
@@ -104,6 +105,18 @@ for (const outcome of ["transcript.final", "error"]) {
     );
   });
 }
+
+test("exports only resumption identifiers and the last observed control sequence", async (t) => {
+  const f = await fixture(t);
+  f.receive({ type: "state", state: "idle", turnId: 0, seq: 12 });
+  f.receive({ type: "state", state: "idle", turnId: 0, seq: 3 });
+  assert.deepEqual(f.client.resumeState(), {
+    conversationId: "conversation-fixture",
+    resume: { previousSessionId: "session-fixture", lastSeq: 12 },
+  });
+  assert.equal(f.sent.some((event) => event.type === "text.send"), false);
+  await assert.rejects(openCall({ apiUrl: "http://127.0.0.1:3001", credential: "synthetic", resume: f.client.resumeState().resume }), /Retomada exige/);
+});
 
 test("cuts playback on a recognized word before capture ends, preserving the full utterance", async (t) => {
   const f = await fixture(t);

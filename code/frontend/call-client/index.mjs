@@ -54,6 +54,7 @@ export async function createCallClient(options, runtime = {}) {
   let recognizingTurnId = null;
   let microphone;
   let disposed = false;
+  let lastSequence = -1;
   const timings = createVoiceTimings(now, options.onTiming);
   const send = (event) => {
     if (socket.readyState === WebSocket.OPEN) {
@@ -78,6 +79,9 @@ export async function createCallClient(options, runtime = {}) {
   const receiveControl = (data) => {
     try {
       const value = JSON.parse(data);
+      if (Number.isInteger(value.seq)) {
+        lastSequence = Math.max(lastSequence, value.seq);
+      }
       if (value.type === "transcript.partial") {
         if (
           value.turnId !== (captureTurnId ?? recognizingTurnId) ||
@@ -206,6 +210,15 @@ export async function createCallClient(options, runtime = {}) {
   });
   return {
     ...connection,
+    resumeState() {
+      return {
+        conversationId: connection.conversationId,
+        resume: {
+          previousSessionId: connection.session?.sessionId,
+          lastSeq: lastSequence,
+        },
+      };
+    },
     text(text) {
       microphone?.reset();
       captureTurnId = null;
