@@ -46,3 +46,9 @@ node --test code/frontend/call-client/tests/*.test.mjs
 As confirmações intermediárias de reprodução têm intervalo mínimo de 500 ms entre envios, mesmo com blocos de 100 ms. O fim do segmento e a interrupção confirmam as amostras efetivamente reproduzidas. Confirmar todos os blocos ultrapassaria o limite de 180 mensagens por minuto da API.
 
 A reprodução usa `audio.segment.sampleRate` (16 ou 24 kHz), com quadros de 20 ms e tamanho correspondente (648 ou 968 bytes). A captura permanece em 16 kHz. Recarregue o cliente após atualizar a API para saída Cartesia em 24 kHz.
+
+## Retomada — fase 3
+
+`client.resumeState()` retorna `{ conversationId, resume: { previousSessionId, lastSeq } }`. Guarde esse estado somente na sessão do cliente e passe-o a uma nova chamada `createCallClient({ apiUrl, credential, dataClass, ...state })`. A conexão pede um ticket novo e negocia `session.resume`. A API valida proprietário e sessão anterior, abre uma sessão nova e recupera contexto persistido. Não repete áudio nem envia automaticamente uma fala interrompida. `lastSeq` é diagnóstico dos controles observados; reprodução depende de `playback.progress`.
+
+Cada cliente novo cria reprodução e captura novas, com buffer vazio. O cliente de teste guarda esse estado após queda inesperada e usa-o quando Conectar é pressionado na mesma página. Encerrar chamada descarta a retomada. Não há loop automático de reconexão. Consulte [a arquitetura de memória](../../../docs/architecture/Memoria_Fase_3.md).

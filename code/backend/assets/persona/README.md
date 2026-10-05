@@ -12,7 +12,7 @@ Após editar qualquer Markdown carregado, reinicie a API; na execução compilad
 
 A 0.4.11 concluiu os 30 cenários, com notas por Codex de 3,13/5 em fidelidade e naturalidade, abaixo da meta, e oito de doze turnos encadeados por falta de cota. A 0.4.12 teve 28 respostas completas no Cloudflare, com fidelidade 3,25/5 e naturalidade 3,50/5; diferenças de modelo/cobertura impedem atribuir o resultado apenas ao prompt. A 0.4.13 substitui frases prontas da direção principal por gatilhos, esclarece histórico da sessão e ficção e orienta reparo científico e manutenção do formato. Seu prompt normal tem 19.146 caracteres; nenhuma cota ou configuração de provedor foi alterada. A rodada curta usa `refinement-v1.json`, com oito regressões e quatro situações novas, separada dos 30 casos e da continuidade. Resultados ficam locais, sem aceite humano automático.
 
-O usuário autorizou [avançar provisoriamente para a fase 3](../../../../docs/project/Decisao_Persona_Fase_3.md), preservando a voz aceita e retomando as técnicas avançadas após a memória. Isso não aprova os gates textuais pendentes.
+O usuário autorizou [avançar provisoriamente para a fase 3](../../../../docs/decisions/Decisao_Persona_Fase_3.md), preservando a voz aceita e retomando as técnicas avançadas após a memória. Isso não aprova os gates textuais pendentes.
 
 ## Catálogo de reações — versão 0.4.11
 
