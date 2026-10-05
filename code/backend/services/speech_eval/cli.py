@@ -19,9 +19,17 @@ def main():
     parser.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
     parser.add_argument("--compute-type", default="int8")
     parser.add_argument("--beam-size", type=int, choices=range(1, 6), default=3)
+    parser.add_argument("--vad-filter", choices=("true", "false"), default="true")
+    parser.add_argument(
+        "--hotwords", default="", help="Vocabulary only; never the expected transcript"
+    )
     parser.add_argument("--runs", type=int, choices=range(1, 6), default=3)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    if len(args.hotwords) > 256 or any(
+        ord(character) < 32 for character in args.hotwords
+    ):
+        parser.error("Hotwords requires a single line of at most 256 characters")
     manifest = json.loads(args.manifest.read_text(encoding="utf-8-sig"))
     cases = manifest.get("cases", [])
     if not 1 <= len(cases) <= 100:
@@ -43,6 +51,8 @@ def main():
         "device": args.device,
         "computeType": args.compute_type,
         "beamSize": args.beam_size,
+        "vadFilter": args.vad_filter == "true",
+        "hotwords": args.hotwords,
         "runs": args.runs,
         "corpusKind": manifest.get("corpusKind", "unclassified"),
         "referenceVerified": manifest.get("referenceVerified", False),
@@ -68,7 +78,8 @@ def main():
             beam_size=args.beam_size,
             temperature=0.0,
             condition_on_previous_text=False,
-            vad_filter=True,
+            vad_filter=args.vad_filter == "true",
+            hotwords=args.hotwords or None,
         )
         list(warmup)
         warmup_seconds = time.perf_counter() - started
@@ -82,7 +93,8 @@ def main():
                     beam_size=args.beam_size,
                     temperature=0.0,
                     condition_on_previous_text=False,
-                    vad_filter=True,
+                    vad_filter=args.vad_filter == "true",
+                    hotwords=args.hotwords or None,
                 )
                 text = " ".join(segment.text.strip() for segment in segments).strip()
                 elapsed = time.perf_counter() - started

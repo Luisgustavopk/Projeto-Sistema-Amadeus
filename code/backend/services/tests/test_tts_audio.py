@@ -29,6 +29,14 @@ def test_resampling_preserves_duration():
     assert len(raw) == 32000
 
 
+def test_native_quality_diagnostic_does_not_change_default_transport():
+    samples = np.zeros(24000, dtype=np.float32)
+    assert len(encode_pcm(samples, 24000, output_rate=24000)) == 48000
+    assert len(encode_pcm(samples, 24000)) == 32000
+    with pytest.raises(ValueError, match="output rate"):
+        encode_pcm(samples, 24000, output_rate=48000)
+
+
 @pytest.mark.parametrize("value", ["nan", "inf", "-0.1", "2", "bad"])
 def test_invalid_synthesis_controls_fail_before_model_load(monkeypatch, value):
     monkeypatch.setenv("TTS_EXAGGERATION", value)

@@ -8,6 +8,8 @@ Use um ambiente separado das dependências do Chatterbox. Em `code/backend/servi
 
 Em `tts/.env`, configure `TTS_ENGINE=qwen-base`, `TTS_DEVICE=cuda:0` e preserve o `SERVICE_ACCESS_TOKEN`. O modelo local fica, por padrão, em `backend/api/data/models/qwen3-tts-base-1.7b`. Foi testada a revisão `fd4b254389122332181a7c3db7f27e918eec64e3` de `Qwen/Qwen3-TTS-12Hz-1.7B-Base`. O adaptador carrega pesos locais e usa SDPA, sem exigir FlashAttention. CUDA indisponível gera erro explícito; não há troca silenciosa para CPU.
 
+`TTS_ENGINE` é obrigatório: sua ausência não escolhe mais Chatterbox implicitamente. Na versão instalada do SDK, `non_streaming_mode=False` simula entrada progressiva, mas não retorna áudio incrementalmente. Não use essa flag como prova de geração em streaming; a síntese atual permanece por segmento completo, com a referência preservada.
+
 Ao lado de `references/amadeus.wav`, mantenha um arquivo local `amadeus.json`:
 
 ```json
@@ -22,6 +24,16 @@ Ao lado de `references/amadeus.wav`, mantenha um arquivo local `amadeus.json`:
 Para latência previsível, configure `QWEN_WARMUP_REFERENCE` com o nome exato do WAV ativo. O contexto de clonagem e uma síntese curta de aquecimento são preparados durante a inicialização, antes de aceitar pedidos. Sem essa opção, a preparação e o custo de inicialização de CUDA Graphs podem recair sobre a primeira chamada. O contexto é reutilizado enquanto áudio e transcrição permanecerem iguais. A síntese usa texto completo, idioma `Portuguese` e até 512 novos tokens. O idioma do modelo, sozinho, não garante sotaque brasileiro: a avaliação depende da escuta.
 
 Cada pedido aceita até 220 caracteres e devolve PCM16 mono de 16 kHz, mantendo o contrato público. GET `/metrics` autenticado informa tempo de preparação, geração, execução, duração de áudio e reutilização do contexto. Essas medidas são do TTS e não representam a latência total de uma chamada.
+
+### Comparar identidade e qualidade sem trocar o perfil
+
+Em `code/backend/services`, com o TTS encerrado para não carregar dois modelos na GPU:
+
+```powershell
+..\tools\voice-design\.venv\Scripts\python.exe ..\tools\voice-design\compare_qwen_delivery.py --run
+```
+
+O ensaio usa a mesma referência, transcrição, semente e configuração para a frase inteira e suas três frases separadas. Salva `full-24k.wav`, `full-16k.wav`, `segmented-24k.wav` e `segmented-16k.wav`, além dos segmentos individuais, em `api/data/voice-tests/delivery-comparison`. A conversão a 24 kHz é apenas diagnóstico local; o transporte da API permanece em 16 kHz. Compare identidade, sotaque, ritmo e naturalidade antes de escolher uma mudança. O ensaio não altera a referência ou o perfil ativo.
 
 ## Executar e testar
 

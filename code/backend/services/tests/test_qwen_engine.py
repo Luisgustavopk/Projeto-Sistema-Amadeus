@@ -123,6 +123,15 @@ def test_startup_prepares_reference_before_first_user_request(monkeypatch, tmp_p
             return [np.zeros(2400, dtype=np.float32)], 24000
 
     monkeypatch.setattr(module, "load_model", lambda _: Model())
+    # Warmup/cache behavior is the unit boundary; the RNG/model stack belongs
+    # to the real inference test and must not be required by lightweight tests.
+    monkeypatch.setattr(
+        module,
+        "synthesize",
+        lambda model, text, prompt, config: model.generate_voice_clone(
+            text=text, language="Portuguese", voice_clone_prompt=prompt
+        ),
+    )
     monkeypatch.setattr(
         QwenConfig,
         "from_environment",

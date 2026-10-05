@@ -16,6 +16,8 @@ Configuração, instalação e comandos estão em [Serviços locais](../README.m
 
 O idioma fica fixado em português. "STT_BEAM_SIZE" controla quantas hipóteses o decoder compara (1 a 5, padrão 3). Temperatura zero mantém a decodificação determinística, e cada captura é transcrita sem condicionar a janelas anteriores. GET /metrics informa beamSize. Reinicie o STT para aplicar mudanças.
 
+`STT_VAD_FILTER` permite comparar o filtro interno ligado (`true`, padrão) e desligado (`false`), mantendo o VAD do navegador. `STT_HOTWORDS` aceita vocabulário de até 256 caracteres, como nomes próprios; deixe vazio até medir o efeito. Não use a transcrição esperada como prompt do modelo. As métricas informam o filtro e a presença de vocabulário sem expor seu conteúdo.
+
 Beam maior pode aumentar o tempo; a melhoria de precisão precisa ser medida com as mesmas gravações e transcrições corretas. O modelo small permanece configurado: não foi baixado nem ativado um modelo maior. Whisper não garante a variante pt-BR nem transcrições corretas só por fixar o idioma. Compare primeiro erros por palavra e latência; depois avalie um modelo maior se necessário.
 
 ## Comparação com gravações fixas
@@ -30,5 +32,7 @@ Na pasta `code/backend/services`:
 ```
 
 A ferramenta mede erro por palavra (WER), latência de três execuções após aquecimento, duração, RMS, pico e saturação. Usa o mesmo áudio e parâmetros, carrega um modelo por vez e não muda o STT em execução. CPU é o padrão para não disputar VRAM com os serviços; comparar em CUDA exige margem de memória e a biblioteca cuDNN/cuBLAS configurada. Não compare tempos de CPU diretamente aos tempos do serviço em GPU. Para capturas reais, inclua frases em ritmo normal, baixa intensidade e com pausas; cada item do manifesto deve apontar para seu WAV e sua transcrição correta.
+
+Comece com 20–30 gravações conferidas, incluindo “Hum, então me conta uma história legal”, nomes, números e pausas. Faça uma execução com `--vad-filter=true` e outra com `--vad-filter=false`, em relatórios diferentes; os demais parâmetros e arquivos devem permanecer iguais. `--hotwords="Amadeus, Kurisu"` permite uma comparação adicional de vocabulário. Os relatórios registram essas configurações. Essas opções não alteram o serviço em execução.
 
 Teste sintético inicial: WAV de referência com transcrição automática não verificada, três repetições em CPU/int8, beam 3. `small`: mediana 1,68 s; `medium`: 4,61 s; ambos coincidiram com o texto de comparação. É somente um teste de funcionamento do comparador, sem comprovação de precisão no microfone do usuário. O serviço ativo continua `small` em CUDA/int8_float16. Relatório local: `api/data/stt-evals/smoke-small-medium.json`.
