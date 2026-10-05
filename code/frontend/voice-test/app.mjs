@@ -1,6 +1,7 @@
 import { createCallClient } from "/call-client/index.mjs";
 import { createVoiceBaseline } from "/call-client/baseline.mjs";
 import { createTestReport } from "./report.mjs";
+import { attachTtsDiagnostic } from "./tts-diagnostic.mjs";
 import { attachSttDiagnostic } from './stt-diagnostic.mjs';
 import { describeCallClosure } from "./connection-status.mjs";
 
@@ -446,6 +447,7 @@ element("export").addEventListener("click", () => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 renderDiagnostic = attachSttDiagnostic(() => !client && state !== 'connecting', (busy) => { diagnosticBusy = busy; element('connect').disabled = Boolean(client) || state === 'connecting' || busy; });
+attachTtsDiagnostic();
 
 window.addEventListener("pagehide", () => {
   void client?.close();
