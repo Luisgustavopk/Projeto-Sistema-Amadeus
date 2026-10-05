@@ -177,6 +177,7 @@ it('preserva erro de cota da reserva sem repetir a cadeia', async () => {
   const test = setup(async function* () {
     yield await Promise.reject(new QuotaExceededError());
   });
+
   const original = test.factory.getMockImplementation()!;
   test.factory.mockImplementation((role, config) => ({
     ...original(role, config),
@@ -189,6 +190,34 @@ it('preserva erro de cota da reserva sem repetir a cadeia', async () => {
   ).rejects.toMatchObject({ code: 'QUOTA_EXCEEDED' });
   expect(test.factory).toHaveBeenCalledTimes(2);
   expect(test.notify).toHaveBeenCalledOnce();
+});
+
+it('mantém previews local-only no fallback local do STT', () => {
+  const config = ProvidersSchema.parse({
+    llm: { adapter: 'disabled' },
+    stt: {
+      adapter: 'deepgram',
+      model: 'nova-3',
+      apiKeyEnv: 'DEEPGRAM_API_KEY',
+      dataPolicy: 'personal-approved',
+      policyReviewedAt: '2025-01-01T00:00:00.000Z',
+      policyReference: 'https://example.com/privacy',
+      speechFallback: {
+        adapter: 'http-json',
+        endpoint: 'http://127.0.0.1:8001',
+        apiKeyEnv: 'STT_SERVICE_TOKEN',
+        dataPolicy: 'local-approved',
+      },
+    },
+    tts: { adapter: 'disabled' },
+  }).stt;
+
+  expect(
+    filterProviderAttemptsForDataClass(
+      providerAttempts('stt', config),
+      'local-only',
+    ),
+  ).toMatchObject([{ adapter: 'http-json', dataPolicy: 'local-approved' }]);
 });
 
 it('não troca em erro de cota quando a reserva está desativada', async () => {
@@ -253,12 +282,81 @@ it('não gera novamente após falha de persistência', async () => {
   expect(test.factory).toHaveBeenCalledOnce();
   expect(test.settle).toHaveBeenCalledOnce();
 });
-it('sem reserva configurada preserva falha e não inicia outro modelo', async () => {
+it('sem reserva configurada repete uma vez o mesmo modelo e preserva a falha', async () => {
   const test = setup(temporaryFailure, { fallback: false });
   await expect(
     collect(test.services.executeStream(input)),
   ).rejects.toMatchObject({ code: 'PROVIDER_TEMPORARILY_UNAVAILABLE' });
+  expect(test.factory).toHaveBeenCalledTimes(2);
+  expect(test.reserve).toHaveBeenCalledTimes(2);
+  expect(test.notify).not.toHaveBeenCalled();
+});
+
+it('recupera falha temporária do último provedor com nova reserva de uso', async () => {
+  let requests = 0;
+  const test = setup(
+    async function* () {
+      if (++requests === 1) {
+        throw new ProviderTemporarilyUnavailableError();
+      }
+
+      yield output;
+    },
+    { fallback: false },
+  );
+  expect(await collect(test.services.executeStream(input))).toEqual([output]);
+  expect(test.reserve).toHaveBeenCalledTimes(2);
+  expect(test.settle.mock.calls).toEqual([
+    ['gemini-3.8-flash', null],
+    ['gemini-3.8-flash', output],
+  ]);
+  expect(test.notify).not.toHaveBeenCalled();
+});
+
+it('não repete o último provedor após cota, conteúdo parcial ou falha ao liquidar uso', async () => {
+  const quota = setup(
+    async function* () {
+      yield await Promise.reject(new QuotaExceededError());
+    },
+    { fallback: false },
+  );
+  await expect(
+    collect(quota.services.executeStream(input)),
+  ).rejects.toMatchObject({ code: 'QUOTA_EXCEEDED' });
+  expect(quota.factory).toHaveBeenCalledOnce();
+  const partial = setup(
+    async function* () {
+      yield output;
+
+      throw new ProviderTemporarilyUnavailableError();
+    },
+    { fallback: false },
+  );
+  await expect(
+    collect(partial.services.executeStream(input)),
+  ).rejects.toMatchObject({ code: 'PROVIDER_TEMPORARILY_UNAVAILABLE' });
+  expect(partial.factory).toHaveBeenCalledOnce();
+  const storage = setup(temporaryFailure, { fallback: false });
+  storage.settle.mockRejectedValue(new ProviderTemporarilyUnavailableError());
+  await expect(
+    collect(storage.services.executeStream(input)),
+  ).rejects.toMatchObject({ code: 'PROVIDER_TEMPORARILY_UNAVAILABLE' });
+  expect(storage.factory).toHaveBeenCalledOnce();
+});
+
+it('cancelamento durante a espera impede nova chamada ao último provedor', async () => {
+  const abort = new AbortController();
+  const test = setup(temporaryFailure, { fallback: false });
+  const original = test.settle.getMockImplementation()!;
+  test.settle.mockImplementation(async (...args) => {
+    await original(...args);
+    abort.abort();
+  });
+  await expect(
+    collect(test.services.executeStream(input, abort.signal)),
+  ).rejects.toMatchObject({ name: 'AbortError' });
   expect(test.factory).toHaveBeenCalledOnce();
+  expect(test.release).toHaveBeenCalledOnce();
 });
 it('valida nomes e impede reserva idêntica ou em outro adaptador', () => {
   expect(
@@ -697,7 +795,7 @@ it('percorre Gemini, Groq e Cloudflare na ordem até uma resposta completa', asy
   ]);
 });
 
-it('encerra após falha da reserva sem repetir a cadeia', async () => {
+it('encerra após uma repetição da última reserva sem reiniciar a cadeia', async () => {
   const test = setup(temporaryFailure);
   const original = test.factory.getMockImplementation()!;
   test.factory.mockImplementation((role, config) => ({
@@ -707,8 +805,8 @@ it('encerra após falha da reserva sem repetir a cadeia', async () => {
   await expect(
     collect(test.services.executeStream(input)),
   ).rejects.toMatchObject({ code: 'PROVIDER_TEMPORARILY_UNAVAILABLE' });
-  expect(test.factory).toHaveBeenCalledTimes(2);
-  expect(test.settle).toHaveBeenCalledTimes(2);
+  expect(test.factory).toHaveBeenCalledTimes(3);
+  expect(test.settle).toHaveBeenCalledTimes(3);
   expect(test.release).toHaveBeenCalledOnce();
 });
 

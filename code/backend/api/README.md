@@ -4,6 +4,10 @@
 
 O LLM pode usar Gemini, Groq ou Cloudflare Workers AI. Groq e Cloudflare usam endpoints oficiais compatíveis com Chat Completions e suportam entrega SSE. Configure suas chaves somente no ambiente da API (`GEMINI_API_KEY`, `GROQ_API_KEY` e `CLOUDFLARE_AI_TOKEN`); nunca envie valores de segredo no JSON da configuração. Para privilegiar baixa latência, esta instalação local usa Groq como principal, Cloudflare como primeira reserva e Gemini por último. Um smoke test sintético isolado mediu o primeiro texto em 303 ms no Groq e 398 ms no Cloudflare, enquanto o Gemini estava sem cota. Esses valores não representam a conversa completa nem garantem desempenho futuro.
 
+O Groq também pode responder HTTP 413 quando o prompt excede o limite de tokens por minuto da conta. Quando o corpo identifica `error.code: "rate_limit_exceeded"` e `error.type: "tokens"`, a API classifica como `QUOTA_EXCEEDED` e permite a mesma cadeia de reservas. Outros erros 413 são tratados como configuração/entrada recusada. A mensagem remota não é exposta. O prompt completo com documento e skill pode exceder o limite do modelo principal mesmo sem histórico; nesse caso, a geração depende de uma reserva elegível e disponível.
+
+No streaming, uma falha temporária do último provedor elegível permite uma única nova tentativa no mesmo provedor, após 400 ms e antes de qualquer fragmento entregue. Ela recebe nova reserva de uso e respeita cancelamento, política de dados e orçamento. Cota, erro de configuração, falha de persistência e conteúdo parcial não permitem essa repetição. Se a segunda tentativa também falhar, o erro é reportado; disponibilidade externa não é garantida.
+
 `llm.fallbackProviders` aceita até dois provedores alternativos ordenados. Exemplo parcial para mesclar à configuração atual:
 
 ```json
@@ -35,9 +39,51 @@ A cadeia tenta os provedores na ordem configurada apenas após cota (HTTP 402/42
 
 As cotas grátis não são SLA e são independentes por provedor: os limites Groq dependem da organização e devem ser verificados na conta; Workers AI publica 10.000 Neurons gratuitos por dia, compartilhados entre modelos e renovados diariamente. Essa cota não equivale a um número fixo de conversas. A saúde do Groq faz uma consulta de modelos, que não verifica a cota de geração; no Cloudflare, `available` indica apenas que a configuração local foi carregada e não testa a chave, conectividade nem quota. Mesmo com a cadeia configurada, todas as alternativas podem estar indisponíveis. O envio de transcrições/contexto a provedores terceiros depende da política de dados aprovada.
 
+## Provedores cloud de fala
+
+STT aceita Deepgram `nova-2` ou `nova-3`; TTS aceita Cartesia `sonic-3.6` com um `voiceId` existente. Configure `DEEPGRAM_API_KEY` e `CARTESIA_API_KEY` somente no ambiente da API. Ao configurar `stt` ou `tts` em `PUT /v1/providers`, defina o provedor primário, `apiKeyEnv` e `dataPolicy`. `personal-approved` exige `policyReviewedAt` e `policyReference`: antes de habilitar, revise e aprove os termos e o tratamento de áudio/transcrições pela Deepgram e de texto/voz pela Cartesia. Não marque essa aprovação sem fazer a revisão.
+
+Para manter o fallback local, configure `speechFallback` no papel correspondente com `adapter: "http-json"`, o endpoint local e `dataPolicy: "local-approved"`. Nesta instalação, os endpoints são `http://127.0.0.1:8001` para STT e `http://127.0.0.1:8002` para TTS; os serviços usam `STT_SERVICE_TOKEN` e `TTS_SERVICE_TOKEN` no ambiente da API. Exemplo parcial de configuração (mescle aos demais provedores; não substitua `llm`):
+
+```json
+{
+  "stt": {
+    "adapter": "deepgram",
+    "model": "nova-3",
+    "apiKeyEnv": "DEEPGRAM_API_KEY",
+    "dataPolicy": "personal-approved",
+    "policyReviewedAt": "<data-hora-ISO-8601-da-revisao>",
+    "policyReference": "https://deepgram.com/terms",
+    "speechFallback": {
+      "adapter": "http-json",
+      "endpoint": "http://127.0.0.1:8001",
+      "apiKeyEnv": "STT_SERVICE_TOKEN",
+      "dataPolicy": "local-approved"
+    }
+  },
+  "tts": {
+    "adapter": "cartesia",
+    "model": "sonic-3.6",
+    "voiceId": "<UUID-da-voz-Cartesia>",
+    "apiKeyEnv": "CARTESIA_API_KEY",
+    "dataPolicy": "personal-approved",
+    "policyReviewedAt": "<data-hora-ISO-8601-da-revisao>",
+    "policyReference": "https://www.cartesia.ai/legal/dpa",
+    "speechFallback": {
+      "adapter": "http-json",
+      "endpoint": "http://127.0.0.1:8002",
+      "apiKeyEnv": "TTS_SERVICE_TOKEN",
+      "dataPolicy": "local-approved"
+    }
+  }
+}
+```
+
+Pré-visualizações frequentes de STT permanecem locais; apenas a transcrição final pode ser enviada ao provedor remoto conforme a política aprovada. Falhas temporárias ou de cota podem usar o fallback local; erros de autenticação, configuração ou entrada são reportados sem mascaramento. O fallback local só pode receber conteúdo classificado `local-only` quando sua política está configurada como `local-approved`.
+
 ## Conversa e diagnóstico de voz
 
-`llm.thinkingLevel` configura o raciocínio do Gemini (`low`, `medium`, `high`) quando Gemini está ativo; outros provedores ignoram essa opção. A resposta falada é orientada a uma ou duas frases por padrão. O TTS recebe frases completas assim que ficam disponíveis. Vírgulas e ponto e vírgula só são usados como fronteiras quando necessário para respeitar o limite de 220 caracteres; isso evita sintetizar separadamente cláusulas curtas da mesma frase. Esperar o fim da primeira frase pode aumentar o tempo até o primeiro áudio; a continuidade deve ser avaliada por escuta.
+`llm.thinkingLevel` configura o raciocínio do Gemini (`low`, `medium`, `high`) quando Gemini está ativo; outros provedores ignoram essa opção. A resposta falada é orientada a uma ou duas frases por padrão. Respostas de até 220 caracteres são reunidas em uma síntese, preservando pontos, perguntas e exclamações como pausas naturais. Respostas maiores continuam em blocos de até 220 caracteres, preferindo a última frase completa dentro do limite, depois uma pausa ou fronteira de palavra. Isso reduz reinícios da voz entre frases curtas; pode aumentar o tempo até o primeiro áudio por aguardar o restante da resposta curta. Continuidade e latência devem ser avaliadas por escuta.
 
 O STT retorna `NO_SPEECH_DETECTED` para áudio válido sem fala. A captura candidata é descartada e a resposta anterior, se houver, continua; esse caso contabiliza `noSpeech` e não é tratado como indisponibilidade. Erros reais de validação continuam visíveis. O serviço local enfileira até uma inferência enquanto outra está ocupada; HTTP 429 indica fila cheia e 400 entrada recusada. No cliente, o VAD exige 160 ms acima do limiar e preserva 160 ms anteriores à fala, mas não interrompe por si só: durante a captura e a transcrição STT, a resposta atual continua. Ela só é interrompida após `transcript.partial` com palavras durante a captura ou `transcript.final` não vazio; a interrupção manual permanece imediata.
 
@@ -50,6 +96,10 @@ Os serviços locais têm limite operacional de 500 pedidos diários nesta instal
 ## Persona e atuação — fase 2
 
 A persona versionada usa a análise fornecida pelo usuário e o recorte aprovado anterior à viagem de Kurisu ao Japão. Curiosidade, humor contextual, cuidado e limites de identidade ficam em `src/application/persona/prompt.ts`; regras e vocabulário expressivos ficam em `src/domain/persona`. A biografia ficcional é separada do histórico confirmado e de fatos pessoais. Não há memória persistente da fase 3.
+
+O documento original completo está preservado em `../assets/persona/source-v0.4.md`. A versão 0.4.7 inclui diretamente suas seções 3.12, 5.2–5.6 e 14.5 como referência complementar, mantendo prioridade das regras estruturadas. O conteúdo é lido ao iniciar e também incluído na recuperação em fala simples; alterações no Markdown exigem reinício. O build leva uma cópia integral do documento para `dist/application/persona/`. Consulte `../assets/persona/README.md` para limites e organização.
+
+A versão 0.4.8 incorpora `src/application/persona/skill-amadeus-kurisu.md` diretamente no prompt. As pendências foram aprovadas e têm critérios de execução na seção 13 da skill: ficção explícita, meta-consciência, familiaridade, limites de voz, `ceder_turno`, cuidado em crise e medições acústicas sem classificação emocional. O limite de prompt passa a 32768 caracteres para preservar o prompt estruturado e os dois complementos. Consumo e latência incluem esse contexto maior. Execute `npm run eval:persona -- --skill --run --limit=12` para avaliação textual e `npm run check:skill-voice` para preparar a escuta dos quatro presets; a escuta humana continua necessária.
 
 O LLM propõe expressão na mesma geração de fala. O prefixo é removido antes do TTS; intensidade e transições são validadas por chamada. `reply.expression` acompanha os IDs do segmento e informa versão, intenção, emoção, preset e `deliveryApplied: false`. Os presets são direção artística: não alteram parâmetros de voz nativos não validados. `GET /v1/voice/protocol` publica a versão da persona e a associação para clientes futuros; vincule a expressão à reprodução efetiva do segmento, não ao instante em que o evento chega.
 
@@ -107,3 +157,22 @@ A alteração usa a API autenticada e seu bloqueio normal de configuração. A p
 Com i5-12400F, 16 GB de RAM e os serviços de voz ativos, o primeiro trecho de fala local levou 36,82 s no primeiro caso e 3,80–4,81 s nos três seguintes. São tempos do LLM, sem STT, TTS ou áudio físico. D02/D03 copiaram exemplos da persona, e D01 inventou sentido para uma fala incompreensível: personalidade e naturalidade não estão aprovadas. Uma ativação temporária pela API respondeu uma saudação em 4,44 s até o primeiro trecho e foi revertida, com igualdade da configuração anterior verificada. Não satisfaz a meta de conversa de 2 s.
 
 Relatórios locais: `api/data/persona-evals/1791126180265-persona.json` e `api/data/hybrid/integration-smoke.json`. O modelo não recebeu fine-tuning; a direção atual vem do prompt. Treinamento exigirá exemplos curados, revisão e avaliação separada, e não substitui STT/TTS nem memória controlável.
+
+## Comparação isolada da persona
+
+`npm run compare:persona` valida o plano sem chamar provedores. O conjunto versionado `../evals/persona/behavior-v1.json` contém as 12 conversas de três turnos propostas pelo usuário. Para uma triagem com as mesmas perguntas:
+
+```powershell
+npm run compare:persona -- --run --cases=U01,U05,U10
+npm run compare:persona -- --run --compact --cases=U01,U05,U10
+```
+
+Os candidatos são GPT-OSS 120B e 20B no Groq; `--models=qwen/qwen3.8-27b` inclui o controle atual. `--speech-only` compara a fala sem solicitar cabeçalho. Sem `--cases`, são executados os 36 turnos de cada modelo. Cada conversa encadeia as próprias respostas, sem reutilizar respostas de outro candidato. A variante compacta mantém identidade, recorte e referência curada e permanece experimental: não substitui o prompt de produção.
+
+O ensaio usa a credencial Groq configurada, dados sintéticos, reservas e limites normais. Não salva novos provedores, não ativa planos nem aumenta orçamento. Esperas limitadas respeitam `retry-after`; esgotamento diário/local interrompe a coleta desse modelo. Relatórios em `data/persona-evals/comparison` registram prompt, modelo, respostas brutas, recuperação, erros e tempos, com aceite humano pendente. Não representam latência do microfone ao áudio. Cotas por provedor continuam se aplicando mesmo quando a reserva local foi aceita.
+
+Na chamada, execuções sucessivas da mesma sessão aguardam o cancelamento e a persistência anteriores antes de gerar novamente. Consultas antecipadas do STT não se acumulam entre capturas canceladas. No serviço Python, cancelamentos repetidos não liberam o bloqueio enquanto a thread de inferência estiver em execução. A interrupção automática permanece condicionada ao reconhecimento de palavras.
+
+## Qualidade da saída Cartesia
+
+Cartesia usa PCM16 mono de 24 kHz e `accent: "brazilian-portuguese"`, como a comparação isolada. A API preserva a taxa em `audio.segment` até o player, sem reduzir para 16 kHz. Os fallbacks locais e a captura/STT continuam em 16 kHz. Reinicie a API e recarregue a página de chamada para usar o contrato de saída atualizado. A equivalência de parâmetros não substitui a avaliação auditiva de prosódia e continuidade entre frases.

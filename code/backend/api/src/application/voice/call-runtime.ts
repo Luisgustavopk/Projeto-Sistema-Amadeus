@@ -10,6 +10,7 @@ import { ApplicationError } from '../../domain/errors/application-error.ts';
 import type { createTurnProcessor } from './turn-processor.ts';
 import type { VoiceMetrics } from './metrics.ts';
 import { createSpeechPreview } from './speech-preview.ts';
+import { measureVoiceAudio } from './audio-observations.ts';
 
 export function createCallRuntime(input: {
   sessionId: string;
@@ -36,6 +37,7 @@ export function createCallRuntime(input: {
   let latestTurnId = 0;
   let closed = false;
   const pending = new Set<Promise<void>>();
+  let previousExecution = Promise.resolve();
 
   const finishPlayback = (turn: NonNullable<typeof active>) => {
     if (active !== turn || !turn.generated || !turn.playbackEnded || closed) {
@@ -107,6 +109,7 @@ export function createCallRuntime(input: {
     source: {
       text?: string;
       audio?: { pcmBase64: string; sampleRate: 16000; channels: 1 };
+      audioObservations?: ReturnType<typeof measureVoiceAudio>;
     },
     speechEndedAt = performance.now(),
   ) => {
@@ -124,9 +127,14 @@ export function createCallRuntime(input: {
       playbackEnded: false,
     };
     active = turn;
+    const preceding = previousExecution;
 
     turn.finished = (async () => {
       try {
+        // Persist cancellation of the preceding response before building context.
+        // This also prevents overlapping generation within the same call.
+        await preceding;
+        abort.signal.throwIfAborted();
         await input.history.beginTurn({
           id: randomUUID(),
           sessionId: input.sessionId,
@@ -203,7 +211,7 @@ export function createCallRuntime(input: {
         active = null;
       }
 
-      if (!closed) {
+      if (!closed && !abort.signal.aborted) {
         input.sink.send({
           type: 'error',
           turnId,
@@ -213,6 +221,7 @@ export function createCallRuntime(input: {
         input.sink.send({ type: 'state', turnId, state: 'error' });
       }
     });
+    previousExecution = turn.finished;
     pending.add(turn.finished);
     void turn.finished.finally(() => pending.delete(turn.finished));
   };
@@ -238,7 +247,11 @@ export function createCallRuntime(input: {
 
         interrupt();
         pendingSpeech = null;
-        run(turnId, { text }, speechEndedAt);
+        run(
+          turnId,
+          { text, audioObservations: measureVoiceAudio(audio, text) },
+          speechEndedAt,
+        );
       } catch (error) {
         if (abort.signal.aborted || closed) {
           return;

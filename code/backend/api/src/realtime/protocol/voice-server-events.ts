@@ -63,7 +63,7 @@ const event = z.discriminatedUnion('type', [
     segmentId,
     sampleCount: z.number().int().positive(),
     frameCount: z.number().int().positive(),
-    sampleRate: z.literal(16000),
+    sampleRate: z.union([z.literal(16000), z.literal(24000)]),
   }),
   z.strictObject({ type: z.literal('reply.done'), turnId, responseId }),
   z.strictObject({ type: z.literal('interrupted'), turnId, responseId }),

@@ -35,7 +35,7 @@ export const PROVIDER_PROTOCOL = {
         content: 'string',
         inputTokens: 'integer | null',
         outputTokens: 'integer | null',
-        audio: 'TTS: optional {pcmBase64, sampleRate:16000, channels:1}',
+        audio: 'TTS: optional {pcmBase64, sampleRate:16000|24000, channels:1}',
       },
     },
   },

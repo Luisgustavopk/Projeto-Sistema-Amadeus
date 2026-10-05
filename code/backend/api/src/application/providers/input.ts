@@ -9,7 +9,7 @@ import type { ProviderInput } from '../../ports/provider.ts';
 
 const InputSchema = z.strictObject({
   content: z.string().max(65536),
-  systemPrompt: z.string().min(1).max(16384).optional(),
+  systemPrompt: z.string().min(1).max(32768).optional(),
   dataClass: DataClassSchema,
   audio: z
     .strictObject({

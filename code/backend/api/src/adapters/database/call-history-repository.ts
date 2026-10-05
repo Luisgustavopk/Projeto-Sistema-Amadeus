@@ -4,6 +4,7 @@ import type {
   StoredTurn,
 } from '../../ports/call-history-repository.ts';
 import type { DataClass } from '../../domain/providers/model.ts';
+import type { TurnStatus } from '../../domain/voice/model.ts';
 import { randomUUID } from 'node:crypto';
 
 export function createSqliteCallHistory(client: Client): CallHistoryRepository {
@@ -64,7 +65,7 @@ export function createSqliteCallHistory(client: Client): CallHistoryRepository {
     },
     async recent(conversationId, ownerId, limit): Promise<StoredTurn[]> {
       const { rows } = await client.execute({
-        sql: "SELECT t.user_text, COALESCE((SELECT GROUP_CONCAT(text, ' ') FROM (SELECT text FROM speech_segments WHERE response_id = t.response_id AND sample_count > 0 AND played_samples = sample_count ORDER BY position)), '') AS generated_text, t.data_class FROM call_turns t JOIN foundation_conversations c ON c.id = t.conversation_id WHERE c.id = ? AND c.owner_id = ? AND t.user_text <> '' AND t.status IN ('completed', 'interrupted', 'failed') ORDER BY t.created_at DESC LIMIT ?",
+        sql: "SELECT t.user_text, COALESCE((SELECT GROUP_CONCAT(text, ' ') FROM (SELECT text FROM speech_segments WHERE response_id = t.response_id AND sample_count > 0 AND played_samples = sample_count ORDER BY position)), '') AS generated_text, t.data_class, t.status, EXISTS(SELECT 1 FROM speech_segments WHERE response_id = t.response_id AND played_samples > 0 AND played_samples < sample_count) AS partially_played FROM call_turns t JOIN foundation_conversations c ON c.id = t.conversation_id WHERE c.id = ? AND c.owner_id = ? AND t.user_text <> '' AND t.status IN ('completed', 'interrupted', 'failed') ORDER BY t.created_at DESC, t.rowid DESC LIMIT ?",
         args: [conversationId, ownerId, limit],
       });
 
@@ -72,6 +73,8 @@ export function createSqliteCallHistory(client: Client): CallHistoryRepository {
         userText: String(row.user_text),
         generatedText: String(row.generated_text),
         dataClass: String(row.data_class) as DataClass,
+        responseStatus: String(row.status) as TurnStatus,
+        partiallyPlayed: Boolean(row.partially_played),
       }));
     },
     async addSegment(segment) {

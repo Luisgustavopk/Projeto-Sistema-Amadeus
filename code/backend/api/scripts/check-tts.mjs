@@ -69,7 +69,7 @@ async function checkVoice() {
 
   if (
     !audio ||
-    audio.sampleRate !== 16000 ||
+    ![16000, 24000].includes(audio.sampleRate) ||
     audio.channels !== 1 ||
     !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
       audio.pcmBase64,
@@ -80,7 +80,7 @@ async function checkVoice() {
 
   const pcm = Buffer.from(audio.pcmBase64, 'base64');
 
-  if (!pcm.length || pcm.length % 2 || pcm.length > 16000 * 2 * 90) {
+  if (!pcm.length || pcm.length % 2 || pcm.length > audio.sampleRate * 2 * 90) {
     throw new Error('O áudio retornado está vazio ou excede os limites.');
   }
 
@@ -91,8 +91,8 @@ async function checkVoice() {
   wav.writeUInt32LE(16, 16);
   wav.writeUInt16LE(1, 20);
   wav.writeUInt16LE(1, 22);
-  wav.writeUInt32LE(16000, 24);
-  wav.writeUInt32LE(32000, 28);
+  wav.writeUInt32LE(audio.sampleRate, 24);
+  wav.writeUInt32LE(audio.sampleRate * 2, 28);
   wav.writeUInt16LE(2, 32);
   wav.writeUInt16LE(16, 34);
   wav.write('data', 36);
@@ -104,10 +104,10 @@ async function checkVoice() {
   await writeFile(file, Buffer.concat([wav, pcm]));
   console.log(`Áudio salvo em: ${fileURLToPath(file)}`);
   console.log(
-    `Duração: ${(pcm.length / 32000).toFixed(1)} s. Síntese: ${synthesisSeconds.toFixed(2)} s.`,
+    `Duração: ${(pcm.length / (audio.sampleRate * 2)).toFixed(1)} s. Síntese: ${synthesisSeconds.toFixed(2)} s.`,
   );
   console.log(
-    `Fator de tempo real: ${(synthesisSeconds / (pcm.length / 32000)).toFixed(2)} (menor que 1 significa gerar mais rápido que a reprodução).`,
+    `Fator de tempo real: ${(synthesisSeconds / (pcm.length / (audio.sampleRate * 2))).toFixed(2)} (menor que 1 significa gerar mais rápido que a reprodução).`,
   );
   console.log(
     'Teste isolado do TTS; não mede STT, Gemini ou reprodução em tempo real.',

@@ -4,6 +4,7 @@ import type { VoiceSessions } from '../../application/voice/sessions.ts';
 import type { CallRuntime } from '../../application/voice/call-runtime.ts';
 import type { ClientMessage } from '../protocol/client-events.ts';
 import { ApplicationError } from '../../domain/errors/application-error.ts';
+import { RateLimitedError } from '../../domain/errors/rate-limit.ts';
 import { createVoiceTransport } from './voice-transport.ts';
 
 export function createVoiceSession(
@@ -126,7 +127,9 @@ export function createVoiceSession(
         }
 
         if (++controls > 600) {
-          fail(new Error());
+          fail(
+            new RateLimitedError('Limite de eventos de controle da chamada.'),
+          );
 
           return;
         }
@@ -146,7 +149,9 @@ export function createVoiceSession(
             break;
           case 'playback.progress':
             if (++acknowledgements > 180) {
-              fail(new Error());
+              fail(
+                new RateLimitedError('Limite de confirmações de reprodução.'),
+              );
 
               return;
             }

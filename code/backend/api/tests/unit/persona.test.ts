@@ -75,6 +75,27 @@ it('texto sem metadados mantém compatibilidade e começa a fluir imediatamente'
   await expect(iterator.next()).rejects.toThrow('depois');
 });
 
+it('aceita apenas o objeto conhecido como cabeçalho sem wrapper, em qualquer token', async () => {
+  const value =
+    '{"intent":"explorar","emotion":"curiosidade","intensity":0.4}\nVamos testar.';
+
+  for (let split = 0; split <= value.length; split++) {
+    const result = await read([value.slice(0, split), value.slice(split)]);
+    expect(result.text).toBe('Vamos testar.');
+    expect(result.valid).toBe(true);
+  }
+
+  await expect(read(['{"spokenText":"Olá"}'])).rejects.toThrow(
+    'Objeto desconhecido',
+  );
+  await expect(
+    read([
+      '{"intent":"explorar","emotion":"neutra","intensity":0.2,"command":"run"}Oi.',
+    ]),
+  ).rejects.toThrow('Objeto desconhecido');
+  await expect(read(['{"intent":'])).rejects.toThrow('incompleto');
+});
+
 it('recusa resposta vazia ou composta apenas de metadados', async () => {
   await expect(read([])).rejects.toThrow('não retornou texto');
   await expect(
@@ -106,6 +127,9 @@ it('rejeita cabeçalho incompleto ou ilimitado sem vazar instruções para o TTS
 });
 
 it('remove rubricas completas e rejeita rubricas cortadas e JSON residual', () => {
+  expect(validateSpokenSegment('Confira *Nature* ou *Science*.')).toBe(
+    'Confira Nature ou Science.',
+  );
   expect(validateSpokenSegment('*suspira* (sorrindo) Obrigada.')).toBe(
     'Obrigada.',
   );
@@ -128,7 +152,7 @@ it('limita intensidade, prioriza acolhimento e evita ironia consecutiva', () => 
   ).toBe(0.35);
   expect(
     state.accept({ intent: 'acolher', emotion: 'ironia_leve', intensity: 0.9 }),
-  ).toEqual({ intent: 'acolher', emotion: 'preocupacao', intensity: 0.7 });
+  ).toEqual({ intent: 'acolher', emotion: 'neutra', intensity: 0.15 });
   state.accept({
     intent: 'provocacao_afetuosa',
     emotion: 'neutra',
@@ -157,6 +181,21 @@ it('estado é isolado por sessão e retorna ao neutro sem guardar fatos do usuá
   const copy = first.snapshot();
   copy.intensity = 1;
   expect(first.snapshot()).toEqual(NEUTRAL_EXPRESSION);
+});
+
+it('acolhimento preserva alegria e cordialidade sem impor preocupação', () => {
+  const state = createExpressionState();
+  expect(
+    state.accept({
+      intent: 'acolher',
+      emotion: 'alegria_discreta',
+      intensity: 0.4,
+    }).emotion,
+  ).toBe('alegria_discreta');
+  expect(
+    state.accept({ intent: 'acolher', emotion: 'neutra', intensity: 0.15 })
+      .emotion,
+  ).toBe('neutra');
 });
 
 it('prompt versionado distingue biografia, enredo e histórico confirmado', () => {
@@ -199,7 +238,7 @@ it('envia o complemento curado como orientação separada do histórico real', (
     'apresente a biografia curada como origem da persona',
   );
   expect(context).toContain('Se perguntarem diretamente se você é humana');
-  expect(Buffer.byteLength(buildPersonaPrompt(), 'utf8')).toBeLessThan(10000);
+  expect(buildPersonaPrompt().length).toBeLessThanOrEqual(32768);
 });
 
 it('eventos por segmento declaram direção artística sem prometer atuação nativa', () => {

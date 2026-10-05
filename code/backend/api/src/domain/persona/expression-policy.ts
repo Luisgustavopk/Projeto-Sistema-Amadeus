@@ -19,9 +19,10 @@ export function createExpressionState() {
         ? { ...parsed.data }
         : { ...NEUTRAL_EXPRESSION };
 
-      if (next.intent === 'acolher' || next.emotion === 'preocupacao') {
-        next.emotion = 'preocupacao';
+      if (next.emotion === 'preocupacao') {
         next.intent = 'acolher';
+      } else if (next.intent === 'acolher' && next.emotion === 'ironia_leve') {
+        next.emotion = 'neutra';
       } else if (next.intent === 'provocacao_afetuosa') {
         next.emotion = 'ironia_leve';
       }

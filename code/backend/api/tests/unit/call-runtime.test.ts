@@ -95,3 +95,34 @@ it('uma falha de geração não deixa um turno ativo sem execução', async () =
   expect(f.release).toHaveBeenCalledOnce();
   await f.runtime.close('closed');
 });
+
+it('aguarda cancelamento e persistência anteriores antes de gerar a nova resposta', async () => {
+  let releasePrevious = () => {};
+
+  const persisted = new Promise<void>((resolve) => {
+    releasePrevious = resolve;
+  });
+  const order: string[] = [];
+  const f = fixture(async (turn) => {
+    order.push(`start-${turn.turnId}`);
+
+    if (turn.turnId === 1) {
+      await new Promise<void>((resolve) =>
+        turn.signal.addEventListener('abort', () => resolve(), { once: true }),
+      );
+      await persisted;
+      order.push('previous-persisted');
+      turn.signal.throwIfAborted();
+    }
+  });
+  f.runtime.text(1, 'Primeiro');
+  await vi.waitFor(() => expect(order).toContain('start-1'));
+  f.runtime.text(2, 'Segundo');
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  expect(order).toEqual(['start-1']);
+  releasePrevious();
+  await vi.waitFor(() =>
+    expect(order).toEqual(['start-1', 'previous-persisted', 'start-2']),
+  );
+  await f.runtime.close('closed');
+});

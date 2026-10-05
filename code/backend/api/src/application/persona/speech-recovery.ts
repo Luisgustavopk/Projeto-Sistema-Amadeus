@@ -15,6 +15,7 @@ export async function* streamPersonaSpeech(
   signal: AbortSignal,
   onExpression: (value: Expression, valid: boolean) => void,
   onRecovery: () => void,
+  validateStyle?: (text: string, delivered: boolean) => void,
 ): AsyncIterable<string> {
   let delivered = false;
 
@@ -30,6 +31,7 @@ export async function* streamPersonaSpeech(
         const text = validateSpokenSegment(segment);
 
         if (text) {
+          validateStyle?.(text, delivered);
           usable = true;
           delivered = true;
           yield text;

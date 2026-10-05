@@ -1,6 +1,10 @@
 import type { ProviderFactory } from '../../ports/provider.ts';
 import { ProviderConfigurationError } from '../../domain/errors/providers.ts';
 import { createProvider } from './http-json.ts';
+import {
+  createCartesiaProvider,
+  createDeepgramProvider,
+} from './cloud-speech.ts';
 import { createGeminiProvider } from './gemini.ts';
 import {
   createCloudflareAiProvider,
@@ -12,6 +16,14 @@ export function createProviderFactory(
   secrets: NodeJS.ProcessEnv,
 ): ProviderFactory {
   return (role, config) => {
+    if (config.adapter === 'deepgram') {
+      return createDeepgramProvider(role, config, secrets);
+    }
+
+    if (config.adapter === 'cartesia') {
+      return createCartesiaProvider(role, config, secrets);
+    }
+
     if (config.adapter === 'gemini') {
       if (role !== 'llm') {
         throw new ProviderConfigurationError(

@@ -7,6 +7,13 @@ export const DataClassSchema = z.enum(['synthetic', 'personal', 'local-only']);
 export type DataClass = z.infer<typeof DataClassSchema>;
 const ApiKeyEnvSchema = z.string().regex(/^[A-Z][A-Z0-9_]{0,63}$/);
 const ModelSchema = z.string().regex(/^[a-zA-Z0-9@._:/-]{1,128}$/);
+const LocalSpeechFallbackSchema = z.strictObject({
+  adapter: z.literal('http-json'),
+  endpoint: z.string().url(),
+  apiKeyEnv: ApiKeyEnvSchema,
+  model: ModelSchema.optional(),
+  dataPolicy: z.literal('local-approved'),
+});
 const LlmFallbackSchema = z
   .strictObject({
     adapter: z.enum(['gemini', 'groq', 'cloudflare-ai']),
@@ -76,10 +83,14 @@ export const ProviderSchema = z
       'gemini',
       'groq',
       'cloudflare-ai',
+      'deepgram',
+      'cartesia',
     ]),
     endpoint: z.string().url().optional(),
     apiKeyEnv: ApiKeyEnvSchema.optional(),
     model: z.string().min(1).max(128).optional(),
+    voiceId: z.uuid().optional(),
+    speechFallback: LocalSpeechFallbackSchema.optional(),
     accountId: z
       .string()
       .regex(/^[a-fA-F0-9]{32}$/)
@@ -204,6 +215,45 @@ export const ProviderSchema = z
       });
     }
 
+    if (
+      p.adapter === 'deepgram' &&
+      (!['nova-2', 'nova-3'].includes(p.model ?? '') ||
+        !p.apiKeyEnv ||
+        p.endpoint ||
+        p.voiceId)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          'Deepgram STT exige o modelo nova-2 ou nova-3 e uma variável de chave.',
+      });
+    }
+
+    if (
+      p.adapter === 'cartesia' &&
+      (p.model !== 'sonic-3.6' || !p.apiKeyEnv || !p.voiceId || p.endpoint)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          'Cartesia TTS exige o modelo sonic-3.6, uma voz e uma variável de chave.',
+      });
+    }
+
+    if (p.voiceId && p.adapter !== 'cartesia') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'ID de voz só se aplica ao Cartesia TTS.',
+      });
+    }
+
+    if (p.speechFallback && !['deepgram', 'cartesia'].includes(p.adapter)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Fallback local só se aplica aos provedores de fala remotos.',
+      });
+    }
+
     if (p.endpoint && URL.canParse(p.endpoint)) {
       const url = new URL(p.endpoint);
       const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
@@ -282,6 +332,61 @@ export const ProvidersSchema = z
           code: 'custom',
           path: [role],
           message: 'Reservas de provedor são suportadas somente para LLM.',
+        });
+      }
+    }
+
+    if (
+      providers.llm.speechFallback ||
+      providers.llm.voiceId ||
+      ['deepgram', 'cartesia'].includes(providers.llm.adapter)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['llm'],
+        message: 'Adaptadores de fala não podem ser usados pelo LLM.',
+      });
+    }
+
+    if (providers.stt.adapter === 'cartesia') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['stt'],
+        message: 'Cartesia é suportado somente como provedor TTS.',
+      });
+    }
+
+    if (providers.tts.adapter === 'deepgram') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['tts'],
+        message: 'Deepgram é suportado somente como provedor STT.',
+      });
+    }
+
+    for (const role of ['stt', 'tts'] as const) {
+      const fallback = providers[role].speechFallback;
+
+      if (!fallback) {
+        continue;
+      }
+
+      const url = new URL(fallback.endpoint);
+
+      if (
+        !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) ||
+        url.protocol !== 'http:' ||
+        url.username ||
+        url.password ||
+        url.search ||
+        url.hash ||
+        providers[role].adapter === 'disabled'
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [role, 'speechFallback'],
+          message:
+            'Fallback de fala exige endpoint HTTP local e um provedor remoto ativo.',
         });
       }
     }

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const PERSONA_VERSION = 'kurisu-amadeus-0.4.6';
+export const PERSONA_VERSION = 'kurisu-amadeus-0.4.8';
 
 export const ExpressionSchema = z.strictObject({
   intent: z.enum([
@@ -14,6 +14,7 @@ export const ExpressionSchema = z.strictObject({
     'corrigir_se',
     'admitir_limite',
     'retomar',
+    'ceder_turno',
     'limitar',
     'esclarecer',
     'compartilhar',

@@ -26,11 +26,15 @@ export function providerAttempts(
   role: Role,
   config: ProviderConfig,
 ): ProviderConfig[] {
-  const { fallbackModel, fallbackProviders, ...primary } = config;
+  const { fallbackModel, fallbackProviders, speechFallback, ...primary } =
+    config;
   delete primary.localProvider;
 
   if (role !== 'llm') {
-    return [primary];
+    return [
+      primary,
+      ...(speechFallback ? [{ ...speechFallback, limits: config.limits }] : []),
+    ];
   }
 
   const attempts: ProviderConfig[] = [primary];

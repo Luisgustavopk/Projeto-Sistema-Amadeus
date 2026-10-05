@@ -26,8 +26,16 @@ export const VOICE_PIPELINE_PROTOCOL = {
     seq: 'monotonically increasing integer',
   },
   audio: AUDIO_FORMAT,
+  outputAudio: {
+    codec: 'pcm_s16le',
+    channels: 1,
+    sampleRates: [16000, 24000],
+    frameDurationMs: 20,
+    rateSource: 'audio.segment.sampleRate',
+  },
   binaryAudio: {
-    frameBytes: 648,
+    frameBytes: 648, // Input; output is 8 + sampleRate / 50 * 2.
+    outputFrameBytes: [648, 968],
     headerBytes: 8,
     sequence: 'uint32 little-endian at offset 0; reset per utterance/segment',
     turnId: 'uint32 little-endian at offset 4',
@@ -45,7 +53,7 @@ export const VOICE_PIPELINE_PROTOCOL = {
     connectionTtlSeconds: 1800,
   },
   generation:
-    'Gemini SSE to bounded sentence queue; TTS buffered per sentence; http-json uses buffered fallback',
+    'LLM stream to bounded speech blocks up to 220 characters; short replies synthesized together; TTS buffered per block',
   playback:
     'Monotonic playedSamples bound to session/response/segment; only fully acknowledged segments enter spoken context',
   privacy:

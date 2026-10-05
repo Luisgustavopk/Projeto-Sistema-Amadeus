@@ -44,6 +44,7 @@ export function createSpeechPreview(input: {
         !current ||
         current.recognized ||
         current.inFlight ||
+        pending.size > 0 ||
         buffer.frameCount < current.nextFrame ||
         !input.enabled()
       ) {

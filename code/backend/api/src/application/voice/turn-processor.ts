@@ -10,6 +10,8 @@ import { VoiceInputError } from '../../domain/errors/voice.ts';
 import { streamPersonaSpeech } from '../persona/speech-recovery.ts';
 import { buildSpeechOnlyPersonaPrompt } from '../persona/prompt.ts';
 import { buildVoiceContext } from './context.ts';
+import { measureVoiceAudio } from './audio-observations.ts';
+import { createConversationStyleGuard } from '../persona/conversation-style.ts';
 import { createExpressionState } from '../../domain/persona/expression-policy.ts';
 import {
   PERSONA_VERSION,
@@ -25,6 +27,7 @@ export type VoiceTurn = {
   dataClass: DataClass;
   text?: string;
   audio?: AudioClip;
+  audioObservations?: ReturnType<typeof measureVoiceAudio>;
   profile: VoiceProfile | null;
   signal: AbortSignal;
   speechEndedAt: number;
@@ -72,7 +75,7 @@ export function createTurnProcessor(
         {
           content: '',
           audio,
-          dataClass: turn.dataClass,
+          dataClass: mode === 'preview' ? 'local-only' : turn.dataClass,
           maxTokens: 1000,
         },
         turn.signal,
@@ -156,6 +159,8 @@ export function createTurnProcessor(
         text,
         turn.dataClass,
         expressionState.snapshot(),
+        turn.audioObservations ??
+          (turn.audio ? measureVoiceAudio(turn.audio, text) : undefined),
       );
       let proposal = expressionState.snapshot();
       let metadataValid = false;
@@ -212,6 +217,7 @@ export function createTurnProcessor(
           }
         },
         () => metrics.count('personaRecoveries'),
+        createConversationStyleGuard(recent, text),
       );
       emit({ type: 'reply.start', turnId, responseId });
       const generated: string[] = [];
@@ -281,6 +287,7 @@ export function createTurnProcessor(
         }
 
         let pcm: Buffer;
+        let sampleRate: 16000 | 24000;
         const synthesisStart = performance.now();
 
         try {
@@ -306,6 +313,15 @@ export function createTurnProcessor(
             throw new VoiceInputError('O TTS não retornou áudio PCM.');
           }
 
+          sampleRate = synthesized.audio.sampleRate;
+
+          if (
+            ![16000, 24000].includes(sampleRate) ||
+            synthesized.audio.channels !== 1
+          ) {
+            throw new VoiceInputError('Formato de áudio sintetizado inválido.');
+          }
+
           pcm = Buffer.from(synthesized.audio.pcmBase64, 'base64');
 
           if (
@@ -328,6 +344,7 @@ export function createTurnProcessor(
           emit({
             type: 'error',
             code: 'TTS_UNAVAILABLE_TEXT_AVAILABLE',
+            turnId,
             recoverable: true,
           });
           position++;
@@ -347,7 +364,14 @@ export function createTurnProcessor(
         await history.setAudio(segmentId, pcm.length / 2);
         emit({ type: 'state', turnId, state: 'speaking' });
         const deliveryStart = performance.now();
-        await sink.audio({ turnId, responseId, segmentId, pcm, signal });
+        await sink.audio({
+          turnId,
+          responseId,
+          segmentId,
+          pcm,
+          sampleRate,
+          signal,
+        });
         metrics.time('audioDelivery', performance.now() - deliveryStart);
         position++;
       }

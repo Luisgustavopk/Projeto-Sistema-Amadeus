@@ -43,7 +43,15 @@ export function createProviderQueries(
                       }),
                     ),
                   ]
-                : [],
+                : config[role].speechFallback
+                  ? [
+                      {
+                        adapter: config[role].speechFallback.adapter,
+                        model: config[role].speechFallback.model ?? null,
+                        dataPolicy: config[role].speechFallback.dataPolicy,
+                      },
+                    ]
+                  : [],
             ...(role === 'llm' && config.llm.localProvider
               ? {
                   local: {
@@ -75,7 +83,7 @@ export function createProviderQueries(
               role,
               model: attempt.model ?? null,
               isFallback: index > 0 && attempt.adapter !== 'openai-local',
-              isLocal: attempt.adapter === 'openai-local',
+              isLocal: attempt.dataPolicy === 'local-approved',
               ...(await usage.usage(ownerId, role, attempt)),
             }),
           ),

@@ -4,6 +4,39 @@ import { ProviderSchema } from '../../src/domain/providers/model.ts';
 
 afterEach(() => vi.unstubAllGlobals());
 
+it('desabilita raciocínio do Qwen para não sintetizar o bloco interno como fala', async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>(
+    async () =>
+      new Response(
+        JSON.stringify({
+          choices: [
+            { message: { content: 'Teste concluído.' }, finish_reason: 'stop' },
+          ],
+        }),
+      ),
+  );
+  vi.stubGlobal('fetch', fetch);
+  const provider = createProviderFactory({ GROQ_API_KEY: 'test-secret' })(
+    'llm',
+    ProviderSchema.parse({
+      adapter: 'groq',
+      model: 'qwen/qwen3.8-27b',
+      apiKeyEnv: 'GROQ_API_KEY',
+    }),
+  );
+  await provider.execute({
+    content: 'teste',
+    dataClass: 'synthetic',
+    maxTokens: 128,
+  });
+  const body = JSON.parse(fetch.mock.calls[0]?.[1]?.body as string);
+  expect(body).toMatchObject({
+    reasoning_effort: 'none',
+    include_reasoning: false,
+  });
+  expect(body.reasoning_format).toBeUndefined();
+});
+
 it('usa Groq via endpoint oficial compatível e contabiliza tokens', async () => {
   const fetch = vi.fn<typeof globalThis.fetch>(
     async () =>
@@ -49,6 +82,8 @@ it('usa Groq via endpoint oficial compatível e contabiliza tokens', async () =>
       { role: 'user', content: 'teste' },
     ],
     max_tokens: 128,
+    reasoning_effort: 'low',
+    include_reasoning: false,
     stream: false,
   });
 });
@@ -143,6 +178,7 @@ it.each([
   [429, 'QUOTA_EXCEEDED'],
   [503, 'PROVIDER_TEMPORARILY_UNAVAILABLE'],
   [401, 'PROVIDER_CONFIGURATION'],
+  [413, 'PROVIDER_CONFIGURATION'],
 ])(
   'classifica status HTTP %s para habilitar ou recusar fallback correto',
   async (status, code) => {
@@ -162,5 +198,77 @@ it.each([
         maxTokens: 64,
       }),
     ).rejects.toMatchObject({ code });
+  },
+);
+
+it.each(['execute', 'stream'] as const)(
+  'classifica o 413 de tokens do Groq como cota em %s, sem expor a mensagem remota',
+  async (mode) => {
+    vi.stubGlobal(
+      'fetch',
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              code: 'rate_limit_exceeded',
+              type: 'tokens',
+              message: 'private remote detail',
+            },
+          }),
+          { status: 413 },
+        ),
+    );
+    const provider = createProviderFactory({ GROQ_API_KEY: 'test-secret' })(
+      'llm',
+      ProviderSchema.parse({
+        adapter: 'groq',
+        model: 'test-model',
+        apiKeyEnv: 'GROQ_API_KEY',
+      }),
+    );
+    const input = {
+      content: 'teste',
+      dataClass: 'synthetic' as const,
+      maxTokens: 64,
+    };
+
+    const run = async () => {
+      if (mode === 'execute') {
+        return provider.execute(input);
+      }
+
+      for await (const chunk of provider.stream!(input)) {
+        void chunk;
+      }
+    };
+
+    await expect(run()).rejects.toMatchObject({ code: 'QUOTA_EXCEEDED' });
+    await expect(run()).rejects.not.toThrow('private remote detail');
+  },
+);
+
+it.each([
+  'not-json',
+  'x'.repeat(8193),
+  JSON.stringify({ error: { code: 'request_too_large' } }),
+])(
+  'não transforma um 413 sem identificação de limite de tokens em cota',
+  async (body) => {
+    vi.stubGlobal('fetch', async () => new Response(body, { status: 413 }));
+    const provider = createProviderFactory({ GROQ_API_KEY: 'test-secret' })(
+      'llm',
+      ProviderSchema.parse({
+        adapter: 'groq',
+        model: 'test-model',
+        apiKeyEnv: 'GROQ_API_KEY',
+      }),
+    );
+    await expect(
+      provider.execute({
+        content: 'teste',
+        dataClass: 'synthetic',
+        maxTokens: 64,
+      }),
+    ).rejects.toMatchObject({ code: 'PROVIDER_CONFIGURATION' });
   },
 );

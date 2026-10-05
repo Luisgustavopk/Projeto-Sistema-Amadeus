@@ -96,8 +96,8 @@ function getCredentials(
   throw new ProviderConfigurationError('Configuração LLM inválida.');
 }
 
-function mapHttpFailure(status: number): Error {
-  if (status === 402 || status === 429) {
+function mapHttpFailure(status: number, tokenRateLimited = false): Error {
+  if (status === 402 || status === 429 || tokenRateLimited) {
     return new QuotaExceededError('Cota ou limite do provedor LLM esgotado.');
   }
 
@@ -113,13 +113,59 @@ function mapHttpFailure(status: number): Error {
     );
   }
 
-  if (status === 400 || status === 404 || status === 422) {
+  if ([400, 404, 413, 422].includes(status)) {
     return new ProviderConfigurationError(
       'Modelo ou parâmetros recusados pelo provedor LLM.',
     );
   }
 
   return new ProviderUnavailableError('Provedor LLM indisponível.');
+}
+
+// Groq can report a token rate limit as HTTP 413. Inspect only its bounded,
+// structured error code; never expose the remote message or request contents.
+async function isTokenRateLimit(response: Response): Promise<boolean> {
+  const reader = response.body?.getReader();
+
+  if (!reader) {
+    return false;
+  }
+
+  const chunks: Uint8Array[] = [];
+  let bytes = 0;
+
+  try {
+    while (true) {
+      const next = await reader.read();
+
+      if (next.done) {
+        break;
+      }
+
+      bytes += next.value.byteLength;
+
+      if (bytes > 8192) {
+        return false;
+      }
+
+      chunks.push(next.value);
+    }
+
+    const result = z
+      .object({
+        error: z.object({
+          code: z.literal('rate_limit_exceeded'),
+          type: z.literal('tokens'),
+        }),
+      })
+      .safeParse(JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown);
+
+    return result.success;
+  } catch {
+    return false;
+  } finally {
+    await reader.cancel().catch(() => {});
+  }
 }
 
 function throwIfTruncated(finishReason?: string | null) {
@@ -159,6 +205,19 @@ export function createOpenAiCompatibleProvider(
             { role: 'user', content: input.content },
           ],
           max_tokens: input.maxTokens,
+          ...(config.adapter === 'groq' && config.model === 'qwen/qwen3.8-27b'
+            ? { reasoning_effort: 'none', include_reasoning: false }
+            : {}),
+          ...(config.adapter === 'groq' &&
+          /^openai\/gpt-oss-(?:20b|120b)$/u.test(config.model ?? '')
+            ? {
+                reasoning_effort: config.thinkingLevel ?? 'low',
+                include_reasoning: false,
+              }
+            : {}),
+          ...(stream && config.adapter === 'groq'
+            ? { stream_options: { include_usage: true } }
+            : {}),
           stream,
         }),
         redirect: 'error',
@@ -178,9 +237,16 @@ export function createOpenAiCompatibleProvider(
     }
 
     if (!response.ok) {
-      await response.body?.cancel();
+      const tokenRateLimited =
+        config.adapter === 'groq' && response.status === 413
+          ? await isTokenRateLimit(response)
+          : false;
 
-      throw mapHttpFailure(response.status);
+      if (!response.body?.locked) {
+        await response.body?.cancel();
+      }
+
+      throw mapHttpFailure(response.status, tokenRateLimited);
     }
 
     return response;
