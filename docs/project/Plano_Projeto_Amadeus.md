@@ -461,6 +461,16 @@ Não foram adiados novos itens de escopo. Personalidade/expressão aprofundadas 
 
 ## Registro de implementação inicial da fase 2 — 04/10/2026
 
+### Atualização de 05/10/2026
+
+O usuário declarou a avaliação vocal concluída e aprovou a voz atual para avançar. Esse aceite substitui a pendência vocal de transição descrita nos registros antigos, sem inventar notas ou alegar execução do benchmark completo. Controles emocionais nativos adicionais não receberam validação específica.
+
+RF-019 agora tem configuração persistida e validada via `GET/PUT /v1/persona`, com revisão concorrente e aplicação no próximo turno sem reinício. RF-034 recebeu versões vocais que reúnem referência/clone, modelo, configuração TTS, formato de síntese e presets; há listagem e restauração do TTS preservando LLM/STT. Configurações internas e pesos de serviços externos não são reinstalados por esse recurso.
+
+A versão 0.4.10 mantém a estrutura e os complementos, usando direção concisa da skill e histórico limitado para reduzir o contexto. O Groq voltou a responder após a redução, mas posteriormente atingiu cota diária. O streaming Cloudflare recebeu correção para fragmentos numéricos enviados como números JSON, antes interpretados como indisponibilidade temporária.
+
+Foi concluído um conjunto de 30 cenários no Cloudflare com a versão 0.4.9. A revisão por Codex encontrou problemas de naturalidade e resposta ao pedido atual, incluindo elogios, reparo de erro e limites de memória/lembrete. A 0.4.10 reforça esses pontos, com reteste completo ainda bloqueado por cotas de Groq/Cloudflare e indisponibilidade do Gemini. Os resultados de versões/hashes diferentes permanecem separados. Não há aprovação textual automática nem encerramento formal da fase 2; sua implementação avançou, mas o gate de texto e a confirmação de funcionamento prolongado continuam pendentes. Memória da fase 3 pode ser preparada em paralelo, sem declarar esses gates atendidos.
+
 A análise `Persona_Kurisu_Amadeus_v0.4.md` foi preservada em `code/backend/assets/persona/source-v0.4.md`. O usuário aprovou o recorte anterior à viagem de Kurisu ao Japão. Persona `kurisu-amadeus-0.4.2`: prompt compacto versionado, distinção de biografia ficcional e vivências reais, humor contextual, cuidado, honestidade e limites de memória/capacidades.
 
 Cada segmento tem direção artística validada ligada a `responseId` e `segmentId`, emitida por `reply.expression`. O estado expressivo é limitado, suavizado e isolado por chamada. A mesma geração LLM produz expressão e texto; não há uma segunda geração para atuar. Os metadados são removidos antes do TTS. Presets e expressões visuais são semânticos: controles emocionais nativos do TTS permanecem não validados, e Live2D continua na fase 5. A referência e a configuração vocal aceitas são preservadas.

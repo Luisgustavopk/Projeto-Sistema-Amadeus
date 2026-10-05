@@ -1,8 +1,12 @@
 # Persona
 
-Persona de execução: **kurisu-amadeus-0.4.8**. A personalidade define padrões de atuação; não contém fatos privados do usuário nem depende de memória pessoal.
+Persona de execução: **kurisu-amadeus-0.4.10**. A personalidade define padrões de atuação; não contém fatos privados do usuário nem depende de memória pessoal.
 
 Em 05/10/2026, o usuário declarou a avaliação vocal concluída e aprovou a qualidade atual da voz para avançar. Esse aceite substitui a pendência de escuta para a transição de fase, sem atribuir notas numéricas ou alegar a execução do benchmark de 30 falas × três gerações. As fichas antigas preservam o estado registrado na coleta; controles emocionais nativos continuam sem validação específica.
+
+A versão 0.4.10 preserva o prompt estruturado e o documento de referência, mas carrega a seção 14 da skill como direção operacional concisa para reduzir redundância. O contexto enviado mantém até 3.000 caracteres de histórico confirmado; familiaridade e variação consideram os turnos disponíveis sem ampliar permissões de dados. A direção administrativa pode ser editada em `GET/PUT /v1/persona`, com controle de revisão concorrente, persistência e aplicação no próximo turno, inclusive na recuperação de fala. A edição não substitui a identidade nem o contrato de expressão.
+
+Foi concluído um conjunto de 30 cenários no Cloudflare na 0.4.9. A revisão por Codex encontrou problemas em elogios, reparo científico e pedidos de memória/lembrete; não houve aceite automático. A 0.4.10 reforça esses pontos. O reteste completo ficou bloqueado por cotas de Groq/Cloudflare e indisponibilidade do Gemini. Os relatórios locais preservam os hashes distintos e a revisão mantém os resultados antigos sem notas humanas inventadas.
 
 ## Fonte e decisões
 

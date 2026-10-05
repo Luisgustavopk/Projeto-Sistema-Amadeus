@@ -1,5 +1,15 @@
 # API
 
+## Configuração da persona e versões vocais — fase 2
+
+`GET /v1/persona` retorna a direção administrativa, versão base e revisão. `PUT /v1/persona` recebe `{"expectedRevision":0,"direction":"Prefira explicações com exemplos curtos."}`. O limite é 2.000 caracteres; tags técnicas são recusadas. Uma edição concorrente/desatualizada recebe 409. A configuração é persistida por proprietário e vale no próximo turno sem reiniciar nem reconectar; um turno já iniciado e sua recuperação conservam a mesma revisão. Direção vazia remove o complemento administrativo. O prompt estruturado, documento, skill e contrato técnico permanecem presentes.
+
+`POST /v1/voice/versions` recebe `{"name":"Voz aprovada"}` e registra clone/referência/hash, modelo, configuração TTS, formato PCM, accent, segmentação e presets artísticos, sem valores de credenciais. `GET /v1/voice/versions` lista até 256 versões preservadas. `POST /v1/voice/versions/:id/restore` restaura somente o TTS, preservando LLM/STT. Uma voz local exige reativar sua referência original antes da restauração; a operação respeita o bloqueio de configuração. As versões registram o contrato da API; configurações internas de um serviço local externo e pesos não são reinstalados por esse endpoint.
+
+Persona 0.4.10: a seção operacional concisa da skill reduz redundância, preservando o arquivo completo e as regras estruturadas. O histórico confirmado enviado tem orçamento de 3.000 caracteres; entradas omitidas continuam influenciando a política de dados. O prompt menor resolveu o 413 de tamanho observado no Groq. Chamadas longas e consumo acumulado continuam sujeitos às cotas da conta. `npm run eval:persona -- --run --interval-ms=60000` espaça os cenários por um minuto sem alterar limites ou faturamento.
+
+O usuário aprovou a qualidade vocal atual em 05/10/2026. O gate aceita `voiceAcceptance` com `source: "user"`, `approved: true`, `approvedAt` e `reason`, sem exigir notas vocais inventadas; isso não dispensa a revisão textual. Foram coletados 30 cenários no Cloudflare na 0.4.9 e encontrados problemas de resposta ao pedido atual. A 0.4.10 reforça esses comportamentos, mas seu reteste completo permanece pendente por cotas/disponibilidade. A correção do streaming Cloudflare aceita fragmentos numéricos como texto, evitando a falsa classificação de indisponibilidade temporária.
+
 ## Provedores LLM e reservas
 
 O LLM pode usar Gemini, Groq ou Cloudflare Workers AI. Groq e Cloudflare usam endpoints oficiais compatíveis com Chat Completions e suportam entrega SSE. Configure suas chaves somente no ambiente da API (`GEMINI_API_KEY`, `GROQ_API_KEY` e `CLOUDFLARE_AI_TOKEN`); nunca envie valores de segredo no JSON da configuração. Para privilegiar baixa latência, esta instalação local usa Groq como principal, Cloudflare como primeira reserva e Gemini por último. Um smoke test sintético isolado mediu o primeiro texto em 303 ms no Groq e 398 ms no Cloudflare, enquanto o Gemini estava sem cota. Esses valores não representam a conversa completa nem garantem desempenho futuro.
