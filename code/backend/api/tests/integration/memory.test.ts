@@ -108,6 +108,313 @@ async function enableSemantic(f: Awaited<ReturnType<typeof fixture>>) {
   });
 }
 
+it.each(['synthetic', 'personal', 'local-only'] as const)(
+  'aprova automaticamente fatos e checkpoints %s mantendo sua classificação',
+  async (dataClass) => {
+    const f = await fixture();
+    expect((await f.service.policy()).autoApprove).toBe(false);
+    await f.service.configure({
+      expectedRevision: 0,
+      enabled: true,
+      personalEnabled: true,
+      extraction: 'local',
+      retentionDays: 30,
+      acknowledgeLocalStorage: true,
+      autoApprove: true,
+    });
+    await f.add('Eu gosto de café sem açúcar.', dataClass);
+    await f.history.endSession(f.sessionId, 'closed');
+    await f.service.runOnce();
+    const facts = await f.repo.facts();
+    expect(facts).toHaveLength(1);
+    expect(facts[0]).toMatchObject({
+      status: 'confirmed',
+      permission: dataClass === 'local-only' ? 'local-only' : 'eligible',
+      dataClass,
+      origin: 'local-extraction',
+    });
+    expect((await f.repo.summaries())[0]!.permission).toBe(
+      dataClass === 'local-only' ? 'local-only' : 'eligible',
+    );
+    expect(await f.service.retrieve(randomUUID(), 'café', dataClass)).toContain(
+      facts[0]!.text,
+    );
+
+    if (dataClass !== 'synthetic') {
+      expect(await f.service.retrieve(randomUUID(), 'café', 'synthetic')).toBe(
+        '',
+      );
+    }
+
+    if (dataClass === 'local-only') {
+      expect(await f.service.retrieve(randomUUID(), 'café', 'personal')).toBe(
+        '',
+      );
+    }
+
+    await f.service.forget(facts[0]!.id, facts[0]!.version, false);
+    await f.service.rebuild(f.conversation.id);
+    await f.service.runOnce();
+    expect(await f.repo.facts()).toEqual([]);
+  },
+);
+
+it('conserva a opção em configurações antigas, permite desligar e não amplia permissões revisadas', async () => {
+  const f = await fixture();
+  const reviewed = await f.service.create(
+    input('Eu gosto de café sem açúcar.'),
+  );
+  await f.service.configure({
+    expectedRevision: 0,
+    enabled: true,
+    personalEnabled: false,
+    extraction: 'local',
+    retentionDays: null,
+    autoApprove: true,
+  });
+  await f.service.configure({
+    expectedRevision: 1,
+    enabled: true,
+    personalEnabled: false,
+    extraction: 'local',
+    retentionDays: null,
+  });
+  expect((await f.repo.policy()).autoApprove).toBe(true);
+  await f.add('Eu gosto de café sem açúcar.');
+  await f.history.endSession(f.sessionId, 'closed');
+  await f.service.runOnce();
+  expect((await f.repo.facts())[0]).toMatchObject({
+    id: reviewed.id,
+    permission: 'local-only',
+    origin: 'user',
+  });
+  await f.service.configure({
+    expectedRevision: 2,
+    enabled: true,
+    personalEnabled: false,
+    extraction: 'local',
+    retentionDays: null,
+    autoApprove: false,
+  });
+  await f.service.rebuild(f.conversation.id);
+  await f.service.runOnce();
+  expect((await f.repo.policy()).autoApprove).toBe(false);
+  expect((await f.repo.facts())[0]!.permission).toBe('local-only');
+});
+
+it('aprova correções por LLM sem confirmação por ID e conserva a origem e o esquecimento', async () => {
+  const f = await fixture();
+  const old = await f.service.create(
+    input('Usuário prefere chá.', {
+      permission: 'eligible',
+      relation: { subject: 'usuário', predicate: 'prefere', object: 'chá' },
+    }),
+  );
+  const turn = await f.add('Agora prefiro café, não chá.');
+  await f.history.endSession(f.sessionId, 'closed');
+  await enableSemantic(f);
+  await f.service.configure({
+    expectedRevision: 1,
+    enabled: true,
+    personalEnabled: false,
+    extraction: 'llm',
+    retentionDays: null,
+    autoApprove: true,
+  });
+  f.execute.mockResolvedValueOnce({
+    content: JSON.stringify({
+      facts: [
+        {
+          text: 'Usuário prefere café.',
+          category: 'preferencia',
+          relation: {
+            subject: 'usuário',
+            predicate: 'prefere',
+            object: 'café',
+          },
+          kind: 'correction',
+          supersedes: { factId: old.id, version: old.version },
+          evidence: [
+            { turnId: turn.id, quote: 'Agora prefiro café, não chá.' },
+          ],
+        },
+      ],
+    }),
+    inputTokens: 10,
+    outputTokens: 10,
+  });
+  await f.service.runOnce();
+  const facts = await f.repo.facts();
+  expect(facts.find((fact) => fact.id === old.id)?.status).toBe('superseded');
+  const correction = facts.find((fact) => fact.kind === 'correction')!;
+  expect(correction).toMatchObject({
+    status: 'confirmed',
+    permission: 'eligible',
+    origin: 'llm-extraction',
+  });
+  expect((await f.service.graph()).edges.map((edge) => edge.target)).toEqual([
+    'cafe',
+  ]);
+  expect(await f.service.retrieve(randomUUID(), 'café', 'synthetic')).toContain(
+    correction.text,
+  );
+  expect(await f.service.retrieve(randomUUID(), 'chá', 'synthetic')).toBe('');
+  await f.service.forget(correction.id, correction.version, false);
+  await f.service.rebuild(f.conversation.id);
+  await f.service.runOnce();
+  expect(
+    (await f.repo.facts()).some((fact) => fact.status === 'confirmed'),
+  ).toBe(false);
+});
+
+it('corrige uma memória aprovada automaticamente sem perder a origem ou restaurar a fonte anterior', async () => {
+  const f = await fixture();
+  await f.service.configure({
+    expectedRevision: 0,
+    enabled: true,
+    personalEnabled: false,
+    extraction: 'local',
+    retentionDays: null,
+    autoApprove: true,
+  });
+  await f.add('Eu prefiro chá.');
+  await f.history.endSession(f.sessionId, 'closed');
+  await f.service.runOnce();
+  const old = (await f.repo.facts())[0]!;
+  const next = await f.conversations.create('primary');
+  const sessionId = randomUUID();
+  const turnId = randomUUID();
+  const responseId = randomUUID();
+  await f.history.startSession({
+    id: sessionId,
+    conversationId: next.id,
+    ownerId: 'primary',
+    voiceProfileId: null,
+  });
+  await f.history.beginTurn({
+    id: turnId,
+    responseId,
+    sessionId,
+    conversationId: next.id,
+    clientTurnId: 1,
+    dataClass: 'synthetic',
+  });
+  await f.history.updateTurn(responseId, {
+    userText: 'Agora prefiro café, não chá.',
+    status: 'completed',
+  });
+  await f.history.endSession(sessionId, 'closed');
+  await f.service.configure({
+    expectedRevision: 1,
+    enabled: true,
+    personalEnabled: false,
+    extraction: 'llm',
+    retentionDays: null,
+  });
+  f.execute.mockResolvedValueOnce({
+    content: JSON.stringify({
+      facts: [
+        {
+          text: 'Usuário prefere café.',
+          category: 'preferencia',
+          kind: 'correction',
+          relation: {
+            subject: 'usuário',
+            predicate: 'prefere',
+            object: 'café',
+          },
+          supersedes: { factId: old.id, version: old.version },
+          evidence: [{ turnId, quote: 'Agora prefiro café, não chá.' }],
+        },
+      ],
+    }),
+    inputTokens: 10,
+    outputTokens: 10,
+  });
+  await f.service.runOnce();
+  const facts = await f.repo.facts();
+  expect(facts.find((fact) => fact.id === old.id)).toMatchObject({
+    status: 'superseded',
+    origin: 'local-extraction',
+  });
+  const correction = facts.find((fact) => fact.kind === 'correction')!;
+  expect(correction).toMatchObject({
+    status: 'confirmed',
+    origin: 'llm-extraction',
+    permission: 'eligible',
+  });
+  await f.service.rebuild(f.conversation.id);
+  await f.service.runOnce();
+  expect(
+    (await f.repo.facts()).some(
+      (fact) => fact.text === old.text && fact.status === 'confirmed',
+    ),
+  ).toBe(false);
+  await f.service.deleteConversation(next.id);
+  expect((await f.repo.facts()).some((fact) => fact.id === correction.id)).toBe(
+    false,
+  );
+});
+
+it('rejeita evidência inventada também no modo automático', async () => {
+  const f = await fixture();
+  await enableSemantic(f);
+  await f.service.configure({
+    expectedRevision: 1,
+    enabled: true,
+    personalEnabled: false,
+    extraction: 'llm',
+    retentionDays: null,
+    autoApprove: true,
+  });
+  const turn = await f.add('Imagine que eu gosto de chá em uma história.');
+  await f.history.endSession(f.sessionId, 'closed');
+  f.execute.mockResolvedValueOnce({
+    content: JSON.stringify({
+      facts: [
+        {
+          text: 'Usuário prefere chá.',
+          category: 'preferencia',
+          relation: null,
+          evidence: [{ turnId: turn.id, quote: 'Eu gosto de chá.' }],
+        },
+      ],
+    }),
+    inputTokens: 10,
+    outputTokens: 10,
+  });
+  await f.service.runOnce();
+  expect(await f.repo.facts()).toEqual([]);
+  expect((await f.repo.jobs())[0]!.status).not.toBe('completed');
+});
+
+it('volta a sugerir novas memórias depois de desligar a aprovação automática', async () => {
+  const f = await fixture();
+
+  for (const autoApprove of [true, false]) {
+    await f.service.configure({
+      expectedRevision: (await f.repo.policy()).revision,
+      enabled: true,
+      personalEnabled: false,
+      extraction: 'local',
+      retentionDays: null,
+      autoApprove,
+    });
+  }
+
+  await f.add('Eu gosto de café sem açúcar.');
+  await f.add('Imagine que eu prefiro chá em uma história.');
+  await f.history.endSession(f.sessionId, 'closed');
+  await f.service.runOnce();
+  expect(await f.repo.facts()).toHaveLength(1);
+  expect((await f.repo.facts())[0]).toMatchObject({
+    status: 'suggested',
+    permission: 'local-only',
+  });
+  expect((await f.repo.summaries())[0]!.permission).toBe('local-only');
+  expect(await f.service.retrieve(randomUUID(), 'café', 'synthetic')).toBe('');
+});
+
 it('unifica preferências equivalentes e suas evidências sem promover sugestões', async () => {
   const f = await fixture();
   const first = await f.add('Eu gosto de café sem açúcar.');

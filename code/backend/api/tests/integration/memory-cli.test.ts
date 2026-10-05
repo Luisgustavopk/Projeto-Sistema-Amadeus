@@ -25,6 +25,76 @@ const fact = {
   supersedes: null,
 };
 
+it('liga e desliga a aprovação automática conservando o extrator e a retenção', async () => {
+  let policy = {
+    revision: 3,
+    enabled: true,
+    personalEnabled: true,
+    extraction: 'llm',
+    retentionDays: 30,
+    autoApprove: false,
+  };
+  const server = createServer(async (req, res) => {
+    res.setHeader('content-type', 'application/json');
+
+    if (req.method === 'PUT') {
+      let raw = '';
+
+      for await (const chunk of req) {
+        raw += chunk;
+      }
+
+      const { expectedRevision, acknowledgeLocalStorage, ...edit } =
+        JSON.parse(raw);
+      expect(expectedRevision).toBe(policy.revision);
+      expect(acknowledgeLocalStorage).toBe(true);
+      policy = { ...edit, revision: policy.revision + 1 };
+    }
+
+    res.end(JSON.stringify(policy));
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+
+  try {
+    const address = server.address();
+
+    if (!address || typeof address === 'string') {
+      throw new Error('Invalid address');
+    }
+
+    const run = (...args: string[]) =>
+      exec(
+        process.execPath,
+        [
+          fileURLToPath(script),
+          'auto-approve',
+          ...args,
+          '--api=http://127.0.0.1:' + address.port,
+        ],
+        { env, windowsHide: true },
+      );
+
+    for (const flag of ['--on', '--off']) {
+      const updated = JSON.parse((await run(flag)).stdout);
+      expect(updated).toMatchObject({
+        enabled: true,
+        personalEnabled: true,
+        extraction: 'llm',
+        retentionDays: 30,
+        autoApprove: flag === '--on',
+      });
+    }
+
+    const invalid = await run('--on', '--off').catch((error) => error);
+    expect(invalid.stderr).toContain('apenas --on ou --off');
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  }
+});
+
 it('mostra comandos com IDs reais e conserva a permissão na confirmação padrão', async () => {
   let confirmed: Record<string, unknown> | undefined;
   const server = createServer(async (req, res) => {

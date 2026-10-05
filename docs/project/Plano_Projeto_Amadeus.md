@@ -295,7 +295,7 @@ Histórico e memórias são persistidos como dados da aplicação; o LLM não ap
 
 Escolher explicitamente armazenamento local ou remoto, proteção em repouso, backup, retenção e comportamento na exclusão antes de habilitar a memória pessoal em uso real. `personal-approved` autoriza o fluxo da aplicação para um provedor após revisão humana; não é uma garantia de retenção zero, confidencialidade absoluta ou uso de dados do provedor restrito. Verificar os termos e controles efetivos de cada conta e modalidade antes de enviar conteúdo.
 
-Uma inferência não vira automaticamente um fato confirmado. Correções explícitas prevalecem e mantêm rastreabilidade. Exclusão de conversa invalida resumos e fatos derivados apenas dela; fatos com outras fontes são recalculados ou apresentados para decisão do usuário.
+Por padrão, uma inferência não vira automaticamente um fato confirmado. Em 05/10/2026, o usuário autorizou a opção persistida `autoApprove`: quando habilitada, extrações validadas são confirmadas e recebem permissão de uso elegível, mantendo classificação, fontes e políticas dos provedores. Dados locais permanecem locais; desligar a opção restaura a revisão manual das próximas extrações. Correções explícitas prevalecem e mantêm rastreabilidade. Exclusão de conversa invalida resumos e fatos derivados apenas dela; fatos com outras fontes são recalculados ou apresentados para decisão do usuário.
 
 Esquecer um fato remove/invalida suas cópias derivadas e impede reextração automática da fonte ainda existente. A operação deve informar se o histórico original permanece; para apagar o dado também do histórico, remover/redigir as mensagens e atualizar resumos. Testar que o fato não reaparece após reinício ou reconstrução da memória.
 

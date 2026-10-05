@@ -7,7 +7,7 @@ import { memoryReview, renderMemoryReview } from './memory-review.mjs';
 async function main() {
   if (process.argv.includes('--help') || process.argv[2] === 'help') {
     console.log(
-      'Revisar: npm run memory -- review\nJSON: npm run memory -- review --json\nConsolidar equivalências claras: npm run memory -- consolidate\nOs comandos de aprovação mostram IDs reais em review. Confirmar não autoriza envio remoto sem --permission=eligible.',
+      'Aprovação automática: npm run memory -- auto-approve --on\nVoltar à revisão manual: npm run memory -- auto-approve --off\nRevisar: npm run memory -- review\nJSON: npm run memory -- review --json\nConsolidar equivalências claras: npm run memory -- consolidate\nOs comandos de aprovação mostram IDs reais em review. Confirmar não autoriza envio remoto sem --permission=eligible.',
     );
     return;
   }
@@ -95,6 +95,24 @@ async function main() {
       };
       break;
     }
+    case 'auto-approve': {
+      const on = argumentsList.includes('--on');
+      const off = argumentsList.includes('--off');
+      if (on === off) throw new Error('Informe apenas --on ou --off.');
+      const current = await fetch(base + '/v1/memory/policy', { headers });
+      if (!current.ok)
+        throw new Error('Não foi possível consultar a política.');
+      const { revision, ...policy } = await current.json();
+      path = '/v1/memory/policy';
+      method = 'PUT';
+      body = {
+        ...policy,
+        expectedRevision: revision,
+        autoApprove: on,
+        acknowledgeLocalStorage: true,
+      };
+      break;
+    }
     case 'create':
       path = '/v1/facts';
       method = 'POST';
@@ -126,7 +144,7 @@ async function main() {
       break;
     default:
       throw new Error(
-        'Use status, extractor, configure-extractor, facts, review, consolidate, summaries, graph, conversations, export, configure, create, edit, confirm, forget, permit-summary ou rebuild.',
+        'Use status, extractor, configure-extractor, facts, review, consolidate, summaries, graph, conversations, export, configure, auto-approve, create, edit, confirm, forget, permit-summary ou rebuild.',
       );
   }
 

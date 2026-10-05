@@ -6,6 +6,7 @@ export const MemoryPolicySchema = z.strictObject({
   revision: z.number().int().nonnegative(),
   enabled: z.boolean(),
   personalEnabled: z.boolean(),
+  autoApprove: z.boolean().default(false),
   extraction: z.enum(['local', 'llm']),
   retentionDays: z.number().int().min(1).max(3650).nullable(),
 });
@@ -13,6 +14,7 @@ export type MemoryPolicy = z.infer<typeof MemoryPolicySchema>;
 export const MemoryPolicyEditSchema = MemoryPolicySchema.omit({
   revision: true,
 }).extend({
+  autoApprove: z.boolean().optional(),
   expectedRevision: z.number().int().nonnegative(),
   acknowledgeLocalStorage: z.literal(true).optional(),
 });

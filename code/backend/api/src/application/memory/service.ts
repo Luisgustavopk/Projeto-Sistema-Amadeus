@@ -286,6 +286,8 @@ export function createMemoryService(
         revision: parsed.expectedRevision,
         enabled: parsed.enabled,
         personalEnabled: parsed.personalEnabled,
+        autoApprove:
+          parsed.autoApprove ?? (await repository.policy()).autoApprove,
         extraction: parsed.extraction,
         retentionDays: parsed.retentionDays,
       });

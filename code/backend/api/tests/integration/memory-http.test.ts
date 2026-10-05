@@ -8,6 +8,52 @@ import { loadConfig } from '../../src/config/index.ts';
 const token = 'test-only-credential-of-more-than-32-characters';
 const headers = { authorization: `Bearer ${token}` };
 
+it('persiste a opção de aprovação automática e recusa mudanças com revisão antiga', async () => {
+  const app = await buildApp({ token });
+
+  try {
+    const payload = {
+      expectedRevision: 0,
+      enabled: true,
+      personalEnabled: false,
+      extraction: 'local',
+      retentionDays: null,
+      autoApprove: true,
+    };
+    const changed = await app.inject({
+      method: 'PUT',
+      url: '/v1/memory/policy',
+      headers,
+      payload,
+    });
+    expect(changed.statusCode).toBe(200);
+    expect(changed.json()).toMatchObject({ revision: 1, autoApprove: true });
+    expect(
+      (await app.inject({ url: '/v1/memory/status', headers })).json().policy
+        .autoApprove,
+    ).toBe(true);
+    expect(
+      (
+        await app.inject({
+          method: 'PUT',
+          url: '/v1/memory/policy',
+          headers,
+          payload,
+        })
+      ).statusCode,
+    ).toBe(409);
+    const off = await app.inject({
+      method: 'PUT',
+      url: '/v1/memory/policy',
+      headers,
+      payload: { ...payload, expectedRevision: 1, autoApprove: false },
+    });
+    expect(off.json()).toMatchObject({ revision: 2, autoApprove: false });
+  } finally {
+    await app.close();
+  }
+});
+
 it('protege rotas, valida versões e documenta a gestão de memória no OpenAPI', async () => {
   const app = await buildApp({ token });
 
@@ -103,6 +149,7 @@ it('protege rotas, valida versões e documenta a gestão de memória no OpenAPI'
       (await app.inject({ url: '/v1/memory/policy', headers })).json(),
     ).toMatchObject({
       personalEnabled: false,
+      autoApprove: false,
       extraction: 'local',
       retentionDays: null,
     });

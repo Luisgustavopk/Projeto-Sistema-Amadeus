@@ -68,7 +68,7 @@ export function parseMemoryExtraction(
   }
 }
 
-// Conservative local suggestions are declarations, never automatically confirmed facts.
+// Extractors only suggest; the repository applies the configured approval policy.
 export function suggestLocally(sources: MemorySource[]): SuggestedFact[] {
   const suggestions: SuggestedFact[] = [];
 

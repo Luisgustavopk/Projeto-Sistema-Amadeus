@@ -19,11 +19,32 @@ flowchart TD
     B --> J[Fila persistente de memória]
     R --> J
     J --> E[Resumo extrativo e sugestões]
-    E --> U[Revisão do usuário]
+    E --> U[Revisão manual ou aprovação automática habilitada]
     U --> F
 ```
 
 A memória integra o pipeline existente, inclusive a recuperação de resposta falável. Voz, clone, STT, presets e personalidade 0.4.13 são preservados. A LLM não recebe ferramentas para alterar a memória durante a geração; confirmação, edição e esquecimento são operações reais da API/CLI. O contexto instrui a personagem a não afirmar que uma alteração aconteceu sem confirmação da API.
+
+## Aprovação automática opcional
+
+Em 05/10/2026, o usuário autorizou uma opção para dispensar a aprovação individual das memórias. `memory_policy.auto_approve` persiste essa escolha por proprietário; a API a expõe como `autoApprove`. A migração `0007_memory_auto_approval` mantém a opção desativada em bancos existentes. A ativação desta instalação foi solicitada pelo usuário.
+
+```powershell
+npm run memory -- auto-approve --on
+npm run memory -- status
+# Retornar à revisão manual das próximas extrações:
+npm run memory -- auto-approve --off
+```
+
+O comando altera somente a opção, conserva os demais campos e exige a revisão atual da política. `PUT /v1/memory/policy` aceita `autoApprove: true/false`; clientes antigos que omitem o campo conservam a escolha vigente. A mudança cancela extrações em andamento e invalida resultados iniciados na política anterior, permitindo reprocessamento com a opção atual.
+
+Quando ativa, todas as memórias válidas das próximas extrações, locais ou por LLM, passam a `confirmed` sem confirmação por ID. Fatos duradouros, acontecimentos com validade e correções com alvo/versão elegíveis seguem o mesmo fluxo. A aprovação e a substituição ocorrem na transação que salva as evidências. A origem continua `local-extraction`/`llm-extraction`, inclusive nas correções, para que exclusão de fontes e reconstrução preservem a rastreabilidade.
+
+Memórias e checkpoints pessoais/sintéticos recebem `eligible`; a recuperação continua limitada ao assunto, à classificação e à política aprovada de cada provedor. `local-only` conserva a restrição local. A opção mantém a seleção do extrator, as instruções para distinguir hipóteses/ficção e as validações de schema/citações; cada fala não vira automaticamente um fato. Habilitação pessoal, retenção, cotas, expiração, esquecimento e bloqueios de fontes continuam aplicados.
+
+Ligar a opção não promove retrospectivamente todas as sugestões existentes. Uma sugestão derivada pode ser aprovada se reencontrada em nova extração validada; permissões de fatos já revisados manualmente são preservadas. Desligar volta à revisão manual das novas extrações, sem revogar as aprovações anteriores. `review`, `edit` e `forget` continuam disponíveis para corrigir ou remover memórias.
+
+Verificação desta alteração: 330 testes da API passaram, além de formatação, lint, tipos e build. Os novos testes cobrem ativação/desativação, preservação dos demais campos, atualização de banco legado, recuperação entre conversas, isolamento pessoal/local, evidência inválida, correções automáticas e esquecimento/reconstrução. A API local confirmou `autoApprove: true` na revisão 3, com extração por LLM, memória pessoal e retenção de 30 dias; o extrator continua Groq `openai/gpt-oss-20b`, com `freeOnly: true`. Foi criado backup antes da migração. Esta verificação não consumiu chamadas remotas.
 
 ## Modelo de dados
 
@@ -37,9 +58,9 @@ A memória integra o pipeline existente, inclusive a recuperação de resposta f
 | Controles     | `memory_policy`, `memory_blocked_turns`, `memory_tombstones`                 | Política por proprietário, bloqueio de fontes e impressões digitais de fatos esquecidos       |
 | Retomada      | `memory_resumptions`                                                         | Associação entre sessão nova e anterior; sequência reportada pelo cliente                     |
 
-Um fato pode ter várias fontes. `suggested` significa que a informação aguarda revisão; `confirmed` é a confirmação explícita do proprietário. `origin` distingue entrada direta do usuário, extração local e extração por LLM. Inferências não são automaticamente promovidas a fatos confirmados.
+Um fato pode ter várias fontes. `suggested` significa que a informação aguarda revisão; `confirmed` indica confirmação manual ou aprovação segundo a opção automática habilitada pelo proprietário. `origin` distingue entrada direta do usuário, extração local e extração por LLM. No modo manual padrão, inferências não são automaticamente promovidas a fatos confirmados.
 
-`kind` distingue `fact` (informação duradoura), `event` (acontecimento temporário) e `correction` (proposta de correção). Acontecimentos têm `expiresAt`, calculado desde a última fonte usada: entre 1 e 365 dias, com padrão de sete dias quando o extrator não informa um prazo. Vencidos deixam de participar da busca e do grafo imediatamente, mesmo antes da limpeza periódica. Correções podem conter `supersedes`, com ID e versão da memória alvo. Só a confirmação aplica a substituição: o alvo fica `superseded`, sua relação e derivados antigos são invalidados e a informação nova passa a valer. Se o alvo mudou, a confirmação retorna 409 para uma nova revisão. Uma correção sem alvo inequívoco permanece uma sugestão independente.
+`kind` distingue `fact` (informação duradoura), `event` (acontecimento temporário) e `correction` (proposta de correção). Acontecimentos têm `expiresAt`, calculado desde a última fonte usada: entre 1 e 365 dias, com padrão de sete dias quando o extrator não informa um prazo. Vencidos deixam de participar da busca e do grafo imediatamente, mesmo antes da limpeza periódica. Correções podem conter `supersedes`, com ID e versão da memória alvo. Só a confirmação aplica a substituição: o alvo fica `superseded`, sua relação e derivados antigos são invalidados e a informação nova passa a valer. Se o alvo mudou, a confirmação retorna 409 para uma nova revisão. Uma correção sem alvo inequívoco não substitui registros anteriores; ela segue o modo de aprovação configurado como informação independente.
 
 Relações usam sujeito, predicado e objeto. Predicados iniciais: `prefere`, `usa`, `desenvolve`, `chama_se`, `tem`, `relacionado_a`. Exemplo: `Amadeus → usa → Cartesia → usa → Clone aprovado`. Cada aresta pertence a um fato e acompanha sua confirmação, classificação, permissão e exclusão. Entidades são comparadas por normalização de caixa, acentos e pontuação; não existe fusão semântica automática de nomes ou resolução de homônimos.
 
@@ -47,7 +68,7 @@ Relações usam sujeito, predicado e objeto. Predicados iniciais: `prefere`, `us
 
 O worker verifica a fila a cada cinco segundos. Grupos de oito turnos concluídos, interrompidos ou falhos com entrada não vazia formam checkpoints; o encerramento permite processar o grupo final menor. No máximo vinte trabalhos são enfileirados por passagem. A associação única entre turno e trabalho evita reprocessar o mesmo trecho, exceto em reconstrução ou atualização da reprodução.
 
-Padrão `extraction: "local"`: reconhece declarações simples como “meu nome é”, “prefiro”, “gosto de”, “uso” e “estou desenvolvendo”, com ou sem o pronome “eu”. Aceita os complementos coloquiais finais “, sabia?”, “, sabe?”, “, né?” e “, viu!”, removendo apenas esse complemento do fato e preservando a fala original como evidência. Por exemplo, “Eu gosto de café sem açúcar, sabia?” sugere a preferência por café sem açúcar. Perguntas sobre a própria declaração, negações, marcadores explícitos de ficção/hipótese e formas não reconhecidas não geram sugestões. Esse extrator é deliberadamente limitado; não interpreta livremente qualquer conversa e não confirma fatos automaticamente. Não usa API, GPU ou treinamento.
+Padrão `extraction: "local"`: reconhece declarações simples como “meu nome é”, “prefiro”, “gosto de”, “uso” e “estou desenvolvendo”, com ou sem o pronome “eu”. Aceita os complementos coloquiais finais “, sabia?”, “, sabe?”, “, né?” e “, viu!”, removendo apenas esse complemento do fato e preservando a fala original como evidência. Por exemplo, “Eu gosto de café sem açúcar, sabia?” sugere a preferência por café sem açúcar. Perguntas sobre a própria declaração, negações, marcadores explícitos de ficção/hipótese e formas não reconhecidas não geram sugestões. Esse extrator é deliberadamente limitado; não interpreta livremente qualquer conversa; a aprovação é controlada pela política de memória. Não usa API, GPU ou treinamento.
 
 Modo `extraction: "llm"`, escolhido para as conversas naturais desta instalação: usa um **provedor exclusivo da memória**, configurado em `/v1/memory/extractor`, independente do principal e de suas reservas. O prompt está em [memory-extraction-v1.md](../../code/backend/api/src/application/memory/memory-extraction-v1.md), com limite de 12.000 caracteres. O build copia o Markdown para o runtime compilado.
 
@@ -92,7 +113,7 @@ Antes de ativar memória pessoal, a configuração exige uma retenção entre 1 
 
 Quando configurada, a retenção remove conversas inativas desde o último encerramento e fatos sem atualização além do prazo. Sessões abertas são preservadas. A limpeza roda no worker, aproximadamente uma vez por hora, com lotes limitados; não é um serviço de exclusão no instante exato do vencimento. Uma conversa reativada mantém seu histórico enquanto estiver dentro da política de atividade. Desabilitar o worker pausa também essa limpeza. Exporte ou faça backup antes de habilitar um prazo que alcance dados existentes.
 
-Fatos e checkpoints começam com `permission: "local-only"`. A confirmação de um fato não autoriza automaticamente envio remoto. `eligible` permite considerar o envio, mas a classificação e a política do provedor ainda precisam permitir:
+No modo manual padrão, fatos e checkpoints começam com `permission: "local-only"`. A confirmação manual de um fato não autoriza automaticamente envio remoto. `eligible` permite considerar o envio, mas a classificação e a política do provedor ainda precisam permitir:
 
 | Turno/contexto | Memória permitida                                                                                   |
 | -------------- | --------------------------------------------------------------------------------------------------- |
@@ -110,7 +131,7 @@ A migração `0006_memory_equivalence` acrescenta um índice de equivalência. O
 
 A chave de equivalência só é produzida para preferências duradouras simples cujo texto e relação descrevem o mesmo objeto. Formas como “gosto de” e “prefiro” podem equivaler; negações, condições, eventos, correções e textos com informações adicionais não são fundidos por aproximação. A extração continua semântica por LLM; essa regra conservadora atua apenas na deduplicação e não limita quais informações ela pode sugerir. Não há comparação semântica universal nem dependência de embeddings.
 
-Novas sugestões equivalentes na mesma classificação reutilizam o registro existente e preservam evidências. Não promovem uma sugestão a fato confirmado nem ampliam a permissão existente. Para dados legados, `POST /v1/memory/consolidate` e `memory -- consolidate` trabalham por proprietário, aguardam o fim do turno e unem fontes numa transação. Priorizam um registro confirmado, incrementam sua versão e invalidam extrações concorrentes. Registros com classificações diferentes, permissões confirmadas conflitantes ou alvos de correções pendentes não são unidos. O retorno informa `merged` e `skipped`. Exclusão e reconstrução continuam aplicando bloqueios às fontes reunidas.
+Novas sugestões equivalentes na mesma classificação reutilizam o registro existente e preservam evidências. No modo manual, não promovem uma sugestão a fato confirmado nem ampliam a permissão existente. Com aprovação automática, uma sugestão derivada reencontrada em evidência válida pode ser confirmada; fatos já revisados conservam suas permissões. Para dados legados, `POST /v1/memory/consolidate` e `memory -- consolidate` trabalham por proprietário, aguardam o fim do turno e unem fontes numa transação. Priorizam um registro confirmado, incrementam sua versão e invalidam extrações concorrentes. Registros com classificações diferentes, permissões confirmadas conflitantes ou alvos de correções pendentes não são unidos. O retorno informa `merged` e `skipped`. Exclusão e reconstrução continuam aplicando bloqueios às fontes reunidas.
 
 `memory -- review` apresenta texto, ID, versão, classificação, estado e comandos reais para confirmar localmente, autorizar uso remoto ou esquecer. `--json` mantém integração com ferramentas. Erros de argumentos são apresentados sem stack trace; um marcador de exemplo recebe orientação para consultar a revisão. A interface completa de gestão continua na fase 5.
 
@@ -196,7 +217,7 @@ Referências de voz, modelos dos serviços de áudio e `.env` são arquivos sepa
 
 ## Validação e limites de aceite
 
-Os testes verificam extração sem confirmação automática, citações, reprodução parcial, checkpoint, idempotência, cotas, prioridade, proprietários, versões, correções, exclusão, reconstrução, reinício, snapshot/restauração, rotas autenticadas e recuperação na chamada WebSocket. Provedores de teste são locais/simulados; essa verificação não consome APIs remotas.
+Os testes verificam extração manual e aprovação automática opcional, citações, reprodução parcial, checkpoint, idempotência, cotas, prioridade, proprietários, versões, correções, exclusão, reconstrução, reinício, snapshot/restauração, rotas autenticadas e recuperação na chamada WebSocket. Provedores de teste são locais/simulados; essa verificação não consome APIs remotas.
 
 `npm run eval:memory` mede trinta recuperações após cinco aquecimentos em 1.002 fatos fictícios, valida relevância básica e ausência de contexto para assunto desconhecido e salva relatório em `data/memory-evals/`. Compara caracteres recuperados ao envio integral dos fatos, registra p50/p95 da recuperação local e faz zero chamadas de LLM. Não é avaliação semântica abrangente, contagem real de tokens ou benchmark de latência total da voz.
 

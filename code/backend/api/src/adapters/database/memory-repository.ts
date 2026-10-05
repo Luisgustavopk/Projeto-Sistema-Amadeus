@@ -72,6 +72,7 @@ export function createMemoryRepository(
       revision: Number(row.revision),
       enabled: Boolean(row.enabled),
       personalEnabled: Boolean(row.personal_enabled),
+      autoApprove: Boolean(row.auto_approve),
       extraction: String(row.extraction) as MemoryPolicy['extraction'],
       retentionDays:
         row.retention_days === null ? null : Number(row.retention_days),
@@ -300,6 +301,7 @@ export function createMemoryRepository(
     db: Executor,
     turnIds: string[],
     reason: string,
+    protectedFactIds: string[] = [],
   ) {
     for (const id of turnIds) {
       await db.execute({
@@ -311,8 +313,8 @@ export function createMemoryRepository(
         args: [id, ownerId],
       });
       await db.execute({
-        sql: "DELETE FROM memory_facts WHERE owner_id = ? AND origin <> 'user' AND id IN (SELECT fact_id FROM memory_fact_sources WHERE turn_id = ?)",
-        args: [ownerId, id],
+        sql: `DELETE FROM memory_facts WHERE owner_id = ? AND origin <> 'user' AND id IN (SELECT fact_id FROM memory_fact_sources WHERE turn_id = ?)${protectedFactIds.length ? ` AND id NOT IN (${protectedFactIds.map(() => '?').join(',')})` : ''}`,
+        args: [ownerId, id, ...protectedFactIds],
       });
       await db.execute({
         sql: "UPDATE memory_fact_sources SET evidence = '[fonte invalidada para recuperação]' WHERE turn_id = ? AND fact_id IN (SELECT id FROM memory_facts WHERE owner_id = ?)",
@@ -345,7 +347,12 @@ export function createMemoryRepository(
     }));
   }
 
-  async function applyCorrection(db: Executor, id: string, input: FactInput) {
+  async function applyCorrection(
+    db: Executor,
+    id: string,
+    input: FactInput,
+    automatic = false,
+  ) {
     if (!input.supersedes) {
       return;
     }
@@ -370,14 +377,19 @@ export function createMemoryRepository(
       sql: 'INSERT OR IGNORE INTO memory_tombstones VALUES (?, ?, ?)',
       args: [ownerId, fingerprint(previous.text), Date.now()],
     });
-    await db.execute({
-      sql: "UPDATE memory_facts SET origin = 'user' WHERE id IN (?, ?)",
-      args: [id, previous.id],
-    });
+
+    if (!automatic) {
+      await db.execute({
+        sql: "UPDATE memory_facts SET origin = 'user' WHERE id IN (?, ?)",
+        args: [id, previous.id],
+      });
+    }
+
     await invalidateSources(
       db,
       previous.sources.map((s) => s.turnId),
       'superseded',
+      [id, previous.id],
     );
     await db.execute({
       sql: "UPDATE memory_facts SET status = 'superseded', version = version + 1, updated_at = ? WHERE id = ?",
@@ -450,12 +462,13 @@ export function createMemoryRepository(
         }
 
         await tx.execute({
-          sql: 'UPDATE memory_policy SET revision = revision + 1, enabled = ?, personal_enabled = ?, extraction = ?, retention_days = ?, epoch = epoch + 1 WHERE owner_id = ?',
+          sql: 'UPDATE memory_policy SET revision = revision + 1, enabled = ?, personal_enabled = ?, extraction = ?, retention_days = ?, auto_approve = ?, epoch = epoch + 1 WHERE owner_id = ?',
           args: [
             Number(input.enabled),
             Number(input.personalEnabled),
             input.extraction,
             input.retentionDays,
+            Number(input.autoApprove),
             ownerId,
           ],
         });
@@ -946,6 +959,8 @@ export function createMemoryRepository(
           return false;
         }
 
+        const { autoApprove } = await policy(tx);
+
         for (const suggestion of suggestions) {
           const selected = suggestion.evidence.map((e) => e);
           const evidenceSources = await sources(
@@ -1023,9 +1038,13 @@ export function createMemoryRepository(
 
           if (id) {
             const previous = await fact(tx, id);
+            const storedDataClass = strongestDataClass([
+              previous.dataClass,
+              dataClass,
+            ]);
             await tx.execute({
               sql: 'UPDATE memory_facts SET data_class = ? WHERE id = ?',
-              args: [strongestDataClass([previous.dataClass, dataClass]), id],
+              args: [storedDataClass, id],
             });
 
             for (const evidence of suggestion.evidence) {
@@ -1034,12 +1053,33 @@ export function createMemoryRepository(
                 args: [id, evidence.turnId, evidence.quote],
               });
             }
+
+            if (
+              autoApprove &&
+              previous.status === 'suggested' &&
+              previous.origin !== 'user'
+            ) {
+              await applyCorrection(
+                tx,
+                id,
+                { ...previous, dataClass: storedDataClass },
+                true,
+              );
+              await tx.execute({
+                sql: "UPDATE memory_facts SET status = 'confirmed', permission = ?, version = version + 1, updated_at = ? WHERE id = ?",
+                args: [
+                  storedDataClass === 'local-only' ? 'local-only' : 'eligible',
+                  Date.now(),
+                  id,
+                ],
+              });
+            }
           }
         }
 
         if (summary && job.sources.length) {
           await tx.execute({
-            sql: 'INSERT OR REPLACE INTO memory_summaries(id, owner_id, conversation_id, job_id, content, data_class, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            sql: 'INSERT OR REPLACE INTO memory_summaries(id, owner_id, conversation_id, job_id, content, data_class, permission, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             args: [
               randomUUID(),
               ownerId,
@@ -1047,6 +1087,10 @@ export function createMemoryRepository(
               job.id,
               summary,
               strongestDataClass(job.sources.map((s) => s.dataClass)),
+              autoApprove &&
+              job.sources.every((s) => s.dataClass !== 'local-only')
+                ? 'eligible'
+                : 'local-only',
               Date.now(),
             ],
           });
