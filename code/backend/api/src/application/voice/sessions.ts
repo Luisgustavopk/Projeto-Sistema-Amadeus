@@ -8,6 +8,7 @@ import { createTurnProcessor } from './turn-processor.ts';
 import { createCallRuntime } from './call-runtime.ts';
 import type { CallRuntime } from './call-runtime.ts';
 import { VoiceNotReadyError } from '../../domain/errors/voice.ts';
+import { VoiceInputError } from '../../domain/errors/voice.ts';
 import type { VoiceMetrics } from './metrics.ts';
 
 export function createVoiceSessions(dependencies: {
@@ -17,6 +18,10 @@ export function createVoiceSessions(dependencies: {
   gate: ExecutionGate;
   metrics: VoiceMetrics;
   ownerId: string;
+  memory?: Pick<
+    import('../memory/service.ts').MemoryService,
+    'retrieve' | 'interruptBackground'
+  >;
   persona?: {
     get: () => Promise<
       import('../persona/configuration.ts').PersonaConfiguration
@@ -48,6 +53,7 @@ export function createVoiceSessions(dependencies: {
       sink: VoiceSink;
       signal?: AbortSignal;
       onReplaced?: () => Promise<void>;
+      resume?: { previousSessionId: string; lastSeq: number };
     }) {
       if (shuttingDown) {
         return Promise.reject(
@@ -63,6 +69,20 @@ export function createVoiceSessions(dependencies: {
         }
 
         input.signal?.throwIfAborted();
+
+        if (input.resume) {
+          if (!dependencies.history.validateResume) {
+            throw new VoiceInputError('Retomada indisponível.');
+          }
+
+          await dependencies.history.validateResume(
+            input.resume.previousSessionId,
+            input.conversationId,
+            dependencies.ownerId,
+          );
+        }
+
+        dependencies.memory?.interruptBackground();
         const profile = await dependencies.profiles.active();
         input.signal?.throwIfAborted();
 
@@ -81,6 +101,7 @@ export function createVoiceSessions(dependencies: {
           conversationId: input.conversationId,
           ownerId: dependencies.ownerId,
           voiceProfileId: profile?.id ?? null,
+          ...(input.resume ? { resume: input.resume } : {}),
         });
 
         const runtime = createCallRuntime({
@@ -93,6 +114,7 @@ export function createVoiceSessions(dependencies: {
             dependencies.history,
             dependencies.metrics,
             dependencies.persona,
+            dependencies.memory,
           ),
           gate: dependencies.gate,
           metrics: dependencies.metrics,

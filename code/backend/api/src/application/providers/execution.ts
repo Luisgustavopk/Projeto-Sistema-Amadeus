@@ -85,6 +85,35 @@ export function createProviderExecution(
           let reservation: string;
 
           try {
+            if (input.purpose === 'memory') {
+              if (config.adapter === 'gemini' && config.geminiTier === 'paid') {
+                throw new QuotaExceededError(
+                  'Trabalhos de memória não usam o plano pago do Gemini.',
+                );
+              }
+
+              const current = await usage.usage(ownerId, role, config);
+              const requestReserve = Math.min(
+                config.limits.requestsPerDay,
+                Math.max(5, Math.ceil(config.limits.requestsPerDay * 0.2)),
+              );
+              const tokenReserve = Math.min(
+                config.limits.tokensPerDay,
+                Math.max(3000, Math.ceil(config.limits.tokensPerDay * 0.2)),
+              );
+
+              if (
+                current.requests + 1 >
+                  config.limits.requestsPerDay - requestReserve ||
+                current.budgetTokens + estimateProviderBudget(input) >
+                  config.limits.tokensPerDay - tokenReserve
+              ) {
+                throw new QuotaExceededError(
+                  'A capacidade restante foi reservada para conversas.',
+                );
+              }
+            }
+
             reservation = await usage.reserve(
               ownerId,
               role,

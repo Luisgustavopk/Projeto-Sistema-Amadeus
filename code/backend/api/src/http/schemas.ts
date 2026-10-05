@@ -33,6 +33,7 @@ export const CapabilitiesSchema = z.object({
         'openrouter',
         'deepgram',
         'cartesia',
+        'zai',
       ]),
       model: z.string().nullable(),
       dataPolicy: z.enum([

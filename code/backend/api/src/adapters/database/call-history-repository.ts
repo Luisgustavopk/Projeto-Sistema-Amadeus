@@ -6,20 +6,49 @@ import type {
 import type { DataClass } from '../../domain/providers/model.ts';
 import type { TurnStatus } from '../../domain/voice/model.ts';
 import { randomUUID } from 'node:crypto';
+import { NotFoundError } from '../../domain/errors/resources.ts';
 
 export function createSqliteCallHistory(client: Client): CallHistoryRepository {
   return {
     async startSession(input) {
-      await client.execute({
-        sql: "INSERT INTO call_sessions VALUES (?, ?, ?, ?, ?, NULL, 'connected')",
-        args: [
-          input.id,
-          input.conversationId,
-          input.ownerId,
-          input.voiceProfileId,
-          Date.now(),
-        ],
+      const statements = [
+        {
+          sql: "INSERT INTO call_sessions VALUES (?, ?, ?, ?, ?, NULL, 'connected')",
+          args: [
+            input.id,
+            input.conversationId,
+            input.ownerId,
+            input.voiceProfileId,
+            Date.now(),
+          ],
+        },
+      ];
+
+      if (input.resume) {
+        statements.push({
+          sql: 'INSERT INTO memory_resumptions VALUES (?, ?, ?, ?)',
+          args: [
+            input.id,
+            input.resume.previousSessionId,
+            input.resume.lastSeq,
+            Date.now(),
+          ],
+        });
+      }
+
+      await client.batch(statements, 'write');
+    },
+    async validateResume(previousSessionId, conversationId, ownerId) {
+      const { rows } = await client.execute({
+        sql: 'SELECT 1 FROM call_sessions WHERE id = ? AND conversation_id = ? AND owner_id = ?',
+        args: [previousSessionId, conversationId, ownerId],
       });
+
+      if (!rows.length) {
+        throw new NotFoundError(
+          'Sessão anterior não pertence a esta conversa.',
+        );
+      }
     },
     async endSession(sessionId, state) {
       await client.batch(
@@ -65,7 +94,7 @@ export function createSqliteCallHistory(client: Client): CallHistoryRepository {
     },
     async recent(conversationId, ownerId, limit): Promise<StoredTurn[]> {
       const { rows } = await client.execute({
-        sql: "SELECT t.user_text, COALESCE((SELECT GROUP_CONCAT(text, ' ') FROM (SELECT text FROM speech_segments WHERE response_id = t.response_id AND sample_count > 0 AND played_samples = sample_count ORDER BY position)), '') AS generated_text, t.data_class, t.status, EXISTS(SELECT 1 FROM speech_segments WHERE response_id = t.response_id AND played_samples > 0 AND played_samples < sample_count) AS partially_played FROM call_turns t JOIN foundation_conversations c ON c.id = t.conversation_id WHERE c.id = ? AND c.owner_id = ? AND t.user_text <> '' AND t.status IN ('completed', 'interrupted', 'failed') ORDER BY t.created_at DESC, t.rowid DESC LIMIT ?",
+        sql: "SELECT t.user_text, COALESCE((SELECT GROUP_CONCAT(text, ' ') FROM (SELECT text FROM speech_segments WHERE response_id = t.response_id AND sample_count > 0 AND played_samples = sample_count ORDER BY position)), '') AS generated_text, t.data_class, t.status, EXISTS(SELECT 1 FROM speech_segments WHERE response_id = t.response_id AND played_samples > 0 AND played_samples < sample_count) AS partially_played FROM call_turns t JOIN foundation_conversations c ON c.id = t.conversation_id WHERE c.id = ? AND c.owner_id = ? AND t.user_text <> '' AND t.status IN ('completed', 'interrupted', 'failed') AND NOT EXISTS (SELECT 1 FROM memory_blocked_turns b WHERE b.turn_id = t.id AND b.owner_id = c.owner_id) ORDER BY t.created_at DESC, t.rowid DESC LIMIT ?",
         args: [conversationId, ownerId, limit],
       });
 
@@ -90,6 +119,10 @@ export function createSqliteCallHistory(client: Client): CallHistoryRepository {
       });
     },
     async acknowledge(input) {
+      const previous = await client.execute({
+        sql: 'SELECT s.played_samples FROM speech_segments s JOIN call_turns t ON t.response_id = s.response_id WHERE s.id = ? AND s.response_id = ? AND t.session_id = ?',
+        args: [input.segmentId, input.responseId, input.sessionId],
+      });
       const result = await client.execute({
         sql: "UPDATE speech_segments SET played_samples = ?, status = CASE WHEN ? = sample_count THEN 'played' ELSE 'partial' END WHERE id = ? AND response_id = ? AND played_samples <= ? AND sample_count >= ? AND EXISTS (SELECT 1 FROM call_turns WHERE response_id = ? AND session_id = ?)",
         args: [
@@ -103,6 +136,31 @@ export function createSqliteCallHistory(client: Client): CallHistoryRepository {
           input.sessionId,
         ],
       });
+
+      if (
+        result.rowsAffected === 1 &&
+        Number(previous.rows[0]?.played_samples ?? input.playedSamples) <
+          input.playedSamples
+      ) {
+        // A late playback acknowledgement invalidates an older summary snapshot.
+        await client.batch(
+          [
+            {
+              sql: 'DELETE FROM memory_summaries WHERE job_id IN (SELECT j.job_id FROM memory_job_sources j JOIN call_turns t ON t.id = j.turn_id WHERE t.response_id = ?)',
+              args: [input.responseId],
+            },
+            {
+              sql: "UPDATE memory_jobs SET status = 'pending', lease_until = NULL, next_run = 0 WHERE status IN ('completed', 'running') AND id IN (SELECT j.job_id FROM memory_job_sources j JOIN call_turns t ON t.id = j.turn_id WHERE t.response_id = ?)",
+              args: [input.responseId],
+            },
+            {
+              sql: 'UPDATE memory_policy SET epoch = epoch + 1 WHERE owner_id = (SELECT owner_id FROM call_sessions WHERE id = ?) AND EXISTS (SELECT 1 FROM memory_job_sources j JOIN call_turns t ON t.id = j.turn_id WHERE t.response_id = ?)',
+              args: [input.sessionId, input.responseId],
+            },
+          ],
+          'write',
+        );
+      }
 
       return result.rowsAffected === 1;
     },

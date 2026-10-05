@@ -18,6 +18,10 @@ import { measureVoiceAudio } from './audio-observations.ts';
 import { createConversationStyleGuard } from '../persona/conversation-style.ts';
 import { createExpressionState } from '../../domain/persona/expression-policy.ts';
 import {
+  memoryContent,
+  memoryDirection as describeMemory,
+} from '../memory/context.ts';
+import {
   PERSONA_VERSION,
   describeDelivery,
 } from '../../domain/persona/expression.ts';
@@ -42,6 +46,10 @@ export function createTurnProcessor(
   history: CallHistoryRepository,
   metrics: VoiceMetrics,
   persona?: { get: () => Promise<PersonaConfiguration> },
+  memory?: Pick<
+    import('../memory/service.ts').MemoryService,
+    'retrieve' | 'interruptBackground'
+  >,
 ) {
   const expressionState = createExpressionState();
 
@@ -133,6 +141,7 @@ export function createTurnProcessor(
     },
     async process(turn: VoiceTurn, sink: VoiceSink) {
       const { signal, turnId, responseId } = turn;
+      memory?.interruptBackground();
 
       const emit = (event: Parameters<VoiceSink['send']>[0]) => {
         signal.throwIfAborted();
@@ -168,10 +177,18 @@ export function createTurnProcessor(
           (turn.audio ? measureVoiceAudio(turn.audio, text) : undefined),
       );
       const personaConfiguration = await persona?.get();
-      context.systemPrompt = applyPersonaConfiguration(
-        context.systemPrompt,
-        personaConfiguration,
+      const memories = await memory?.retrieve(
+        turn.conversationId,
+        text,
+        context.dataClass,
       );
+      signal.throwIfAborted();
+
+      context.content = memoryContent(context.content, memories ?? '');
+      const memoryDirection = memory ? describeMemory(memories ?? '') : '';
+      context.systemPrompt =
+        applyPersonaConfiguration(context.systemPrompt, personaConfiguration) +
+        memoryDirection;
       let proposal = expressionState.snapshot();
       let metadataValid = false;
       let expression = proposal;
@@ -190,7 +207,7 @@ export function createTurnProcessor(
                 ? applyPersonaConfiguration(
                     buildSpeechOnlyPersonaPrompt(expressionState.snapshot()),
                     personaConfiguration,
-                  )
+                  ) + memoryDirection
                 : context.systemPrompt,
               maxTokens: 512,
             },

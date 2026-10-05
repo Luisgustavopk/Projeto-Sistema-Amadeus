@@ -11,6 +11,7 @@ const InputSchema = z.strictObject({
   content: z.string().max(65536),
   systemPrompt: z.string().min(1).max(32768).optional(),
   dataClass: DataClassSchema,
+  purpose: z.enum(['conversation', 'memory']).optional(),
   audio: z
     .strictObject({
       pcmBase64: z.string().max(1280000),
@@ -33,6 +34,7 @@ export function validateProviderInput(role: Role, input: ProviderInput) {
     !InputSchema.safeParse(input).success ||
     !RoleSchema.safeParse(role).success ||
     (role !== 'llm' && input.systemPrompt !== undefined) ||
+    (role !== 'llm' && input.purpose !== undefined) ||
     (role === 'stt' ? !input.audio : !input.content.trim())
   ) {
     throw new InvalidProviderInputError();

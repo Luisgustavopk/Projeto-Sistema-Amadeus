@@ -14,7 +14,13 @@ export interface CallHistoryRepository {
     conversationId: string;
     ownerId: string;
     voiceProfileId: string | null;
+    resume?: { previousSessionId: string; lastSeq: number };
   }): Promise<void>;
+  validateResume?(
+    previousSessionId: string,
+    conversationId: string,
+    ownerId: string,
+  ): Promise<void>;
   endSession(
     sessionId: string,
     state: 'closed' | 'disconnected',

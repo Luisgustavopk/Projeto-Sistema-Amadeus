@@ -23,6 +23,10 @@ export class ActivityGate
     return this.calls;
   }
 
+  get activeExecutions() {
+    return this.executions;
+  }
+
   beginConfiguration(): ReleaseActivity {
     if (this.configuring || this.executions > 0 || this.calls > 0) {
       throw new ProviderBusyError(

@@ -22,6 +22,34 @@
       "when": 1790985600002,
       "tag": "0002_voice_pipeline",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790985600003,
+      "tag": "0003_hybrid_memory",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790985600004,
+      "tag": "0004_memory_search_and_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1790985600005,
+      "tag": "0005_memory_semantics",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1790985600006,
+      "tag": "0006_memory_equivalence",
+      "breakpoints": true
     }
   ]
 }

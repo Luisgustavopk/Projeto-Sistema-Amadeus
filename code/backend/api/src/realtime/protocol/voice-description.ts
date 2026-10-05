@@ -58,5 +58,7 @@ export const VOICE_PIPELINE_PROTOCOL = {
     'Monotonic playedSamples bound to session/response/segment; only fully acknowledged segments enter spoken context',
   privacy:
     'Unspecified dataClass defaults to personal; synthetic is for artificial fixtures only',
-  resumptionImplemented: false,
+  resumptionImplemented: true,
+  resumption:
+    'Fresh one-use ticket for the same owned conversation; session.resume validates the previous session; context restored from persistence, no replay of old audio or resubmission of interrupted utterances. lastSeq is diagnostic, not an event replay cursor.',
 };

@@ -5,6 +5,7 @@ import { registerSystemRoutes } from './system.ts';
 import { registerProvidersRoutes } from './providers.ts';
 import { registerConversationsRoutes } from './conversations.ts';
 import { registerPersonaRoutes } from './persona.ts';
+import { registerMemoryRoutes } from './memory.ts';
 
 export function registerHttpRoutes(
   app: FastifyInstance,
@@ -15,4 +16,5 @@ export function registerHttpRoutes(
   registerProvidersRoutes(app, context);
   registerConversationsRoutes(app, context);
   registerPersonaRoutes(app, context);
+  registerMemoryRoutes(app, context);
 }

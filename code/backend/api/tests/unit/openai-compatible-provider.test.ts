@@ -1,8 +1,50 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createProviderFactory } from '../../src/adapters/providers/factory.ts';
 import { ProviderSchema } from '../../src/domain/providers/model.ts';
+import { MEMORY_OUTPUT_FORMAT } from '../../src/domain/memory/output.ts';
 
 afterEach(() => vi.unstubAllGlobals());
+
+it('pede JSON em extrações de memória na Groq sem alterar respostas da conversa', async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>(
+    async () =>
+      new Response(
+        JSON.stringify({
+          choices: [
+            { message: { content: '{"facts":[]}' }, finish_reason: 'stop' },
+          ],
+        }),
+      ),
+  );
+  vi.stubGlobal('fetch', fetch);
+  const provider = createProviderFactory({
+    GROQ_API_KEY: 'synthetic-test-key',
+  })(
+    'llm',
+    ProviderSchema.parse({
+      adapter: 'groq',
+      model: 'openai/gpt-oss-20b',
+      apiKeyEnv: 'GROQ_API_KEY',
+    }),
+  );
+  await provider.execute({
+    content: 'Dados fictícios',
+    dataClass: 'synthetic',
+    purpose: 'memory',
+    maxTokens: 100,
+  });
+  await provider.execute({
+    content: 'Conversa fictícia',
+    dataClass: 'synthetic',
+    maxTokens: 100,
+  });
+  expect(
+    JSON.parse(fetch.mock.calls[0]![1]!.body as string).response_format,
+  ).toEqual(MEMORY_OUTPUT_FORMAT);
+  expect(
+    JSON.parse(fetch.mock.calls[1]![1]!.body as string).response_format,
+  ).toBeUndefined();
+});
 
 it('preserva fragmentos numéricos do Workers AI sem sintetizar metadados', async () => {
   const events = [

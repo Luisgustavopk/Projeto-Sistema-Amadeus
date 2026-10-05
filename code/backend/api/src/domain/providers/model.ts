@@ -110,6 +110,7 @@ export const ProviderSchema = z
       'openrouter',
       'deepgram',
       'cartesia',
+      'zai',
     ]),
     endpoint: z.string().url().optional(),
     apiKeyEnv: ApiKeyEnvSchema.optional(),
@@ -219,7 +220,9 @@ export const ProviderSchema = z
     }
 
     if (
-      ['groq', 'cloudflare-ai', 'mistral', 'openrouter'].includes(p.adapter) &&
+      ['groq', 'cloudflare-ai', 'mistral', 'openrouter', 'zai'].includes(
+        p.adapter,
+      ) &&
       (!p.model || !p.apiKeyEnv || p.endpoint)
     ) {
       ctx.addIssue({
@@ -233,6 +236,13 @@ export const ProviderSchema = z
       ctx.addIssue({
         code: 'custom',
         message: 'OpenRouter exige um modelo explícito com sufixo :free.',
+      });
+    }
+
+    if (p.adapter === 'zai' && p.model !== 'glm-4.7-flash') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Z.ai aceita somente o modelo gratuito glm-4.7-flash.',
       });
     }
 

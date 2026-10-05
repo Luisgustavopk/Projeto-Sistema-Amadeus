@@ -1,0 +1,16 @@
+{
+  "freeOnly": true,
+  "provider": {
+    "adapter": "zai",
+    "model": "glm-4.7-flash",
+    "apiKeyEnv": "ZAI_GLM_FLASH",
+    "dataPolicy": "personal-approved",
+    "policyReviewedAt": "2026-10-05T19:30:42.000Z",
+    "policyReference": "https://docs.z.ai/legal-agreement/privacy-policy#data-processing-addendum-for-api-services",
+    "limits": {
+      "requestsPerDay": 50,
+      "tokensPerDay": 200000,
+      "source": "operator"
+    }
+  }
+}

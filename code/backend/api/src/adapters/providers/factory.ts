@@ -45,17 +45,17 @@ export function createProviderFactory(
     }
 
     if (
-      ['groq', 'cloudflare-ai', 'mistral', 'openrouter'].includes(
+      ['groq', 'cloudflare-ai', 'mistral', 'openrouter', 'zai'].includes(
         config.adapter,
       )
     ) {
       if (role !== 'llm') {
         throw new ProviderConfigurationError(
-          'Groq e Cloudflare Workers AI são adaptadores de LLM.',
+          'Este adaptador remoto é suportado somente para LLM.',
         );
       }
 
-      if (config.adapter === 'mistral' || config.adapter === 'openrouter') {
+      if (['mistral', 'openrouter', 'zai'].includes(config.adapter)) {
         return createOpenAiCompatibleProvider(config, secrets);
       }
 

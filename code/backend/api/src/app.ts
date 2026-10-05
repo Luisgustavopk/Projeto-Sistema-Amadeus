@@ -38,6 +38,7 @@ export async function buildApp(options: AppOptions) {
 
   app.addHook('onClose', async () => {
     await context.voiceSessions.shutdown();
+    await context.memory.stop();
     database.client.close();
   });
   registerErrorHandlers(app);

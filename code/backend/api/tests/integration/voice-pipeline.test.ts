@@ -282,6 +282,177 @@ async function fixture(
   };
 }
 
+it('recupera fatos confirmados entre conversas sem incluir memória local na nuvem', async () => {
+  const f = await fixture();
+  const created = await f.app.inject({
+    method: 'POST',
+    url: '/v1/facts',
+    headers,
+    payload: {
+      text: 'O clone aprovado está na Cartesia.',
+      category: 'projeto',
+      dataClass: 'synthetic',
+      permission: 'eligible',
+    },
+  });
+  expect(created.statusCode).toBe(201);
+  await f.app.inject({
+    method: 'POST',
+    url: '/v1/facts',
+    headers,
+    payload: {
+      text: 'Cartesia: dado reservado localmente.',
+      category: 'projeto',
+      dataClass: 'synthetic',
+      permission: 'local-only',
+    },
+  });
+  f.send({
+    type: 'text.send',
+    turnId: 1,
+    text: 'Qual clone está na Cartesia?',
+  });
+  await vi.waitFor(() =>
+    expect(f.events.some((event) => event.type === 'reply.done')).toBe(true),
+  );
+  const request = f.requests.find((request) => request.role === 'llm')!.content;
+  expect(request).toContain('O clone aprovado está na Cartesia.');
+  expect(request).not.toContain('dado reservado localmente');
+  expect(request).toContain('Neste turno a API forneceu memórias autorizadas');
+  expect(f.requests.filter((request) => request.role === 'llm')).toHaveLength(
+    1,
+  );
+});
+
+it('distingue falta de memória recuperada da ausência de memória persistente', async () => {
+  const f = await fixture();
+  f.send({ type: 'text.send', turnId: 1, text: 'Como eu gosto do meu café?' });
+  await vi.waitFor(() =>
+    expect(f.events.some((event) => event.type === 'reply.done')).toBe(true),
+  );
+  const request = f.requests.find((request) => request.role === 'llm')!;
+  expect(request.content).not.toContain('Memória persistente selecionada');
+  expect(request.content).toContain(
+    'Neste turno a API não forneceu memórias relevantes autorizadas',
+  );
+  expect(request.content).toContain(
+    'não conclua que o aplicativo não possui memória persistente',
+  );
+});
+
+it('retoma contexto com ticket novo sem repetir áudio ou fala interrompida', async () => {
+  const f = await fixture({
+    llmResponses: [
+      'Resposta anterior parcialmente ouvida.',
+      'Podemos continuar.',
+    ],
+  });
+  f.send({
+    type: 'text.send',
+    turnId: 1,
+    text: 'Minha hipótese sintética anterior.',
+  });
+  await vi.waitFor(() =>
+    expect(f.events.some((e) => e.type === 'reply.done')).toBe(true),
+  );
+  const segment = f.events.find((e) => e.type === 'audio.segment')!;
+  f.send({
+    type: 'playback.progress',
+    responseId: segment.responseId,
+    segmentId: segment.segmentId,
+    playedSamples: 10,
+  });
+  await vi.waitFor(async () =>
+    expect(
+      (
+        await f.database.client.execute({
+          sql: 'SELECT played_samples FROM speech_segments WHERE id = ?',
+          args: [String(segment.segmentId)],
+        })
+      ).rows[0]!.played_samples,
+    ).toBe(10),
+  );
+  const previousSessionId = String(
+    f.events.find((e) => e.type === 'session.ready')!.sessionId,
+  );
+  const oldClosed = once(f.ws, 'close');
+  f.ws.terminate();
+  await oldClosed;
+  const { ticket } = (
+    await f.app.inject({
+      method: 'POST',
+      url: `/v1/conversations/${f.id}/call-tickets`,
+      headers,
+      payload: { origin },
+    })
+  ).json();
+  const ws = new WebSocket(
+    `ws://127.0.0.1:${(f.app.server.address() as { port: number }).port}/v1/conversations/${f.id}/call?ticket=${ticket}`,
+    { headers: { origin } },
+  );
+  cleanup.push(async () => {
+    if (ws.readyState !== WebSocket.CLOSED) {
+      const closing = once(ws, 'close');
+      ws.terminate();
+      await closing;
+    }
+  });
+  const events: Record<string, unknown>[] = [];
+  const frames: Buffer[] = [];
+  ws.on('message', (data, binary) => {
+    if (binary) {
+      frames.push(Buffer.from(data as Buffer));
+    } else {
+      events.push(JSON.parse(String(data)));
+    }
+  });
+  await once(ws, 'open');
+  ws.send(
+    JSON.stringify({
+      type: 'session.resume',
+      protocolVersion: '1.1',
+      previousSessionId,
+      lastSeq: 4,
+      dataClass: 'synthetic',
+      audio: {
+        codec: 'pcm_s16le',
+        sampleRate: 16000,
+        channels: 1,
+        frameDurationMs: 20,
+      },
+    }),
+  );
+  await vi.waitFor(() =>
+    expect(events.some((e) => e.type === 'session.ready')).toBe(true),
+  );
+  expect(events.find((e) => e.type === 'session.ready')).toMatchObject({
+    resumedFrom: previousSessionId,
+    replayedAudio: false,
+  });
+  expect(events.find((e) => e.type === 'session.ready')!.sessionId).not.toBe(
+    previousSessionId,
+  );
+  expect(frames).toHaveLength(0);
+  expect(f.requests.filter((r) => r.role === 'llm')).toHaveLength(1);
+  ws.send(
+    JSON.stringify({
+      type: 'text.send',
+      turnId: 1,
+      text: 'Vamos retomar a hipótese.',
+    }),
+  );
+  await vi.waitFor(() =>
+    expect(events.some((e) => e.type === 'reply.done')).toBe(true),
+  );
+  const content = f.requests.filter((r) => r.role === 'llm')[1]!.content;
+  expect(content).toContain('Minha hipótese sintética anterior.');
+  expect(content).toContain('"partiallyPlayed":true');
+  expect(content).not.toContain('Resposta anterior parcialmente ouvida.');
+  expect(
+    (await f.database.client.execute('SELECT * FROM memory_resumptions')).rows,
+  ).toHaveLength(1);
+});
+
 it.each([16000, 24000] as const)(
   'expressão e áudio de %i Hz acompanham cada segmento sem alterar o payload de síntese',
   async (sampleRate) => {

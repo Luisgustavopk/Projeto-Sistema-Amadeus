@@ -64,7 +64,8 @@ export function attachCallSession(
     }
 
     if (
-      decoded.event.type === 'session.start' &&
+      (decoded.event.type === 'session.start' ||
+        decoded.event.type === 'session.resume') &&
       decoded.event.protocolVersion === '1.1' &&
       sessions &&
       conversationId &&

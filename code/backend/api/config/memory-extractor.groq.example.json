@@ -1,0 +1,17 @@
+{
+  "freeOnly": true,
+  "provider": {
+    "adapter": "groq",
+    "model": "openai/gpt-oss-20b",
+    "apiKeyEnv": "GROQ_GPT_OSS_API_KEY",
+    "thinkingLevel": "medium",
+    "dataPolicy": "personal-approved",
+    "policyReviewedAt": "2026-10-05T18:00:00.000Z",
+    "policyReference": "https://console.groq.com/docs/your-data",
+    "limits": {
+      "requestsPerDay": 50,
+      "tokensPerDay": 200000,
+      "source": "operator"
+    }
+  }
+}

@@ -25,6 +25,9 @@ import { createHealthService } from '../application/diagnostics/health.ts';
 import { createRevisionRepository } from '../adapters/database/revision-repository.ts';
 import { createPersonaConfiguration } from '../application/persona/configuration.ts';
 import { createVoiceVersions } from '../application/voice/versions.ts';
+import { createMemoryRepository } from '../adapters/database/memory-repository.ts';
+import { createMemoryService } from '../application/memory/service.ts';
+import { createMemoryProvider } from '../application/memory/provider.ts';
 
 export async function createContext(
   options: AppOptions,
@@ -97,6 +100,24 @@ export async function createContext(
     { beginConfiguration: () => activity.beginProviderConfiguration() },
   );
   const voiceCapabilities = createVoiceCapabilities(providers, voiceProfiles);
+  const memoryProvider = createMemoryProvider({
+    revisions,
+    conversationConfiguration: configuration,
+    usage,
+    ownerId: config.OWNER_ID,
+    factory: createProviderFactory(secrets),
+    gate: {
+      beginConfiguration: () => activity.beginProviderConfiguration(),
+      beginExecution: () => activity.beginExecution(),
+    },
+  });
+  const memory = createMemoryService(
+    createMemoryRepository(database.client, config.OWNER_ID),
+    memoryProvider,
+    () => activity.activeExecutions > 0,
+    () => activity.activeCalls > 0,
+  );
+  await memory.start();
   const voiceSessions = createVoiceSessions({
     providers,
     profiles: voiceProfiles,
@@ -105,6 +126,7 @@ export async function createContext(
     metrics: voiceMetrics,
     ownerId: config.OWNER_ID,
     persona,
+    memory,
   });
 
   return {
@@ -113,6 +135,8 @@ export async function createContext(
       providers,
       voiceProfiles,
       persona,
+      memory,
+      memoryProvider,
       voiceVersions,
       voiceMetrics,
       voiceCapabilities,

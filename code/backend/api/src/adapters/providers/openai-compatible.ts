@@ -12,6 +12,7 @@ import { ApplicationError } from '../../domain/errors/application-error.ts';
 import { decodeServerSentEvents } from './sse.ts';
 import { NO_CAPABILITIES } from './http-json.ts';
 import { LocalCompletionEndpointSchema } from '../../domain/providers/local.ts';
+import { MEMORY_OUTPUT_FORMAT } from '../../domain/memory/output.ts';
 
 const Completion = z.object({
   choices: z.array(
@@ -120,6 +121,16 @@ function getCredentials(
     };
   }
 
+  if (config.adapter === 'zai') {
+    if (config.model !== 'glm-4.7-flash' || config.endpoint) {
+      throw new ProviderConfigurationError(
+        'Z.ai exige glm-4.7-flash e seu endpoint oficial.',
+      );
+    }
+
+    return { key, endpoint: 'https://api.z.ai/api/paas/v4/chat/completions' };
+  }
+
   if (config.adapter === 'cloudflare-ai' && config.accountId) {
     return {
       key,
@@ -156,6 +167,76 @@ function mapHttpFailure(status: number, tokenRateLimited = false): Error {
   }
 
   return new ProviderUnavailableError('Provedor LLM indisponível.');
+}
+
+async function readZaiFailure(response: Response): Promise<Error | undefined> {
+  const reader = response.body?.getReader();
+
+  if (!reader) {
+    return undefined;
+  }
+
+  const chunks: Uint8Array[] = [];
+  let bytes = 0;
+
+  try {
+    while (true) {
+      const next = await reader.read();
+
+      if (next.done) {
+        break;
+      }
+
+      bytes += next.value.byteLength;
+
+      if (bytes > 8192) {
+        return undefined;
+      }
+
+      chunks.push(next.value);
+    }
+
+    const result = z
+      .object({
+        error: z.object({ code: z.string().regex(/^\d{4}$/) }),
+      })
+      .safeParse(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+
+    if (!result.success) {
+      return undefined;
+    }
+
+    // Use only known numeric codes. Remote messages may contain request data.
+    switch (result.data.error.code) {
+      case '1113':
+        return new ProviderConfigurationError(
+          'Z.ai recusou a conta: saldo ou pacote de recursos ausente (1113). Nenhum pagamento foi ativado.',
+        );
+      case '1311':
+      case '1315':
+        return new ProviderConfigurationError(
+          'A chave ou plano Z.ai não permite este uso da API (' +
+            result.data.error.code +
+            ').',
+        );
+      case '1305':
+        return new ProviderTemporarilyUnavailableError(
+          'Z.ai temporariamente sobrecarregada (1305).',
+        );
+      case '1302':
+      case '1308':
+        return new QuotaExceededError(
+          'Limite de uso da Z.ai atingido (' + result.data.error.code + ').',
+        );
+    }
+  } catch {
+    return undefined;
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
+
+  return undefined;
 }
 
 // Groq can report a token rate limit as HTTP 413. Inspect only its bounded,
@@ -219,7 +300,12 @@ export function createOpenAiCompatibleProvider(
   const { key, endpoint } = getCredentials(config, secrets);
 
   async function open(
-    input: { content: string; maxTokens: number; systemPrompt?: string },
+    input: {
+      content: string;
+      maxTokens: number;
+      systemPrompt?: string;
+      purpose?: 'conversation' | 'memory';
+    },
     stream: boolean,
     signal?: AbortSignal,
   ) {
@@ -241,6 +327,21 @@ export function createOpenAiCompatibleProvider(
             { role: 'user', content: input.content },
           ],
           max_tokens: input.maxTokens,
+          ...(input.purpose === 'memory' ? { temperature: 0 } : {}),
+          ...(config.adapter === 'zai' && input.purpose === 'memory'
+            ? {
+                response_format: { type: 'json_object' },
+                thinking: { type: 'disabled' },
+              }
+            : {}),
+          ...(config.adapter === 'groq' && input.purpose === 'memory'
+            ? {
+                response_format:
+                  config.model === 'openai/gpt-oss-20b'
+                    ? MEMORY_OUTPUT_FORMAT
+                    : { type: 'json_object' },
+              }
+            : {}),
           ...(config.adapter === 'groq' && config.model === 'qwen/qwen3.8-27b'
             ? { reasoning_effort: 'none', include_reasoning: false }
             : {}),
@@ -283,6 +384,8 @@ export function createOpenAiCompatibleProvider(
     }
 
     if (!response.ok) {
+      const zaiFailure =
+        config.adapter === 'zai' ? await readZaiFailure(response) : undefined;
       const tokenRateLimited =
         config.adapter === 'groq' && response.status === 413
           ? await isTokenRateLimit(response)
@@ -294,12 +397,14 @@ export function createOpenAiCompatibleProvider(
 
       // Free endpoints can disappear or fail the data-policy filter. Try the
       // next explicit free model rather than treating this as invalid credentials.
-      const error = mapHttpFailure(
-        config.adapter === 'openrouter' && response.status === 404
-          ? 503
-          : response.status,
-        tokenRateLimited,
-      );
+      const error =
+        zaiFailure ??
+        mapHttpFailure(
+          config.adapter === 'openrouter' && response.status === 404
+            ? 503
+            : response.status,
+          tokenRateLimited,
+        );
 
       if (
         config.adapter === 'openrouter' &&
@@ -342,7 +447,9 @@ export function createOpenAiCompatibleProvider(
     transport: 'sse',
     nativeStreaming: true,
     async health() {
-      if (config.adapter === 'cloudflare-ai') {
+      // These providers do not document a compatible models health endpoint.
+      // Availability here means configuration loaded, not verified inference.
+      if (config.adapter === 'cloudflare-ai' || config.adapter === 'zai') {
         return {
           available: true,
           capabilities: {

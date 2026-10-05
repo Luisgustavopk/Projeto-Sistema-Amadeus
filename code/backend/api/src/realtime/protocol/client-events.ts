@@ -3,6 +3,14 @@ import { AudioSchema } from './audio.ts';
 
 export const ClientEvent = z.discriminatedUnion('type', [
   z.strictObject({
+    type: z.literal('session.resume'),
+    protocolVersion: z.literal('1.1'),
+    previousSessionId: z.uuid(),
+    lastSeq: z.number().int().min(-1).max(4294967295),
+    dataClass: z.enum(['synthetic', 'personal', 'local-only']).optional(),
+    audio: AudioSchema,
+  }),
+  z.strictObject({
     type: z.literal('session.start'),
     protocolVersion: z.enum(['1.0', '1.1']),
     dataClass: z.enum(['synthetic', 'personal', 'local-only']).optional(),

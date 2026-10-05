@@ -36,4 +36,7 @@ export type SystemHttpServices = {
 export type HttpServices = ProviderHttpServices &
   ConversationHttpServices &
   SystemHttpServices &
-  VoiceHttpServices;
+  VoiceHttpServices & {
+    memory: import('../application/memory/service.ts').MemoryService;
+    memoryProvider: import('../application/memory/provider.ts').MemoryProvider;
+  };

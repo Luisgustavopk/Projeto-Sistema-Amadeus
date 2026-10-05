@@ -56,13 +56,26 @@ export function createVoiceSession(
   });
 
   return {
-    start(event: Extract<ClientMessage, { type: 'session.start' }>) {
+    start(
+      event: Extract<
+        ClientMessage,
+        { type: 'session.start' | 'session.resume' }
+      >,
+    ) {
       opening = true;
       void sessions
         .open({
           sessionId,
           conversationId,
           dataClass: event.dataClass ?? 'personal',
+          ...(event.type === 'session.resume'
+            ? {
+                resume: {
+                  previousSessionId: event.previousSessionId,
+                  lastSeq: event.lastSeq,
+                },
+              }
+            : {}),
           sink,
           signal: openingAbort.signal,
           onReplaced: () =>
@@ -101,6 +114,13 @@ export function createVoiceSession(
               sessionId,
               stage: 'voice',
               audio: event.audio,
+              ...(event.type === 'session.resume'
+                ? {
+                    resumedFrom: event.previousSessionId,
+                    lastClientSeq: event.lastSeq,
+                    replayedAudio: false,
+                  }
+                : {}),
             }),
           );
           sink.send({ type: 'state', turnId: 0, state: 'idle' });
