@@ -160,7 +160,7 @@ it('reserva orçamento, registra valores reportados e bloqueia a terceira chamad
     reportedOutputTokens: 4,
     estimatedRequests: 0,
   });
-  expect(usage.budgetTokens).toBe(48);
+  expect(usage.budgetTokens).toBe(10);
   expect(f.calls()).toBe(2);
 });
 it('mantém reservas conservadoras quando falha ou não há consumo reportado', async () => {
@@ -272,8 +272,64 @@ it('preserva o consumo concluído se houver tentativa de finalização repetida'
   );
   expect(usage).toMatchObject({
     requests: 1,
+    budgetTokens: 5,
     reportedInputTokens: 3,
     reportedOutputTokens: 2,
     estimatedRequests: 0,
   });
+});
+
+it('protege reservas pendentes e libera somente a diferença do consumo concluído', async () => {
+  const f = await fixture();
+  const config = {
+    ...f.config.llm,
+    limits: { ...f.config.llm.limits, requestsPerDay: 10, tokensPerDay: 30 },
+  };
+  const reservation = await f.usageRepository.reserve(
+    'primary',
+    'llm',
+    config,
+    24,
+  );
+  await expect(
+    f.usageRepository.reserve('primary', 'llm', config, 24),
+  ).rejects.toMatchObject({ code: 'QUOTA_EXCEEDED' });
+  expect(
+    (await f.usageRepository.usage('primary', 'llm', config)).budgetTokens,
+  ).toBe(24);
+  await f.usageRepository.settle(reservation, {
+    inputTokens: 3,
+    outputTokens: 2,
+  });
+  const next = await f.usageRepository.reserve('primary', 'llm', config, 24);
+  expect(
+    (await f.usageRepository.usage('primary', 'llm', config)).budgetTokens,
+  ).toBe(29);
+  await f.usageRepository.settle(next, { inputTokens: 5, outputTokens: null });
+  expect(
+    (await f.usageRepository.usage('primary', 'llm', config)).budgetTokens,
+  ).toBe(29);
+});
+
+it('contabiliza consumo reportado acima da estimativa sem apagar tentativas falhas', async () => {
+  const f = await fixture();
+  const config = {
+    ...f.config.llm,
+    limits: { ...f.config.llm.limits, requestsPerDay: 10, tokensPerDay: 100 },
+  };
+  const reservation = await f.usageRepository.reserve(
+    'primary',
+    'llm',
+    config,
+    10,
+  );
+  await f.usageRepository.settle(reservation, {
+    inputTokens: 15,
+    outputTokens: 5,
+  });
+  const failed = await f.usageRepository.reserve('primary', 'llm', config, 10);
+  await f.usageRepository.settle(failed, null);
+  expect(await f.usageRepository.usage('primary', 'llm', config)).toMatchObject(
+    { requests: 2, budgetTokens: 30, estimatedRequests: 1 },
+  );
 });

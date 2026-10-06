@@ -122,7 +122,9 @@ export function createProviderExecution(
                   config.limits.tokensPerDay - tokenReserve
               ) {
                 throw new QuotaExceededError(
-                  'A capacidade restante foi reservada para conversas.',
+                  options.reserveConversationCapacity === false
+                    ? 'O limite local do extrator de memória foi atingido.'
+                    : 'A capacidade restante foi reservada para conversas.',
                 );
               }
             }

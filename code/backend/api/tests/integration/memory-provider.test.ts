@@ -136,7 +136,10 @@ it('usa o orçamento dedicado integral sem reservar 20% para conversa e conserva
       dataClass: 'synthetic',
       purpose: 'memory',
     }),
-  ).rejects.toMatchObject({ code: 'QUOTA_EXCEEDED' });
+  ).rejects.toMatchObject({
+    code: 'QUOTA_EXCEEDED',
+    message: 'O limite local do extrator de memória foi atingido.',
+  });
   expect(f.execute).toHaveBeenCalledOnce();
   expect(
     (await f.deps.usage.usage('primary', 'llm', f.conversation)).requests,
