@@ -34,3 +34,8 @@ code/backend/assets/voice-profiles/voice-direction-*.md
 **/.pytest_cache/
 
 **/.ruff_cache/
+
+# External fiction corpora and avatar binaries remain local; provenance is tracked.
+code/backend/assets/persona/external/francesco-amadeus/source/
+code/backend/assets/persona/external/francesco-amadeus/prepared/
+code/frontend/assets/avatar/local/

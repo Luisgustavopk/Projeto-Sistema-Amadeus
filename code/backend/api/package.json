@@ -30,7 +30,9 @@
     "eval:memory-semantic": "node --env-file-if-exists=.env scripts/eval-memory-semantic.mjs",
     "eval:memory-integrated": "node --env-file-if-exists=.env scripts/eval-memory-integrated.mjs",
     "setup:memory-search": "node --env-file-if-exists=.env scripts/setup-memory-search.mjs",
-    "eval:memory-retrieval": "node --env-file-if-exists=.env scripts/eval-memory-retrieval.mjs"
+    "eval:memory-retrieval": "node --env-file-if-exists=.env scripts/eval-memory-retrieval.mjs",
+    "prepare:kurisu-reference": "node scripts/prepare-kurisu-reference.mjs",
+    "test:kurisu-reference": "node --test scripts/tests/kurisu-reference.test.mjs"
   },
   "dependencies": {
     "@fastify/swagger": "9.9.1",
