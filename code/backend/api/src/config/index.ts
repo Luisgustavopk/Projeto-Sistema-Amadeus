@@ -2,11 +2,13 @@ import { ServerConfigSchema } from './server.ts';
 import { DatabaseConfigSchema } from './database.ts';
 import { SecurityConfigSchema, validateTransport } from './security/index.ts';
 import { VoiceConfigSchema } from './voice.ts';
+import { MemoryConfigSchema } from './memory.ts';
 
 const ConfigSchema = ServerConfigSchema.extend({
   ...DatabaseConfigSchema.shape,
   ...SecurityConfigSchema.shape,
   ...VoiceConfigSchema.shape,
+  ...MemoryConfigSchema.shape,
 }).superRefine(validateTransport);
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env) {

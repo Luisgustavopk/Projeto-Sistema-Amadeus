@@ -10,6 +10,7 @@ import { buildApp } from '../../src/app.ts';
 import { loadConfig } from '../../src/config/index.ts';
 import { openDatabase } from '../../src/adapters/database/index.ts';
 import { createSqliteCallHistory } from '../../src/adapters/database/call-history-repository.ts';
+import { MEMORY_EMBEDDING_DIMENSIONS } from '../../src/domain/memory/embeddings.ts';
 
 const token = 'test-only-credential-of-more-than-32-characters';
 const origin = 'http://localhost:5173';
@@ -164,10 +165,20 @@ async function fixture(
   const app = await buildApp({
     token,
     database,
+    memoryEmbeddings: {
+      key: 'test-voice-memory-embedding',
+      embed: async (texts) =>
+        texts.map(() => [
+          1,
+          ...Array<number>(MEMORY_EMBEDDING_DIMENSIONS - 1).fill(0),
+        ]),
+      close: async () => undefined,
+    },
     config: loadConfig({
       API_ACCESS_TOKEN: token,
       ALLOWED_ORIGINS: origin,
       VOICE_REFERENCE_DIRECTORY: dir,
+      MEMORY_RERANK_ENABLED: 'false',
     }),
   });
   cleanup.push(() => app.close());

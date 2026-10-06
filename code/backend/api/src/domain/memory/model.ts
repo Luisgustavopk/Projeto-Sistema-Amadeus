@@ -25,14 +25,12 @@ export const RelationSchema = z.strictObject({
     .min(1)
     .max(120)
     .regex(/[\p{L}\p{N}]/u),
-  predicate: z.enum([
-    'prefere',
-    'usa',
-    'desenvolve',
-    'chama_se',
-    'tem',
-    'relacionado_a',
-  ]),
+  predicate: z
+    .string()
+    .trim()
+    .min(1)
+    .max(64)
+    .regex(/^[\p{L}\p{N}_ -]+$/u),
   object: z
     .string()
     .trim()
@@ -72,6 +70,7 @@ export const FactSchema = FactInputSchema.extend({
       turnId: z.uuid(),
       conversationId: z.uuid(),
       evidence: z.string(),
+      contextValid: z.boolean().optional(),
     }),
   ),
 });
@@ -130,6 +129,21 @@ export const MemoryExportSchema = z.strictObject({
   resumptions: z.array(ExportRowSchema),
 });
 export const MemoryStatusSchema = z.strictObject({
+  ranking: z
+    .strictObject({
+      enabled: z.boolean(),
+      model: z.string().nullable(),
+      state: z.enum(['disabled', 'idle', 'ready', 'degraded']),
+      lastError: z.string().nullable(),
+    })
+    .optional(),
+  search: z.strictObject({
+    enabled: z.boolean(),
+    model: z.string().nullable(),
+    state: z.enum(['disabled', 'idle', 'ready', 'degraded']),
+    lastError: z.literal('LOCAL_MODEL_UNAVAILABLE').nullable(),
+    indexedFacts: z.number().int().nonnegative(),
+  }),
   extractor: MemoryExtractorStatusSchema.optional(),
   policy: MemoryPolicySchema,
   jobs: z.array(
@@ -186,7 +200,7 @@ export const ExtractionSchema = z.strictObject({
           .max(8),
       }),
     )
-    .max(12),
+    .max(24),
 });
 
 export function normalizeMemory(text: string) {

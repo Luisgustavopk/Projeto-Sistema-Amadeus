@@ -17,6 +17,7 @@ import {
 } from '../../src/application/memory/extraction.ts';
 import { QuotaExceededError } from '../../src/domain/errors/providers.ts';
 import type { ProviderServices } from '../../src/application/providers/index.ts';
+import { MEMORY_EMBEDDING_DIMENSIONS } from '../../src/domain/memory/embeddings.ts';
 import {
   FactInputSchema,
   type MemorySource,
@@ -97,6 +98,56 @@ const input = (text: string, overrides = {}) =>
     ...overrides,
   });
 
+it('divide a extração LLM em lotes menores e impede análises paralelas entre processos do mesmo usuário', async () => {
+  const f = await fixture();
+  await f.service.configure({
+    expectedRevision: 0,
+    enabled: true,
+    personalEnabled: false,
+    extraction: 'llm',
+    retentionDays: null,
+    acknowledgeLocalStorage: true,
+  });
+
+  for (const text of [
+    'Primeira informação.',
+    'Segunda informação.',
+    'Terceira informação.',
+    'Quarta informação.',
+  ]) {
+    await f.add(text);
+  }
+
+  await f.history.endSession(f.sessionId, 'closed');
+  await f.repo.enqueue();
+  expect(await f.repo.jobs()).toHaveLength(2);
+  const first = (await f.repo.claim(Date.now()))!;
+  expect(first.sources).toHaveLength(2);
+  const anotherProcess = createMemoryRepository(f.db.client, 'primary');
+  await anotherProcess.recover();
+  expect((await f.repo.jobs()).find((j) => j.id === first.id)!.status).toBe(
+    'running',
+  );
+  expect(await anotherProcess.claim(Date.now())).toBeNull();
+  await f.repo.complete(
+    first,
+    [],
+    summarizeSources(first.sources),
+    'llm-extraction',
+  );
+  const next = (await anotherProcess.claim(Date.now()))!;
+  expect(next.id).not.toBe(first.id);
+  expect(next.sources).toHaveLength(2);
+  const retryAt = Date.now() + 60000;
+  await anotherProcess.defer(next, 'QUOTA_EXCEEDED', retryAt, false);
+  expect(await f.repo.claim(Date.now())).toBeNull();
+  expect(
+    (await f.repo.jobs())
+      .filter((j) => j.status === 'pending')
+      .every((j) => j.nextRun >= retryAt),
+  ).toBe(true);
+});
+
 it('retoma extração adiada por cota em chamada aberta e recupera nome corrigido após reinício', async () => {
   const f = await fixture();
   await f.service.configure({
@@ -124,6 +175,15 @@ it('retoma extração adiada por cota em chamada aberta e recupera nome corrigid
     f.repo,
     { execute: f.execute },
     () => false,
+    {
+      key: 'test-identity-embedding',
+      embed: async (texts) =>
+        texts.map(() => [
+          1,
+          ...Array<number>(MEMORY_EMBEDDING_DIMENSIONS - 1).fill(0),
+        ]),
+      close: async () => undefined,
+    },
   );
   cleanup.push(() => restarted.stop());
   await restarted.start();
@@ -180,6 +240,94 @@ async function enableSemantic(f: Awaited<ReturnType<typeof fixture>>) {
     retentionDays: null,
   });
 }
+
+it('corrige a interpretação de uma fala antiga sem bloquear sua evidência nem apagar fatos irmãos corretos', async () => {
+  const f = await fixture();
+  await f.service.configure({
+    expectedRevision: 0,
+    enabled: true,
+    personalEnabled: false,
+    extraction: 'llm',
+    retentionDays: null,
+    autoApprove: true,
+  });
+  const text =
+    'Gosto de ficção científica e comédia. Não estou ordenando os gêneros.';
+  const source = await f.add(text);
+  await f.db.client.execute({
+    sql: 'UPDATE call_turns SET created_at = ? WHERE id = ?',
+    args: [Date.now() - 10000, source.id],
+  });
+  f.execute.mockResolvedValueOnce({
+    content: JSON.stringify({
+      facts: [
+        {
+          text: 'Não tenho gênero favorito.',
+          category: 'contexto',
+          kind: 'fact',
+          relation: null,
+          evidence: [{ turnId: source.id, quote: text }],
+        },
+        {
+          text: 'Gosto de ficção científica e comédia.',
+          category: 'preferencia',
+          kind: 'fact',
+          relation: null,
+          evidence: [{ turnId: source.id, quote: text }],
+        },
+      ],
+    }),
+    inputTokens: 1,
+    outputTokens: 1,
+  });
+  await f.history.endSession(f.sessionId, 'closed');
+  await f.service.runOnce(Date.now() + 20000);
+  const old = (await f.repo.facts()).find(
+    (fact) => fact.text === 'Não tenho gênero favorito.',
+  )!;
+  const sibling = (await f.repo.facts()).find((fact) =>
+    fact.text.startsWith('Gosto de'),
+  )!;
+  await f.service.rebuild(f.conversation.id);
+  f.execute.mockResolvedValueOnce({
+    content: JSON.stringify({
+      facts: [
+        {
+          text: 'Usuário citou ficção científica e comédia sem declarar uma ordem entre esses gêneros.',
+          category: 'contexto',
+          kind: 'correction',
+          supersedes: { factId: old.id, version: old.version },
+          relation: null,
+          evidence: [{ turnId: source.id, quote: text }],
+        },
+      ],
+    }),
+    inputTokens: 1,
+    outputTokens: 1,
+  });
+  await f.service.runOnce(Date.now() + 20000);
+  const facts = await f.repo.facts();
+  expect(facts.find((fact) => fact.id === old.id)?.status).toBe('superseded');
+  expect(facts.find((fact) => fact.id === sibling.id)?.status).toBe(
+    'confirmed',
+  );
+  const corrected = facts.find((fact) => fact.kind === 'correction')!;
+  expect(corrected.status).toBe('confirmed');
+  expect(corrected.sources).toEqual([
+    {
+      turnId: source.id,
+      conversationId: f.conversation.id,
+      evidence: text,
+      contextValid: true,
+    },
+  ]);
+  expect(
+    (await f.db.client.execute('SELECT * FROM memory_blocked_turns')).rows,
+  ).toHaveLength(0);
+  expect(
+    await f.service.retrieve(randomUUID(), 'ficção científica', 'synthetic'),
+  ).toContain(sibling.text);
+});
 
 it.each(['synthetic', 'personal', 'local-only'] as const)(
   'aprova automaticamente fatos e checkpoints %s mantendo sua classificação',
@@ -338,6 +486,88 @@ it('aprova correções por LLM sem confirmação por ID e conserva a origem e o 
   expect(
     (await f.repo.facts()).some((fact) => fact.status === 'confirmed'),
   ).toBe(false);
+});
+
+it('rejeita apenas uma interpretação automática, preserva fatos da mesma fonte e impede sua reaprovação', async () => {
+  const f = await fixture();
+  const statement = 'Gosto de maçãs. Não estou indicando uma fruta favorita.';
+  const turn = await f.add(statement);
+  await f.history.endSession(f.sessionId, 'closed');
+  await enableSemantic(f);
+  await f.service.configure({
+    expectedRevision: 1,
+    enabled: true,
+    personalEnabled: false,
+    extraction: 'llm',
+    retentionDays: null,
+    autoApprove: true,
+  });
+  const suggestions = [
+    'Usuário gosta de maçãs.',
+    'Usuário não tem fruta favorita.',
+  ].map((text) => ({
+    text,
+    category: 'preferencia',
+    kind: 'fact',
+    relation: { subject: 'usuário', predicate: 'gosta', object: text },
+    evidence: [{ turnId: turn.id, quote: statement }],
+  }));
+  f.execute.mockResolvedValue({
+    content: JSON.stringify({ facts: suggestions }),
+    inputTokens: 10,
+    outputTokens: 10,
+  });
+  await f.service.runOnce();
+  const old = (await f.repo.facts()).find(
+    (fact) => fact.text === suggestions[1]!.text,
+  )!;
+  const other = (await f.repo.facts()).find(
+    (fact) => fact.text === suggestions[0]!.text,
+  )!;
+  const foreign = createMemoryRepository(f.db.client, 'other');
+  await expect(
+    foreign.rejectInterpretation(old.id, old.version),
+  ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  await expect(
+    f.service.rejectInterpretation(old.id, old.version + 1),
+  ).rejects.toMatchObject({ code: 'PROVIDER_BUSY' });
+  const rejected = await f.service.rejectInterpretation(old.id, old.version);
+  expect(rejected).toMatchObject({
+    status: 'superseded',
+    version: old.version + 1,
+    origin: 'llm-extraction',
+  });
+  expect(
+    (await f.repo.facts()).find((fact) => fact.id === other.id),
+  ).toMatchObject({
+    status: 'confirmed',
+    sources: [
+      expect.objectContaining({ evidence: statement, contextValid: true }),
+    ],
+  });
+  expect((await f.service.graph()).edges).toHaveLength(1);
+  expect(
+    (await f.repo.conversation(f.conversation.id)).turns[0]!.userText,
+  ).toBe(statement);
+  expect(
+    (await f.repo.candidateFacts([], 'synthetic', [old.id])).map(
+      (fact) => fact.id,
+    ),
+  ).not.toContain(old.id);
+  const authored = await f.service.create(
+    input('Memória inserida pelo usuário.'),
+  );
+  await expect(
+    f.service.rejectInterpretation(authored.id, authored.version),
+  ).rejects.toMatchObject({ code: 'PROVIDER_BUSY' });
+  await f.service.rebuild(f.conversation.id);
+  await f.service.runOnce();
+  expect(
+    (await f.repo.facts()).find((fact) => fact.id === old.id)?.status,
+  ).toBe('superseded');
+  expect(
+    (await f.repo.facts()).filter((fact) => fact.text === old.text),
+  ).toHaveLength(1);
 });
 
 it('corrige uma memória aprovada automaticamente sem perder a origem ou restaurar a fonte anterior', async () => {
@@ -878,6 +1108,7 @@ it('processa uma preferência coloquial em conversa pessoal encerrada e mantém 
           turnId: turn.id,
           conversationId: f.conversation.id,
           evidence: 'Eu gosto de café sem açúcar, sabia?',
+          contextValid: true,
         },
       ],
     }),
@@ -1159,6 +1390,9 @@ it('rejeita conclusão antiga depois de uma exclusão e recupera trabalho em exe
     ),
   ).toBe(false);
   await f.repo.claim(Date.now());
+  await f.db.client.execute(
+    "UPDATE memory_jobs SET lease_until = 0 WHERE status = 'running'",
+  );
   await f.repo.recover();
   expect((await f.repo.jobs())[0]!.status).toBe('pending');
   await f.service.runOnce();

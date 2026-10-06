@@ -1,10 +1,22 @@
+import { readFileSync } from 'node:fs';
+
+const direction = readFileSync(
+  new URL('./memory-response-v1.md', import.meta.url),
+  'utf8',
+).trim();
+
+if (!direction || direction.length > 2000) {
+  throw new Error('Direção de memória inválida.');
+}
+
 export function memoryDirection(memories: string) {
   return (
     '\nMEMÓRIA OPERACIONAL: o aplicativo oferece memória persistente. ' +
     (memories
       ? 'Neste turno a API forneceu memórias autorizadas no contexto. Use os fatos relevantes para responder naturalmente, sem negar essa capacidade.'
       : 'Neste turno a API não forneceu memórias relevantes autorizadas. Se o detalhe também não estiver no histórico, diga que não tem essa informação disponível agora; não conclua que o aplicativo não possui memória persistente.') +
-    ' Não invente lembranças nem prometa gravação, correção ou exclusão sem confirmação da API.'
+    '\n' +
+    direction
   );
 }
 

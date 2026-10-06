@@ -1,26 +1,19 @@
 import type { DataClass } from '../../domain/providers/model.ts';
 import { normalizeMemory, type MemoryFact } from '../../domain/memory/model.ts';
 
-const STOP_WORDS = new Set(
-  'a o as os de da do das dos um uma e em para por com que qual quais como voce eu meu minha ele ela isso esse essa sobre'.split(
-    ' ',
-  ),
-);
 const HUBS = new Set(['usuario']);
+
+export function memoryContextSources(fact: MemoryFact) {
+  return fact.origin === 'user'
+    ? []
+    : fact.sources.filter((source) => source.contextValid !== false);
+}
 
 export function memoryTerms(text: string) {
   const normalized = normalizeMemory(text);
-  const identity = /\b(meu nome|me chamo|quem sou|quem eu sou|sou eu)\b/u.test(
-    normalized,
-  );
 
   return [
-    ...new Set(
-      normalized
-        .split(' ')
-        .filter((word) => word.length > 2 && !STOP_WORDS.has(word)),
-    ),
-    ...(identity ? ['chama_se', 'identidade'] : []),
+    ...new Set(normalized.split(' ').filter((word) => word.length > 2)),
   ].slice(0, 24);
 }
 
@@ -44,6 +37,8 @@ export function selectRelevantFacts(
   text: string,
   dataClass: DataClass,
   budget = 1800,
+  semanticScores: ReadonlyMap<string, number> = new Map(),
+  semanticAvailable = false,
 ) {
   const query = new Set(memoryTerms(text));
   const candidates = facts.filter(
@@ -53,14 +48,50 @@ export function selectRelevantFacts(
       memoryEligible(fact, dataClass),
   );
 
+  const factWords = new Map(
+    candidates.map((fact) => [
+      fact.id,
+      new Set(
+        normalizeMemory(fact.text + ' ' + JSON.stringify(fact.relation)).split(
+          ' ',
+        ),
+      ),
+    ]),
+  );
+  const frequencies = new Map(
+    [...query].map((word) => [
+      word,
+      candidates.filter((fact) => factWords.get(fact.id)!.has(word)).length,
+    ]),
+  );
+
   const score = (fact: MemoryFact) => {
     const words = new Set(
-      normalizeMemory(
-        fact.text + ' ' + fact.category + ' ' + JSON.stringify(fact.relation),
-      ).split(' '),
+      normalizeMemory(fact.text + ' ' + JSON.stringify(fact.relation)).split(
+        ' ',
+      ),
     );
 
-    return [...query].reduce((sum, word) => sum + Number(words.has(word)), 0);
+    // Corpus frequency reduces generic word matches without language-specific
+    // stop-word lists. Semantic scores have priority in the hybrid ranking.
+    const lexical = [...query].reduce(
+      (sum, word) =>
+        sum + (words.has(word) ? 1 / (frequencies.get(word) ?? 1) : 0),
+      0,
+    );
+
+    if (semanticScores.has(fact.id)) {
+      return 100 + semanticScores.get(fact.id)! + lexical * 0.001;
+    }
+
+    // A common word such as a pronoun must not undo a semantic rejection.
+    // Exact names/codes/phrases still work, with no per-language word list.
+    const literal = normalizeMemory(text);
+
+    return !semanticAvailable ||
+      (literal.length >= 4 && normalizeMemory(fact.text).includes(literal))
+      ? lexical
+      : 0;
   };
 
   const direct = candidates
@@ -71,6 +102,30 @@ export function selectRelevantFacts(
   const selectedIds = new Set(direct.map((entry) => entry.fact.id));
   const graph = [...direct];
   let frontier = direct.map((entry) => entry.fact);
+
+  const directSources = new Set(
+    frontier.flatMap((fact) =>
+      memoryContextSources(fact).map((source) => source.turnId),
+    ),
+  );
+
+  // Sharing evidence means related context, not proof of a relationship.
+  // Add only one hop from direct matches, never the raw source utterance.
+  for (const fact of candidates) {
+    if (graph.length >= 12) {
+      break;
+    }
+
+    if (
+      !selectedIds.has(fact.id) &&
+      memoryContextSources(fact).some((source) =>
+        directSources.has(source.turnId),
+      )
+    ) {
+      graph.push({ fact, score: 0 });
+      selectedIds.add(fact.id);
+    }
+  }
 
   // At most two hops; generic subjects must not pull the user's entire graph.
   for (let depth = 0; depth < 2 && graph.length < 12; depth++) {

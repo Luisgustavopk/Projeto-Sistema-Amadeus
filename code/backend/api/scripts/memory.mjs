@@ -134,6 +134,11 @@ async function main() {
         eraseSources: argumentsList.includes('--erase-sources'),
       };
       break;
+    case 'reject-interpretation':
+      path = '/v1/facts/' + id + '/reject-interpretation';
+      method = 'POST';
+      body = { expectedVersion: Number(value('--version')) };
+      break;
     case 'permit-summary':
       path = '/v1/memory/summaries/' + id;
       method = 'PATCH';
@@ -148,14 +153,19 @@ async function main() {
       break;
     default:
       throw new Error(
-        'Use status, extractor, configure-extractor, facts, review, consolidate, summaries, graph, conversations, export, configure, auto-approve, create, edit, confirm, forget, permit-summary ou rebuild.',
+        'Use status, extractor, configure-extractor, facts, review, consolidate, summaries, graph, conversations, export, configure, auto-approve, create, edit, confirm, reject-interpretation, forget, permit-summary ou rebuild.',
       );
   }
 
   if (
-    ['edit', 'confirm', 'forget', 'permit-summary', 'rebuild'].includes(
-      command,
-    ) &&
+    [
+      'edit',
+      'confirm',
+      'reject-interpretation',
+      'forget',
+      'permit-summary',
+      'rebuild',
+    ].includes(command) &&
     !id
   ) {
     throw new Error('Informe --id=UUID.');
@@ -240,7 +250,11 @@ async function main() {
               {
                 review: memoryReview(result.facts),
                 processing: status
-                  ? { policy: status.policy, jobs: status.jobs }
+                  ? {
+                      policy: status.policy,
+                      jobs: status.jobs,
+                      search: status.search,
+                    }
                   : null,
               },
               null,

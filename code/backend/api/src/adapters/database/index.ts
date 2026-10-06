@@ -11,6 +11,9 @@ export async function openDatabase(url: string) {
   const db = drizzle(client, { schema });
 
   try {
+    // API and memory CLI use the same local file. Short writes should wait
+    // briefly rather than fail immediately when another process commits.
+    await client.execute('PRAGMA busy_timeout = 3000');
     await client.execute('PRAGMA foreign_keys = ON');
     await migrate(db, {
       migrationsFolder: fileURLToPath(

@@ -1,6 +1,13 @@
 import type { MemoryRepository } from '../../ports/memory-repository.ts';
 import type { ProviderServices } from '../providers/index.ts';
 import type { MemoryProvider } from './provider.ts';
+import type { MemoryEmbeddings } from '../../ports/memory-embeddings.ts';
+import type { MemoryReranker } from '../../ports/memory-reranker.ts';
+import {
+  MEMORY_CONTEXT_CHARACTERS,
+  validRelevance,
+} from '../../domain/memory/ranking.ts';
+import { createSemanticMemorySearch } from './semantic-search.ts';
 import {
   FactInputSchema,
   MemoryPolicyEditSchema,
@@ -17,12 +24,14 @@ import {
 import { ApplicationError } from '../../domain/errors/application-error.ts';
 import {
   MEMORY_EXTRACTION_PROMPT,
+  extractionFactContext,
   parseMemoryExtraction,
   suggestLocally,
   summarizeSources,
 } from './extraction.ts';
 import {
   memoryEligible,
+  memoryContextSources,
   memoryTerms,
   selectRelevantFacts,
 } from './retrieval.ts';
@@ -32,7 +41,22 @@ export function createMemoryService(
   providers: Pick<ProviderServices, 'execute'> &
     Partial<Pick<MemoryProvider, 'describeMemory'>>,
   isBusy: () => boolean,
+  embeddings?: MemoryEmbeddings,
+  reranker?: MemoryReranker,
 ) {
+  const semantic = createSemanticMemorySearch(repository, embeddings);
+  let rankingRetryAt = 0;
+  const ranking: {
+    enabled: boolean;
+    model: string | null;
+    state: 'disabled' | 'idle' | 'ready' | 'degraded';
+    lastError: string | null;
+  } = {
+    enabled: Boolean(reranker),
+    model: reranker?.key ?? null,
+    state: reranker ? 'idle' : 'disabled',
+    lastError: null,
+  };
   let running: Promise<void> | undefined;
   let timer: NodeJS.Timeout | undefined;
   let abort: AbortController | undefined;
@@ -46,6 +70,98 @@ export function createMemoryService(
     completedJobs: 0,
     deferredJobs: 0,
   };
+
+  async function relevantFacts(
+    queries: string[],
+    dataClass: DataClass,
+    budget = MEMORY_CONTEXT_CHARACTERS,
+  ) {
+    const semanticResults = await semantic.search(queries, dataClass);
+    const query = queries.join(' ');
+    let candidates = await repository.candidateFacts(
+      memoryTerms(query),
+      dataClass,
+      [...semanticResults.keys()],
+    );
+    const scores = new Map(
+      candidates.flatMap((fact) => {
+        const result = semanticResults.get(fact.id);
+
+        return result?.version === fact.version
+          ? [[fact.id, result.score] as const]
+          : [];
+      }),
+    );
+
+    if (reranker && candidates.length && Date.now() >= rankingRetryAt) {
+      try {
+        const pool = candidates
+          .filter((fact) => scores.has(fact.id))
+          .sort((a, b) => scores.get(b.id)! - scores.get(a.id)!)
+          .slice(0, 24);
+
+        if (pool.length) {
+          const values = await reranker.rank(
+            queries.at(-1)!,
+            pool.map((fact) => fact.text),
+          );
+
+          if (values.length !== pool.length || !values.every(validRelevance)) {
+            throw new Error('Ranking inválido.');
+          }
+
+          // Relevance is not a calibrated truth probability. A very strong
+          // generic match must not suppress a weaker complementary detail.
+          const cutoff = 0.05;
+          const accepted = new Map(
+            pool.flatMap((fact, index) =>
+              values[index]! >= cutoff
+                ? [
+                    [
+                      fact.id,
+                      { score: values[index]!, version: fact.version },
+                    ] as const,
+                  ]
+                : [],
+            ),
+          );
+          // Recheck versions after inference; a concurrent correction/deletion
+          // must not inject the old fact or reuse its relevance for a new one.
+          candidates = await repository.candidateFacts([], dataClass, [
+            ...accepted.keys(),
+          ]);
+          scores.clear();
+
+          for (const fact of candidates) {
+            const result = accepted.get(fact.id);
+
+            if (result?.version === fact.version) {
+              scores.set(fact.id, result.score);
+            }
+          }
+
+          ranking.state = 'ready';
+          ranking.lastError = null;
+        }
+      } catch {
+        ranking.state = 'degraded';
+        ranking.lastError = 'LOCAL_RERANKER_UNAVAILABLE';
+        rankingRetryAt = Date.now() + 60000;
+      }
+    }
+
+    return {
+      candidates,
+      selected: selectRelevantFacts(
+        candidates,
+        query,
+        dataClass,
+        budget,
+        scores,
+        semantic.status().state === 'ready',
+      ),
+    };
+  }
 
   async function prepareMutation() {
     abort?.abort();
@@ -90,6 +206,11 @@ export function createMemoryService(
       lastPurge = now;
     }
 
+    await semantic.index(
+      policy.personalEnabled ? 'local-only' : 'synthetic',
+      () => !stopped && !isBusy() && Date.now() - lastForegroundAt >= 15000,
+    );
+
     await repository.enqueue(undefined, now - 15000);
     const job = await repository.claim(now);
 
@@ -117,21 +238,22 @@ export function createMemoryService(
       let suggestions = suggestLocally(job.sources);
 
       if (policy.extraction === 'llm' && job.sources.length) {
-        const query = [...job.sources, ...previousSources]
-          .map((s) => s.userText)
-          .join(' ');
-        const candidates = await repository.candidateFacts(
-          memoryTerms(query),
-          dataClass,
-        );
-        const selected = selectRelevantFacts(
-          candidates,
-          query,
+        abort = new AbortController();
+        const signal = AbortSignal.any([
+          abort.signal,
+          AbortSignal.timeout(45000),
+        ]);
+        const { candidates, selected } = await relevantFacts(
+          contextSources.map((source) => source.userText),
           dataClass,
           3000,
         );
-        const known = candidates.filter((f) =>
-          selected.some((c) => c.id === f.id),
+        signal.throwIfAborted();
+        const { known, wire: existingFacts } = extractionFactContext(
+          candidates,
+          selected.map((fact) => fact.id),
+          job.sources,
+          dataClass,
         );
         const wireCurrent = job.sources.map((source) => ({
           ...source,
@@ -144,8 +266,10 @@ export function createMemoryService(
           assistantConfirmed: source.assistantConfirmed.slice(0, 200),
         }));
         const wire = (source: (typeof wireCurrent)[number]) => ({
-          ...source,
           turnId: source.id,
+          createdAt: source.createdAt,
+          userText: source.userText,
+          assistantConfirmed: source.assistantConfirmed,
           userTruncated:
             source.userText.length <
             contextSources.find((s) => s.id === source.id)!.userText.length,
@@ -154,11 +278,6 @@ export function createMemoryService(
             contextSources.find((s) => s.id === source.id)!.assistantConfirmed
               .length,
         });
-        abort = new AbortController();
-        const signal = AbortSignal.any([
-          abort.signal,
-          AbortSignal.timeout(45000),
-        ]);
         const output = await providers.execute(
           'llm',
           {
@@ -166,14 +285,7 @@ export function createMemoryService(
             content: JSON.stringify({
               currentSources: wireCurrent.map(wire),
               previousSources: wirePrevious.map(wire),
-              existingFacts: known.map((f) => ({
-                id: f.id,
-                version: f.version,
-                text: f.text,
-                kind: f.kind,
-                expiresAt: f.expiresAt,
-                relation: f.relation,
-              })),
+              existingFacts,
             }),
             dataClass,
             purpose: 'memory',
@@ -200,8 +312,11 @@ export function createMemoryService(
         measurements.completedJobs++;
       }
     } catch (error) {
-      const code =
-        error instanceof ApplicationError ? error.code : 'INTERNAL_ERROR';
+      const code = abort?.signal.aborted
+        ? 'ACTIVE_CONVERSATION'
+        : error instanceof ApplicationError
+          ? error.code
+          : 'INTERNAL_ERROR';
       const quotaOrPolicy = [
         'QUOTA_EXCEEDED',
         'DATA_POLICY_BLOCKED',
@@ -247,6 +362,8 @@ export function createMemoryService(
       stopped = true;
       clearInterval(timer);
       abort?.abort();
+      await semantic.close();
+      await reranker?.close();
       await running;
     },
     interruptBackground() {
@@ -294,6 +411,11 @@ export function createMemoryService(
       });
     },
     list: () => repository.facts(),
+    async rejectInterpretation(id: string, version: number) {
+      await prepareMutation();
+
+      return repository.rejectInterpretation(id, version);
+    },
     async consolidate() {
       await prepareMutation();
 
@@ -358,7 +480,12 @@ export function createMemoryService(
 
       return repository.forgetFact(id, version, eraseSources);
     },
-    async retrieve(conversationId: string, text: string, dataClass: DataClass) {
+    async retrieve(
+      conversationId: string,
+      text: string,
+      dataClass: DataClass,
+      recentContext: { user: string; assistantConfirmed: string }[] = [],
+    ) {
       const started = performance.now();
       const policy = await repository.policy();
 
@@ -369,11 +496,65 @@ export function createMemoryService(
         return '';
       }
 
-      const facts = selectRelevantFacts(
-        await repository.candidateFacts(memoryTerms(text), dataClass),
-        text,
+      const previous = recentContext
+        .filter((turn) => turn.user.trim() !== text.trim())
+        .slice(-2)
+        .map((turn) =>
+          [turn.user.slice(0, 400), turn.assistantConfirmed.slice(0, 400)]
+            .filter(Boolean)
+            .join('\n'),
+        );
+      const queries = previous.length
+        ? [text, [...previous, text].join('\n')]
+        : [text];
+      const { selected: facts, candidates } = await relevantFacts(
+        queries,
         dataClass,
       );
+      const sources = new Map<string, number[]>();
+
+      for (const [index, fact] of facts.entries()) {
+        const stored = candidates.find((candidate) => candidate.id === fact.id);
+
+        for (const source of stored ? memoryContextSources(stored) : []) {
+          const key = source.conversationId + ':' + source.turnId;
+          const group = sources.get(key) ?? [];
+
+          if (!group.includes(index)) {
+            group.push(index);
+          }
+
+          sources.set(key, group);
+        }
+      }
+
+      // Indices refer only to selected, permitted facts. No source text or
+      // hidden facts are disclosed. Co-mention does not assert a graph edge.
+      const coMentioned: number[][] = [];
+      const seenGroups = new Set<string>();
+
+      for (const group of sources.values()) {
+        const key = JSON.stringify(group);
+
+        if (group.length < 2 || seenGroups.has(key)) {
+          continue;
+        }
+
+        if (
+          JSON.stringify({ facts, coMentioned: [...coMentioned, group] })
+            .length > MEMORY_CONTEXT_CHARACTERS
+        ) {
+          continue;
+        }
+
+        coMentioned.push(group);
+        seenGroups.add(key);
+
+        if (coMentioned.length === 8) {
+          break;
+        }
+      }
+
       const terms =
         text
           .normalize('NFD')
@@ -420,7 +601,11 @@ export function createMemoryService(
 
       const content =
         facts.length || selectedSummaries.length
-          ? JSON.stringify({ facts, summaries: selectedSummaries })
+          ? JSON.stringify({
+              facts,
+              summaries: selectedSummaries,
+              ...(coMentioned.length ? { coMentioned } : {}),
+            })
           : '';
       measurements.retrievals++;
       measurements.totalRetrievalMs += performance.now() - started;
@@ -448,6 +633,8 @@ export function createMemoryService(
         policy: await repository.policy(),
         jobs: await repository.jobs(),
         measurements: { ...measurements },
+        search: semantic.status(),
+        ranking: { ...ranking },
         ...(providers.describeMemory
           ? { extractor: await providers.describeMemory() }
           : {}),

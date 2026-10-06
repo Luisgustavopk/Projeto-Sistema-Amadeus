@@ -10,6 +10,7 @@ import { VoiceInputError } from '../../domain/errors/voice.ts';
 import { streamPersonaSpeech } from '../persona/speech-recovery.ts';
 import { buildSpeechOnlyPersonaPrompt } from '../persona/prompt.ts';
 import { buildVoiceContext } from './context.ts';
+import { buildHistoryContext } from './history-context.ts';
 import {
   applyPersonaConfiguration,
   type PersonaConfiguration,
@@ -183,6 +184,7 @@ export function createTurnProcessor(
         turn.conversationId,
         text,
         context.dataClass,
+        buildHistoryContext(recent, 1800),
       );
       signal.throwIfAborted();
 

@@ -1,6 +1,8 @@
 import type { ServerOptions } from 'node:https';
 import type { Config } from '../config/index.ts';
 import type { openDatabase } from '../adapters/database/index.ts';
+import type { MemoryEmbeddings } from '../ports/memory-embeddings.ts';
+import type { MemoryReranker } from '../ports/memory-reranker.ts';
 
 export type AppOptions = {
   token: string;
@@ -10,4 +12,6 @@ export type AppOptions = {
   tls?: ServerOptions;
   secrets?: NodeJS.ProcessEnv;
   logStream?: { write: (message: string) => void };
+  memoryEmbeddings?: MemoryEmbeddings;
+  memoryReranker?: MemoryReranker;
 };

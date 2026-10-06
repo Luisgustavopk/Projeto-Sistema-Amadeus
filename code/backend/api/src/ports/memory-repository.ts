@@ -8,14 +8,32 @@ import type {
   SuggestedFact,
 } from '../domain/memory/model.ts';
 import type { DataClass } from '../domain/providers/model.ts';
+import type { EmbeddingDocument } from '../domain/memory/embeddings.ts';
 
 export interface MemoryRepository {
   policy(): Promise<MemoryPolicy>;
   updatePolicy(input: MemoryPolicy): Promise<MemoryPolicy>;
   facts(): Promise<MemoryFact[]>;
   consolidate(): Promise<{ merged: number; skipped: number }>;
-  candidateFacts(terms: string[], dataClass: DataClass): Promise<MemoryFact[]>;
+  candidateFacts(
+    terms: string[],
+    dataClass: DataClass,
+    semanticIds?: string[],
+  ): Promise<MemoryFact[]>;
+  embeddingPage(
+    modelKey: string,
+    dataClass: DataClass,
+    afterId?: string,
+    limit?: number,
+  ): Promise<EmbeddingDocument[]>;
+  saveEmbedding(
+    document: EmbeddingDocument,
+    modelKey: string,
+    contentHash: string,
+    vector: number[],
+  ): Promise<void>;
   createFact(input: FactInput): Promise<MemoryFact>;
+  rejectInterpretation(id: string, version: number): Promise<MemoryFact>;
   editFact(
     id: string,
     version: number,

@@ -197,6 +197,19 @@ export function registerMemoryRoutes(
         req.body.eraseSources,
       ),
   );
+  app.post(
+    '/v1/facts/:id/reject-interpretation',
+    {
+      schema: {
+        security,
+        params,
+        body: z.strictObject({ expectedVersion: z.number().int().positive() }),
+        response: { 200: FactSchema, ...errors },
+      },
+    },
+    (req) =>
+      memory.rejectInterpretation(req.params.id, req.body.expectedVersion),
+  );
   app.get(
     '/v1/memory/status',
     { schema: { security, response: { 200: MemoryStatusSchema, ...errors } } },

@@ -65,7 +65,7 @@ it('preserva dados e reaplica migrações após reiniciar o processo', async () 
       setting: 'preserved',
       adapter: 'http-json',
       requests: 1,
-      budgetTokens: 20,
+      budgetTokens: 5,
       reused: false,
       owner: true,
       otherOwner: false,

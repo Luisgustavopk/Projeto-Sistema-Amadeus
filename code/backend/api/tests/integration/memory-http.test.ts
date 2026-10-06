@@ -103,6 +103,22 @@ it('protege rotas, valida versões e documenta a gestão de memória no OpenAPI'
     });
     expect(created.statusCode).toBe(201);
     const fact = created.json();
+    const rejection = {
+      method: 'POST' as const,
+      url: `/v1/facts/${fact.id}/reject-interpretation`,
+      payload: { expectedVersion: fact.version },
+    };
+    expect((await app.inject(rejection)).statusCode).toBe(401);
+    expect((await app.inject({ ...rejection, headers })).statusCode).toBe(409);
+    expect(
+      (
+        await app.inject({
+          ...rejection,
+          headers,
+          payload: { expectedVersion: 0 },
+        })
+      ).statusCode,
+    ).toBe(400);
     const changed = await app.inject({
       method: 'PATCH',
       url: `/v1/facts/${fact.id}`,

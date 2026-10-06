@@ -15,6 +15,7 @@ import {
 } from '../../domain/memory/model.ts';
 import { NotFoundError } from '../../domain/errors/resources.ts';
 import { ProviderBusyError } from '../../domain/errors/providers.ts';
+import { validEmbedding } from '../../domain/memory/embeddings.ts';
 
 type Executor = Pick<Client, 'execute'>;
 const fingerprint = (text: string) =>
@@ -61,11 +62,19 @@ export function createMemoryRepository(
   }
 
   async function policy(db: Executor = client): Promise<MemoryPolicy> {
-    await ensure(db);
-    const { rows } = await db.execute({
+    let { rows } = await db.execute({
       sql: 'SELECT * FROM memory_policy WHERE owner_id = ?',
       args: [ownerId],
     });
+
+    if (!rows.length) {
+      await ensure(db);
+      ({ rows } = await db.execute({
+        sql: 'SELECT * FROM memory_policy WHERE owner_id = ?',
+        args: [ownerId],
+      }));
+    }
+
     const row = rows[0]!;
 
     return {
@@ -115,7 +124,7 @@ export function createMemoryRepository(
     });
     const sources = await db.execute({
       sql:
-        'SELECT s.fact_id, s.turn_id, s.evidence, t.conversation_id FROM memory_fact_sources s JOIN memory_facts f ON f.id = s.fact_id JOIN call_turns t ON t.id = s.turn_id WHERE f.owner_id = ?' +
+        'SELECT s.fact_id, s.turn_id, s.evidence, t.conversation_id, NOT EXISTS(SELECT 1 FROM memory_blocked_turns b WHERE b.owner_id = f.owner_id AND b.turn_id = s.turn_id) AS context_valid FROM memory_fact_sources s JOIN memory_facts f ON f.id = s.fact_id JOIN call_turns t ON t.id = s.turn_id WHERE f.owner_id = ?' +
         selection,
       args: [ownerId, ...(ids ?? [])],
     });
@@ -153,6 +162,7 @@ export function createMemoryRepository(
             turnId: s.turn_id,
             conversationId: s.conversation_id,
             evidence: s.evidence,
+            contextValid: Boolean(s.context_valid),
           })),
       }),
     );
@@ -385,12 +395,28 @@ export function createMemoryRepository(
       });
     }
 
-    await invalidateSources(
-      db,
-      previous.sources.map((s) => s.turnId),
-      'superseded',
-      [id, previous.id],
-    );
+    const evidence = await db.execute({
+      sql: 'SELECT MAX(t.created_at) AS latest FROM memory_fact_sources s JOIN call_turns t ON t.id = s.turn_id WHERE s.fact_id = ?',
+      args: [id],
+    });
+    // Reprocessing evidence that predates the old interpretation corrects the
+    // claim, not the utterance. Keep its valid quotes and sibling facts. A new
+    // declaration still invalidates the superseded sources conservatively.
+    const latest = evidence.rows[0]?.latest;
+    const reinterpreted =
+      latest !== null &&
+      latest !== undefined &&
+      Number(latest) < previous.createdAt;
+
+    if (!reinterpreted) {
+      await invalidateSources(
+        db,
+        previous.sources.map((s) => s.turnId),
+        'superseded',
+        [id, previous.id],
+      );
+    }
+
     await db.execute({
       sql: "UPDATE memory_facts SET status = 'superseded', version = version + 1, updated_at = ? WHERE id = ?",
       args: [Date.now(), previous.id],
@@ -477,19 +503,130 @@ export function createMemoryRepository(
       });
     },
     facts,
-    async candidateFacts(terms, dataClass) {
-      if (!terms.length) {
+    async embeddingPage(modelKey, dataClass, afterId = '', limit = 128) {
+      const { rows } = await client.execute({
+        sql: `SELECT f.id, f.version, f.text, f.category, s.label AS subject, r.predicate, o.label AS object, e.content_hash, e.vector
+          FROM memory_facts f
+          LEFT JOIN memory_relations r ON r.fact_id = f.id
+          LEFT JOIN memory_entities s ON s.id = r.subject_id
+          LEFT JOIN memory_entities o ON o.id = r.object_id
+          LEFT JOIN memory_embeddings e ON e.fact_id = f.id AND e.model_key = ? AND e.fact_version = f.version
+          WHERE f.owner_id = ? AND f.id > ? AND f.status = 'confirmed'
+          AND (f.expires_at IS NULL OR f.expires_at > ?)
+          AND (? = 'local-only' OR (f.permission = 'eligible' AND f.data_class <> 'local-only' AND (? = 'personal' OR f.data_class = 'synthetic')))
+          ORDER BY f.id LIMIT ?`,
+        args: [
+          modelKey,
+          ownerId,
+          afterId,
+          Date.now(),
+          dataClass,
+          dataClass,
+          Math.max(1, Math.min(256, limit)),
+        ],
+      });
+
+      return rows.map((row) => {
+        let vector: unknown = null;
+
+        try {
+          vector = row.vector ? JSON.parse(String(row.vector)) : null;
+        } catch {
+          /* Rebuild an invalid derived cache. */
+        }
+
+        return {
+          id: String(row.id),
+          version: Number(row.version),
+          text: String(row.text),
+          category: String(row.category) as MemoryFact['category'],
+          relation:
+            row.subject === null
+              ? null
+              : {
+                  subject: String(row.subject),
+                  predicate: String(row.predicate) as NonNullable<
+                    MemoryFact['relation']
+                  >['predicate'],
+                  object: String(row.object),
+                },
+          contentHash:
+            row.content_hash === null ? null : String(row.content_hash),
+          vector: validEmbedding(vector) ? vector : null,
+        };
+      });
+    },
+    async saveEmbedding(document, modelKey, contentHash, vector) {
+      if (!validEmbedding(vector)) {
+        throw new Error('Embedding inválido.');
+      }
+
+      // A concurrent edit/deletion cannot resurrect an obsolete embedding.
+      await write(async (tx) => {
+        await tx.execute({
+          sql: `INSERT INTO memory_embeddings(fact_id, model_key, fact_version, content_hash, vector)
+            SELECT id, ?, version, ?, ? FROM memory_facts
+            WHERE id = ? AND owner_id = ? AND version = ? AND status = 'confirmed'
+            AND (expires_at IS NULL OR expires_at > ?)
+            ON CONFLICT(fact_id) DO UPDATE SET model_key = excluded.model_key, fact_version = excluded.fact_version, content_hash = excluded.content_hash, vector = excluded.vector`,
+          args: [
+            modelKey,
+            contentHash,
+            JSON.stringify(vector),
+            document.id,
+            ownerId,
+            document.version,
+            Date.now(),
+          ],
+        });
+      });
+    },
+    async candidateFacts(terms, dataClass, semanticIds = []) {
+      if (!terms.length && !semanticIds.length) {
         return [];
       }
 
       const eligible =
         "f.owner_id = ? AND f.status = 'confirmed' AND (f.expires_at IS NULL OR f.expires_at > ?) AND (? = 'local-only' OR (f.permission = 'eligible' AND f.data_class <> 'local-only' AND (? = 'personal' OR f.data_class = 'synthetic')))";
       const eligibilityArgs = [ownerId, Date.now(), dataClass, dataClass];
-      const { rows } = await client.execute({
-        sql: `SELECT f.id FROM memory_facts f WHERE ${eligible} AND (${terms.map(() => 'instr(f.search_text, ?) > 0').join(' OR ')}) ORDER BY f.updated_at DESC LIMIT 40`,
-        args: [...eligibilityArgs, ...terms],
-      });
+      const { rows } = terms.length
+        ? await client.execute({
+            sql: `SELECT f.id FROM memory_facts f WHERE ${eligible} AND (${terms.map(() => 'instr(f.search_text, ?) > 0').join(' OR ')}) ORDER BY f.updated_at DESC LIMIT 40`,
+            args: [...eligibilityArgs, ...terms],
+          })
+        : { rows: [] };
       const ids = new Set(rows.map((r) => String(r.id)));
+
+      if (semanticIds.length) {
+        const seeds = semanticIds.slice(0, 12);
+        const semantic = await client.execute({
+          sql: `SELECT f.id FROM memory_facts f WHERE ${eligible} AND f.id IN (${seeds.map(() => '?').join(',')})`,
+          args: [...eligibilityArgs, ...seeds],
+        });
+
+        for (const row of semantic.rows) {
+          ids.add(String(row.id));
+        }
+      }
+
+      // One provenance hop adds complementary confirmed facts extracted from
+      // the same utterance. It does not create a semantic relation or expose
+      // the source transcript, and private facts cannot serve as a bridge.
+      const sourceSeeds = [...ids];
+
+      if (sourceSeeds.length) {
+        const relatedSources = await client.execute({
+          sql: `SELECT DISTINCT f.id FROM memory_facts f JOIN memory_fact_sources s ON s.fact_id = f.id WHERE ${eligible} AND f.origin <> 'user' AND NOT EXISTS (SELECT 1 FROM memory_blocked_turns b WHERE b.owner_id = f.owner_id AND b.turn_id = s.turn_id) AND s.turn_id IN (SELECT ms.turn_id FROM memory_fact_sources ms JOIN memory_facts seed ON seed.id = ms.fact_id WHERE seed.origin <> 'user' AND ms.fact_id IN (${sourceSeeds.map(() => '?').join(',')})) ORDER BY f.updated_at DESC LIMIT 80`,
+          args: [...eligibilityArgs, ...sourceSeeds],
+        });
+
+        for (const row of relatedSources.rows) {
+          if (ids.size < 120) {
+            ids.add(String(row.id));
+          }
+        }
+      }
+
       let frontier = [...ids];
 
       for (
@@ -641,6 +778,35 @@ export function createMemoryRepository(
         }
 
         await relation(tx, id, input.relation);
+        await cleanupEntities(tx);
+        await bump(tx);
+
+        return fact(tx, id);
+      });
+    },
+    async rejectInterpretation(id, version) {
+      return write(async (tx) => {
+        const previous = await fact(tx, id, version);
+
+        if (previous.origin === 'user' || previous.status === 'superseded') {
+          throw new ProviderBusyError(
+            'Somente uma interpretação automática ativa pode ser rejeitada.',
+          );
+        }
+
+        await tx.execute({
+          sql: 'INSERT OR IGNORE INTO memory_tombstones VALUES (?, ?, ?)',
+          args: [ownerId, fingerprint(previous.text), Date.now()],
+        });
+        await tx.execute({
+          sql: "UPDATE memory_facts SET status = 'superseded', version = version + 1, updated_at = ? WHERE id = ? AND owner_id = ?",
+          args: [Date.now(), id, ownerId],
+        });
+        await relation(tx, id, null);
+        await tx.execute({
+          sql: 'DELETE FROM memory_embeddings WHERE fact_id = ?',
+          args: [id],
+        });
         await cleanupEntities(tx);
         await bump(tx);
 
@@ -822,6 +988,8 @@ export function createMemoryRepository(
     },
     async enqueue(conversationId, idleBefore) {
       await write(async (tx) => {
+        const batchSize = (await policy(tx)).extraction === 'llm' ? 2 : 8;
+
         if (conversationId) {
           await requireConversation(tx, conversationId);
         }
@@ -835,13 +1003,13 @@ export function createMemoryRepository(
         for (const session of sessions) {
           while (queued < 20) {
             const { rows } = await tx.execute({
-              sql: "SELECT id FROM call_turns t WHERE session_id = ? AND status <> 'processing' AND user_text <> '' AND NOT EXISTS (SELECT 1 FROM memory_job_sources WHERE turn_id = t.id) AND NOT EXISTS (SELECT 1 FROM memory_blocked_turns WHERE turn_id = t.id AND owner_id = ?) ORDER BY created_at, rowid LIMIT 8",
-              args: [String(session.id), ownerId],
+              sql: "SELECT id FROM call_turns t WHERE session_id = ? AND status <> 'processing' AND user_text <> '' AND NOT EXISTS (SELECT 1 FROM memory_job_sources WHERE turn_id = t.id) AND NOT EXISTS (SELECT 1 FROM memory_blocked_turns WHERE turn_id = t.id AND owner_id = ?) ORDER BY created_at, rowid LIMIT ?",
+              args: [String(session.id), ownerId, batchSize],
             });
 
             if (
               !rows.length ||
-              (rows.length < 8 &&
+              (rows.length < batchSize &&
                 session.ended_at === null &&
                 (idleBefore === undefined ||
                   Number(session.last_turn_at) > idleBefore))
@@ -884,13 +1052,24 @@ export function createMemoryRepository(
     },
     async recover() {
       await client.execute({
-        sql: "UPDATE memory_jobs SET attempts = attempts + 1, status = CASE WHEN attempts + 1 >= 5 THEN 'failed' ELSE 'pending' END, lease_until = NULL, last_error = 'PROCESS_RESTARTED' WHERE owner_id = ? AND status = 'running'",
-        args: [ownerId],
+        sql: "UPDATE memory_jobs SET attempts = attempts + 1, status = CASE WHEN attempts + 1 >= 5 THEN 'failed' ELSE 'pending' END, lease_until = NULL, last_error = 'PROCESS_RESTARTED' WHERE owner_id = ? AND status = 'running' AND (lease_until IS NULL OR lease_until < ?)",
+        args: [ownerId, Date.now()],
       });
     },
     async claim(now) {
       return write(async (tx) => {
         await ensure(tx);
+        const active = await tx.execute({
+          sql: "SELECT 1 FROM memory_jobs WHERE owner_id = ? AND status = 'running' AND lease_until >= ? LIMIT 1",
+          args: [ownerId, now],
+        });
+
+        // Multiple API/CLI processes share SQLite. Only one analysis per owner
+        // may hold a live lease, avoiding duplicate parallel provider pressure.
+        if (active.rows.length) {
+          return null;
+        }
+
         const { rows } = await tx.execute({
           sql: "SELECT j.*, p.epoch FROM memory_jobs j JOIN memory_policy p ON p.owner_id = j.owner_id WHERE j.owner_id = ? AND (j.status = 'pending' OR (j.status = 'running' AND j.lease_until < ?)) AND j.next_run <= ? AND j.attempts < 5 ORDER BY j.created_at, j.id LIMIT 1",
           args: [ownerId, now, now],
@@ -1108,16 +1287,27 @@ export function createMemoryRepository(
       });
     },
     async defer(job, code, nextRun, countAttempt) {
-      await client.execute({
-        sql: "UPDATE memory_jobs SET attempts = attempts + ?, status = CASE WHEN attempts + ? >= 5 THEN 'failed' ELSE 'pending' END, next_run = ?, last_error = ?, lease_until = NULL WHERE id = ? AND owner_id = ? AND status = 'running'",
-        args: [
-          Number(countAttempt),
-          Number(countAttempt),
-          nextRun,
-          code,
-          job.id,
-          ownerId,
-        ],
+      await write(async (tx) => {
+        await tx.execute({
+          sql: "UPDATE memory_jobs SET attempts = attempts + ?, status = CASE WHEN attempts + ? >= 5 THEN 'failed' ELSE 'pending' END, next_run = ?, last_error = ?, lease_until = NULL WHERE id = ? AND owner_id = ? AND status = 'running'",
+          args: [
+            Number(countAttempt),
+            Number(countAttempt),
+            nextRun,
+            code,
+            job.id,
+            ownerId,
+          ],
+        });
+
+        if (code === 'QUOTA_EXCEEDED') {
+          // All jobs share one extractor. Preserve its retry window across
+          // processes instead of immediately trying another queued job.
+          await tx.execute({
+            sql: "UPDATE memory_jobs SET next_run = MAX(next_run, ?) WHERE owner_id = ? AND status = 'pending'",
+            args: [nextRun, ownerId],
+          });
+        }
       });
     },
     async jobs() {

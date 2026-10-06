@@ -57,7 +57,7 @@ export function renderMemoryReview(facts) {
     return 'Nenhum fato para revisar. Aguarde o processamento da memória nas pausas ou após encerrar a conversa.';
   const labels = {
     expired: 'Vencido; não será recuperado.',
-    superseded: 'Substituído por uma correção; não será recuperado.',
+    superseded: 'Substituído ou rejeitado; não será recuperado.',
     eligible:
       'Confirmado e elegível; pode entrar no contexto remoto se relevante e permitido pela política.',
     'needs-confirmation':

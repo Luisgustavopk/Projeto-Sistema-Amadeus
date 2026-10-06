@@ -6,6 +6,7 @@ import {
 import { ProviderInvalidError } from '../../domain/errors/providers.ts';
 import { readFileSync } from 'node:fs';
 import type { MemoryFact } from '../../domain/memory/model.ts';
+import { memoryContextSources, memoryEligible } from './retrieval.ts';
 
 export const MEMORY_EXTRACTION_PROMPT = readFileSync(
   new URL('./memory-extraction-v1.md', import.meta.url),
@@ -14,6 +15,66 @@ export const MEMORY_EXTRACTION_PROMPT = readFileSync(
 
 if (!MEMORY_EXTRACTION_PROMPT || MEMORY_EXTRACTION_PROMPT.length > 12000) {
   throw new Error('Prompt de extração de memória inválido.');
+}
+
+export function extractionFactContext(
+  candidates: MemoryFact[],
+  selectedIds: string[],
+  currentSources: MemorySource[],
+  dataClass: MemorySource['dataClass'],
+  budget = 3000,
+) {
+  const turns = new Set(currentSources.map((source) => source.id));
+  const eligible = candidates.filter(
+    (fact) =>
+      fact.status === 'confirmed' &&
+      memoryEligible(fact, dataClass) &&
+      (fact.expiresAt === null || fact.expiresAt > Date.now()),
+  );
+  const priority = eligible.filter((fact) =>
+    memoryContextSources(fact).some((source) => turns.has(source.turnId)),
+  );
+  const ordered = [
+    ...priority,
+    ...eligible.filter((fact) => selectedIds.includes(fact.id)),
+  ];
+  const known: MemoryFact[] = [];
+  const wire: {
+    id: string;
+    version: number;
+    text: string;
+    kind: MemoryFact['kind'];
+    expiresAt: number | null;
+    relation: MemoryFact['relation'];
+  }[] = [];
+
+  for (const fact of ordered) {
+    if (known.length >= 12) {
+      break;
+    }
+
+    if (known.some((item) => item.id === fact.id)) {
+      continue;
+    }
+
+    const item = {
+      id: fact.id,
+      version: fact.version,
+      text: fact.text,
+      kind: fact.kind,
+      expiresAt: fact.expiresAt,
+      relation: fact.relation,
+    };
+
+    if (JSON.stringify([...wire, item]).length > budget) {
+      continue;
+    }
+
+    known.push(fact);
+    wire.push(item);
+  }
+
+  return { known, wire };
 }
 
 export function parseMemoryExtraction(

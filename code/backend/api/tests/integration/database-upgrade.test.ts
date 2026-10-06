@@ -214,7 +214,7 @@ it('atualiza a primeira versão da memória e preserva fatos, resumos e polític
       content: '[]',
     });
     expect(upgraded.context).toContain('Prefiro café sem açúcar.');
-    expect(upgraded.migrations).toBe(8);
+    expect(upgraded.migrations).toBe(9);
     expect(upgraded.resumptions).toBe(0);
     expect(upgraded.tombstones).toEqual([
       { fingerprint: 'forgotten-fingerprint' },

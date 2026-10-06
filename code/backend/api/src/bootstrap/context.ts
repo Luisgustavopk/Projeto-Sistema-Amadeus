@@ -28,6 +28,8 @@ import { createVoiceVersions } from '../application/voice/versions.ts';
 import { createMemoryRepository } from '../adapters/database/memory-repository.ts';
 import { createMemoryService } from '../application/memory/service.ts';
 import { createMemoryProvider } from '../application/memory/provider.ts';
+import { createLocalMemoryEmbeddings } from '../adapters/embeddings/local.ts';
+import { createLocalMemoryReranker } from '../adapters/embeddings/reranker.ts';
 
 export async function createContext(
   options: AppOptions,
@@ -115,6 +117,14 @@ export async function createContext(
     createMemoryRepository(database.client, config.OWNER_ID),
     memoryProvider,
     () => activity.activeExecutions > 0,
+    config.MEMORY_SEMANTIC_ENABLED
+      ? (options.memoryEmbeddings ??
+          createLocalMemoryEmbeddings(config.MEMORY_MODEL_CACHE_DIRECTORY))
+      : undefined,
+    config.MEMORY_SEMANTIC_ENABLED && config.MEMORY_RERANK_ENABLED
+      ? (options.memoryReranker ??
+          createLocalMemoryReranker(config.MEMORY_MODEL_CACHE_DIRECTORY))
+      : undefined,
   );
   await memory.start();
   const voiceSessions = createVoiceSessions({

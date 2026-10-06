@@ -6,6 +6,7 @@ import { ExtractionSchema, RelationSchema } from './model.ts';
 const fact = ExtractionSchema.shape.facts.element;
 const relation = RelationSchema.extend({
   subject: z.string().min(1).max(120),
+  predicate: z.string().min(1).max(64),
   object: z.string().min(1).max(120),
 });
 const output = z.strictObject({
@@ -26,7 +27,7 @@ const output = z.strictObject({
         evidence: fact.shape.evidence,
       }),
     )
-    .max(12),
+    .max(24),
 });
 
 export const MEMORY_OUTPUT_FORMAT = {
