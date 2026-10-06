@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Amadeus — comparação dos avatares</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script defer src="/vendor/pixi.min.js"></script>
+    <script defer src="/vendor/live2d.min.js"></script>
+    <script defer src="/vendor/live2dcubismcore.min.js"></script>
+    <script defer src="/vendor/live2d-display.min.js"></script>
+    <script type="module" src="/app.mjs"></script>
+  </head>
+  <body>
+    <header>
+      <div>
+        <span class="eyebrow">PROJETO AMADEUS · PRÉVIA LOCAL</span>
+        <h1>Dois desenhos. Dois rigs.</h1>
+        <p>Compare a aparência, as expressões e os movimentos da Kurisu.</p>
+      </div>
+      <button id="save" disabled>Salvar comparação em PNG</button>
+    </header>
+    <main>
+      <section class="card" id="legacy">
+        <div class="card-heading">
+          <h2>Modelo antigo</h2>
+          <span>Cubism 2 · arquivo enviado</span>
+        </div>
+        <div class="stage">
+          <canvas aria-label="Avatar antigo renderizado"></canvas>
+        </div>
+        <p class="status" role="status">Carregando modelo antigo…</p>
+        <div class="controls">
+          <label>Expressão<select class="expression" disabled></select></label>
+          <label>Movimento<select class="motion" disabled></select></label>
+          <button class="play" disabled>Reproduzir movimento</button>
+          <label
+            >Zoom<input
+              class="zoom"
+              type="range"
+              min="0.7"
+              max="2.5"
+              step="0.05"
+              value="1"
+              disabled
+          /></label>
+          <button class="reset" disabled>Recentrar</button>
+          <button class="pause" disabled>Pausar animação</button>
+          <label class="checkbox"
+            ><input class="mouth" type="checkbox" disabled />Simular boca</label
+          >
+        </div>
+        <p class="note">
+          As expressões f01–f04 têm nomes genéricos. Observe o efeito real no
+          desenho.
+        </p>
+      </section>
+      <section class="card" id="modern">
+        <div class="card-heading">
+          <h2>Modelo novo</h2>
+          <span>Cubism 3+ · estilo VTuber</span>
+        </div>
+        <div class="stage">
+          <canvas aria-label="Avatar novo renderizado"></canvas>
+        </div>
+        <p class="status" role="status">Carregando modelo novo…</p>
+        <div class="controls">
+          <label>Expressão<select class="expression" disabled></select></label>
+          <label>Movimento<select class="motion" disabled></select></label>
+          <button class="play" disabled>Reproduzir movimento</button>
+          <label
+            >Zoom<input
+              class="zoom"
+              type="range"
+              min="0.7"
+              max="2.5"
+              step="0.05"
+              value="1"
+              disabled
+          /></label>
+          <button class="reset" disabled>Recentrar</button>
+          <button class="pause" disabled>Pausar animação</button>
+          <label class="checkbox"
+            ><input class="mouth" type="checkbox" disabled />Simular boca</label
+          >
+        </div>
+        <p class="note">
+          Os dois são ilustrações 2D animadas. O movimento pode simular
+          profundidade.
+        </p>
+      </section>
+    </main>
+    <footer>
+      Modelo novo escolhido para integração futura. Prévia independente da
+      conversa, com simulação da boca sem áudio ou microfone.
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "selectedAt": "2026-10-06",
+  "selectedBy": "user",
+  "model": "local/modern/Kurisu/Kurisu.model3.json",
+  "provenance": "kurisu-sources.manifest.json",
+  "productionEnabled": false,
+  "renderValidated": false,
+  "integrationPhase": 5
+}

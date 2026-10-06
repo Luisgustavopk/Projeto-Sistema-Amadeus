@@ -1,0 +1,22 @@
+﻿[
+  {
+    "file": "pixi.min.js",
+    "url": "https://cdn.jsdelivr.net/npm/pixi.js@6.5.10/dist/browser/pixi.min.js",
+    "sha256": "403f2f2ee8145fa17f60c5c89403056efe2680e5096ec2762036486914ed19c5"
+  },
+  {
+    "file": "live2d-display.min.js",
+    "url": "https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/index.min.js",
+    "sha256": "a89a80b019293dd22ff7357469569fdc456011f93535ded81bfa3f592d64fa6e"
+  },
+  {
+    "file": "live2d.min.js",
+    "url": "https://cdn.jsdelivr.net/gh/dylanNew/live2d/webgl/Live2D/lib/live2d.min.js",
+    "sha256": "e4ea1f18bdd44b65394ffd5a1bab16982e88757d45134d1bd0737c8a6b3ddd08"
+  },
+  {
+    "file": "live2dcubismcore.min.js",
+    "url": "https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js",
+    "sha256": "25ae938cb4fe282ce189b357bcc97e603d1e1f7ec78bf04150d401c23cdc792f"
+  }
+]

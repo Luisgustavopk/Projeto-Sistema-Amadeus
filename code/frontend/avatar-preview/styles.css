@@ -1,0 +1,157 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  color: #e7ecf1;
+  background: #10151d;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  padding: 28px;
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  max-width: 1460px;
+  margin: 0 auto 22px;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #c7a47b;
+}
+h1 {
+  font-size: 28px;
+  margin: 7px 0;
+  font-weight: 650;
+}
+header p {
+  margin: 0;
+  color: #a9b4c3;
+}
+main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+  max-width: 1460px;
+  margin: auto;
+}
+.card {
+  background: #1a222e;
+  border: 1px solid #33404f;
+  border-radius: 14px;
+  overflow: hidden;
+  min-width: 0;
+}
+.card-heading {
+  padding: 17px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.card-heading span {
+  color: #a9b4c3;
+  font-size: 12px;
+}
+.stage {
+  height: min(53vh, 560px);
+  min-height: 320px;
+  background: #eae4da;
+  overflow: hidden;
+}
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+.status {
+  font-size: 12px;
+  color: #b9dcc7;
+  margin: 12px 20px;
+  min-height: 18px;
+}
+.status.error {
+  color: #ffafaa;
+}
+.controls {
+  padding: 0 20px 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: end;
+}
+label {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+  color: #b8c3d1;
+}
+button,
+select {
+  min-height: 36px;
+  padding: 8px 11px;
+  border: 1px solid #4b596c;
+  border-radius: 7px;
+  background: #263448;
+  color: #edf1f7;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+button:hover,
+select:hover {
+  background: #35475f;
+}
+button:disabled,
+select:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+input[type="range"] {
+  width: 100%;
+  accent-color: #d9ab79;
+}
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+}
+.note {
+  padding: 0 20px 14px;
+  margin: 0;
+  color: #96a5b7;
+  font-size: 12px;
+  line-height: 1.5;
+}
+footer {
+  max-width: 1460px;
+  margin: 20px auto 0;
+  color: #8f9dae;
+  font-size: 12px;
+}
+@media (max-width: 800px) {
+  body {
+    padding: 16px;
+  }
+  header {
+    align-items: start;
+    flex-direction: column;
+  }
+  main {
+    grid-template-columns: 1fr;
+  }
+  .stage {
+    height: 450px;
+  }
+}

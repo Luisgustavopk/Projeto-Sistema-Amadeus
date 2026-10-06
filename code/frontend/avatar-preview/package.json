@@ -1,0 +1,11 @@
+{
+  "name": "@amadeus/avatar-preview",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
+}
