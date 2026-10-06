@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import type { Provider, ProviderOutput } from '../../ports/provider.ts';
+import type {
+  Provider,
+  ProviderOutput,
+  ProviderInput,
+} from '../../ports/provider.ts';
 import type { ProviderConfig } from '../../domain/providers/model.ts';
 import {
   ProviderConfigurationError,
@@ -12,7 +16,7 @@ import { ApplicationError } from '../../domain/errors/application-error.ts';
 import { decodeServerSentEvents } from './sse.ts';
 import { NO_CAPABILITIES } from './http-json.ts';
 import { LocalCompletionEndpointSchema } from '../../domain/providers/local.ts';
-import { MEMORY_OUTPUT_FORMAT } from '../../domain/memory/output.ts';
+import { memoryOutputFormat } from '../../domain/memory/output.ts';
 
 const Completion = z.object({
   choices: z.array(
@@ -305,6 +309,7 @@ export function createOpenAiCompatibleProvider(
       maxTokens: number;
       systemPrompt?: string;
       purpose?: 'conversation' | 'memory';
+      memoryTask?: ProviderInput['memoryTask'];
     },
     stream: boolean,
     signal?: AbortSignal,
@@ -338,7 +343,7 @@ export function createOpenAiCompatibleProvider(
             ? {
                 response_format:
                   config.model === 'openai/gpt-oss-20b'
-                    ? MEMORY_OUTPUT_FORMAT
+                    ? memoryOutputFormat(input.memoryTask)
                     : { type: 'json_object' },
               }
             : {}),

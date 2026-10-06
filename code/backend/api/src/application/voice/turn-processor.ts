@@ -21,6 +21,8 @@ import { createConversationStyleGuard } from '../persona/conversation-style.ts';
 import { createExpressionState } from '../../domain/persona/expression-policy.ts';
 import {
   memoryContent,
+  memoryAnswerContent,
+  memoryAnswerDirection,
   memoryDirection as describeMemory,
 } from '../memory/context.ts';
 import {
@@ -52,7 +54,13 @@ export function createTurnProcessor(
   memory?: Pick<
     import('../memory/service.ts').MemoryService,
     'retrieve' | 'interruptBackground'
-  >,
+  > &
+    Partial<
+      Pick<
+        import('../memory/service.ts').MemoryService,
+        'planAnswer' | 'verifyAnswer'
+      >
+    >,
 ) {
   const expressionState = createExpressionState();
 
@@ -189,7 +197,24 @@ export function createTurnProcessor(
       signal.throwIfAborted();
 
       context.content = memoryContent(context.content, memories ?? '');
-      const memoryDirection = memory ? describeMemory(memories ?? '') : '';
+      const planningStarted = performance.now();
+      const plan = await memory?.planAnswer?.(
+        memories ?? '',
+        text,
+        context.dataClass,
+        signal,
+        buildHistoryContext(recent, 1800),
+      );
+
+      if (memory?.planAnswer) {
+        metrics.time('memoryPlan', performance.now() - planningStarted);
+      }
+
+      signal.throwIfAborted();
+      context.content = memoryAnswerContent(context.content, plan ?? null);
+      const memoryDirection =
+        (memory ? describeMemory(memories ?? '') : '') +
+        memoryAnswerDirection(plan ?? null);
       context.systemPrompt =
         applyPersonaConfiguration(context.systemPrompt, personaConfiguration) +
         memoryDirection;
@@ -456,8 +481,49 @@ export function createTurnProcessor(
       );
       emit({ type: 'reply.start', turnId, responseId });
 
-      for await (const segment of segments) {
-        await deliverSegment(segment);
+      if (memory?.verifyAnswer && plan && plan.status !== 'unrelated') {
+        const buffered: string[] = [];
+        let length = 0;
+
+        for await (const segment of segments) {
+          length += segment.length;
+
+          if (length > 6000) {
+            throw new VoiceInputError(
+              'Resposta de memória excede o limite de revisão.',
+            );
+          }
+
+          buffered.push(segment);
+        }
+
+        const reviewStarted = performance.now();
+        const supported = await memory.verifyAnswer(
+          memories ?? '',
+          text,
+          buffered.join(' '),
+          context.dataClass,
+          signal,
+          buildHistoryContext(recent, 1800),
+        );
+        metrics.time('memoryReplyCheck', performance.now() - reviewStarted);
+
+        if (supported) {
+          for (const segment of buffered) {
+            await deliverSegment(segment);
+          }
+        } else {
+          metrics.failure('MEMORY_REPLY_UNVERIFIED');
+          proposal = NEUTRAL_EXPRESSION;
+          metadataValid = false;
+          await deliverSegment(
+            'Não consegui confirmar esse detalhe nas minhas lembranças agora. Pode me lembrar?',
+          );
+        }
+      } else {
+        for await (const segment of segments) {
+          await deliverSegment(segment);
+        }
       }
 
       if (!modelSpeechCount) {

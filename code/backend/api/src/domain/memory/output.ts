@@ -1,5 +1,10 @@
 import { z } from 'zod';
 import { ExtractionSchema, RelationSchema } from './model.ts';
+import {
+  ReconciliationSchema,
+  MemoryAnswerSchema,
+  MemorySpeechReviewSchema,
+} from './review.ts';
 
 // Strict decoding requires every field, including nullable fields. The full
 // local schema and literal evidence validation remain authoritative.
@@ -38,3 +43,54 @@ export const MEMORY_OUTPUT_FORMAT = {
     schema: z.toJSONSchema(output),
   },
 };
+
+export function memoryOutputFormat(task?: string) {
+  const schema =
+    task === 'reconcile'
+      ? ReconciliationSchema
+      : task === 'verify-answer'
+        ? MemorySpeechReviewSchema
+        : task === 'answer'
+          ? MemoryAnswerSchema
+          : undefined;
+
+  if (task === 'review') {
+    return {
+      type: 'json_schema',
+      json_schema: {
+        name: 'amadeus_memory_review',
+        strict: true,
+        schema: z.toJSONSchema(
+          z.strictObject({
+            facts: z
+              .array(
+                output.shape.facts.element.extend({
+                  support: z.enum(['full', 'partial', 'none']),
+                  contextPreserved: z.boolean(),
+                  context: z.string().min(1).max(200).nullable(),
+                  sourceMode: z.enum([
+                    'asserted',
+                    'hypothetical',
+                    'fictional',
+                    'uncertain',
+                  ]),
+                }),
+              )
+              .max(24),
+          }),
+        ),
+      },
+    };
+  }
+
+  return schema
+    ? {
+        type: 'json_schema',
+        json_schema: {
+          name: `amadeus_memory_${task}`,
+          strict: true,
+          schema: z.toJSONSchema(schema),
+        },
+      }
+    : MEMORY_OUTPUT_FORMAT;
+}

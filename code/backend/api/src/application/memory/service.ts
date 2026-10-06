@@ -7,6 +7,11 @@ import {
   MEMORY_CONTEXT_CHARACTERS,
   validRelevance,
 } from '../../domain/memory/ranking.ts';
+import {
+  extractReviewedMemory,
+  planMemoryAnswer,
+  verifyMemorySpeech,
+} from './review.ts';
 import { createSemanticMemorySearch } from './semantic-search.ts';
 import {
   FactInputSchema,
@@ -23,9 +28,7 @@ import {
 } from '../../domain/errors/providers.ts';
 import { ApplicationError } from '../../domain/errors/application-error.ts';
 import {
-  MEMORY_EXTRACTION_PROMPT,
   extractionFactContext,
-  parseMemoryExtraction,
   suggestLocally,
   summarizeSources,
 } from './extraction.ts';
@@ -63,6 +66,7 @@ export function createMemoryService(
   let stopped = false;
   let lastPurge = 0;
   let lastForegroundAt = 0;
+  let answerRetryAt = 0;
   const measurements = {
     retrievals: 0,
     totalRetrievalMs: 0,
@@ -241,7 +245,7 @@ export function createMemoryService(
         abort = new AbortController();
         const signal = AbortSignal.any([
           abort.signal,
-          AbortSignal.timeout(45000),
+          AbortSignal.timeout(90000),
         ]);
         const { candidates, selected } = await relevantFacts(
           contextSources.map((source) => source.userText),
@@ -249,55 +253,19 @@ export function createMemoryService(
           3000,
         );
         signal.throwIfAborted();
-        const { known, wire: existingFacts } = extractionFactContext(
+        const { known } = extractionFactContext(
           candidates,
           selected.map((fact) => fact.id),
           job.sources,
           dataClass,
         );
-        const wireCurrent = job.sources.map((source) => ({
-          ...source,
-          userText: source.userText.slice(0, 1500),
-          assistantConfirmed: source.assistantConfirmed.slice(0, 200),
-        }));
-        const wirePrevious = previousSources.map((source) => ({
-          ...source,
-          userText: source.userText.slice(0, 900),
-          assistantConfirmed: source.assistantConfirmed.slice(0, 200),
-        }));
-        const wire = (source: (typeof wireCurrent)[number]) => ({
-          turnId: source.id,
-          createdAt: source.createdAt,
-          userText: source.userText,
-          assistantConfirmed: source.assistantConfirmed,
-          userTruncated:
-            source.userText.length <
-            contextSources.find((s) => s.id === source.id)!.userText.length,
-          assistantTruncated:
-            source.assistantConfirmed.length <
-            contextSources.find((s) => s.id === source.id)!.assistantConfirmed
-              .length,
-        });
-        const output = await providers.execute(
-          'llm',
-          {
-            systemPrompt: MEMORY_EXTRACTION_PROMPT,
-            content: JSON.stringify({
-              currentSources: wireCurrent.map(wire),
-              previousSources: wirePrevious.map(wire),
-              existingFacts,
-            }),
-            dataClass,
-            purpose: 'memory',
-            maxTokens: 4096,
-          },
-          signal,
-        );
-        suggestions = parseMemoryExtraction(
-          output.content,
-          [...wirePrevious, ...wireCurrent],
-          wireCurrent,
+        suggestions = await extractReviewedMemory(
+          providers,
+          job.sources,
+          previousSources,
           known,
+          dataClass,
+          signal,
         );
       }
 
@@ -380,6 +348,174 @@ export function createMemoryService(
       await running;
     },
     policy: () => repository.policy(),
+    async verifyAnswer(
+      memories: string,
+      question: string,
+      reply: string,
+      dataClass: DataClass,
+      signal: AbortSignal,
+      recent: { user: string; assistantConfirmed: string }[] = [],
+    ) {
+      try {
+        const policy = await repository.policy();
+
+        if (
+          !policy.enabled ||
+          policy.extraction !== 'llm' ||
+          (dataClass !== 'synthetic' && !policy.personalEnabled)
+        ) {
+          return false;
+        }
+
+        const snapshot = JSON.parse(memories) as {
+          facts: { id: string; version: number; text: string }[];
+        };
+
+        const permitted = async () => {
+          const current = await repository.candidateFacts(
+            [],
+            dataClass,
+            snapshot.facts.map((f) => f.id),
+          );
+
+          return snapshot.facts.every((s) =>
+            current.some(
+              (f) =>
+                f.id === s.id &&
+                f.version === s.version &&
+                f.text === s.text &&
+                f.status === 'confirmed' &&
+                memoryEligible(f, dataClass) &&
+                (f.expiresAt === null || f.expiresAt > Date.now()),
+            ),
+          );
+        };
+
+        if (!(await permitted())) {
+          return false;
+        }
+
+        const supported = await verifyMemorySpeech(
+          providers,
+          memories,
+          question,
+          reply,
+          dataClass,
+          AbortSignal.any([signal, AbortSignal.timeout(8000)]),
+          recent,
+        );
+
+        return supported && (await permitted());
+      } catch {
+        signal.throwIfAborted();
+
+        return false;
+      }
+    },
+    async planAnswer(
+      memories: string,
+      question: string,
+      dataClass: DataClass,
+      signal: AbortSignal,
+      recent: { user: string; assistantConfirmed: string }[] = [],
+    ) {
+      if (!memories) {
+        return null;
+      }
+
+      const policy = await repository.policy();
+
+      if (
+        !policy.enabled ||
+        (dataClass !== 'synthetic' && !policy.personalEnabled)
+      ) {
+        return null;
+      }
+
+      if (policy.extraction !== 'llm') {
+        return null;
+      }
+
+      if (Date.now() < answerRetryAt) {
+        return { status: 'unavailable' as const, claims: [] };
+      }
+
+      try {
+        const supplied = JSON.parse(memories) as {
+          facts: { id: string; version: number; text: string }[];
+        };
+        const eligible = await repository.candidateFacts(
+          [],
+          dataClass,
+          supplied.facts.map((f) => f.id),
+        );
+        const facts = supplied.facts.map((s) =>
+          eligible.find(
+            (f) =>
+              f.id === s.id &&
+              f.version === s.version &&
+              f.text === s.text &&
+              f.status === 'confirmed' &&
+              memoryEligible(f, dataClass) &&
+              (f.expiresAt === null || f.expiresAt > Date.now()),
+          ),
+        );
+
+        if (facts.some((f) => !f)) {
+          return { status: 'unavailable' as const, claims: [] };
+        }
+
+        const plan = await planMemoryAnswer(
+          providers,
+          JSON.stringify({
+            facts: facts.map((f) => ({
+              id: f!.id,
+              version: f!.version,
+              text: f!.text,
+              relation: f!.relation,
+              kind: f!.kind,
+              expiresAt: f!.expiresAt,
+              dataClass: f!.dataClass,
+            })),
+          }),
+          question,
+          dataClass,
+          AbortSignal.any([signal, AbortSignal.timeout(8000)]),
+          recent,
+        );
+        const snapshot = JSON.parse(memories) as {
+          facts: { id: string; version: number }[];
+        };
+        const used = new Set(plan.claims.flatMap((c) => c.factIds));
+        const current = await repository.candidateFacts([], dataClass, [
+          ...used,
+        ]);
+
+        if (
+          [...used].some(
+            (id) =>
+              !current.some(
+                (f) =>
+                  f.id === id &&
+                  f.status === 'confirmed' &&
+                  memoryEligible(f, dataClass) &&
+                  (f.expiresAt === null || f.expiresAt > Date.now()) &&
+                  f.version ===
+                    snapshot.facts.find((s) => s.id === id)?.version,
+              ),
+          )
+        ) {
+          return { status: 'unavailable' as const, claims: [] };
+        }
+
+        return plan;
+      } catch {
+        signal.throwIfAborted();
+        answerRetryAt = Date.now() + 60000;
+
+        return { status: 'unavailable' as const, claims: [] };
+      }
+    },
     async configure(input: unknown) {
       const parsed = MemoryPolicyEditSchema.parse(input);
 

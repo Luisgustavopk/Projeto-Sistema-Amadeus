@@ -17,6 +17,7 @@ export type ProviderInput = {
   systemPrompt?: string;
   dataClass: DataClass;
   purpose?: 'conversation' | 'memory';
+  memoryTask?: 'extract' | 'review' | 'reconcile' | 'answer' | 'verify-answer';
   maxTokens: number;
   audio?: { pcmBase64: string; sampleRate: 16000; channels: 1 } | undefined;
   voice?: { id: string; referenceFile: string; referenceSha256: string };

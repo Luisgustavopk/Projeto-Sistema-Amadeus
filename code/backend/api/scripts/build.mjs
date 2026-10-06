@@ -34,7 +34,15 @@ if (process.exitCode === 0) {
     ),
     resolve(output, 'application/voice/provider-wait-presets.json'),
   );
-  for (const file of ['memory-extraction-v1.md', 'memory-response-v1.md']) {
+  for (const file of [
+    'memory-extraction-v1.md',
+    'memory-response-v1.md',
+    'memory-review-v1.md',
+    'memory-reconcile-v1.md',
+    'memory-answer-v1.md',
+    'memory-speech-review-v1.md',
+    'memory-answer-direction-v1.md',
+  ]) {
     await copyFile(
       new URL('../src/application/memory/' + file, import.meta.url),
       resolve(output, 'application/memory', file),
