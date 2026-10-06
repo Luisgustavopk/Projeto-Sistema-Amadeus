@@ -2,6 +2,10 @@
 
 Persona de execução: **kurisu-amadeus-0.4.13**. A personalidade define padrões de atuação; não contém fatos privados do usuário nem depende de memória pessoal.
 
+## Corpus externo para refinamento — 06/10/2026
+
+Os recursos de [FrancescoCaracciolo/Amadeus](external/francesco-amadeus/README.md) foram adquiridos como referência local: diálogos com autoria/contexto, história, e-mails, prompt e áudio. Há 758 candidatos de estilo e 40 trechos do resumo, com procedência. A curadoria em pt-BR e a análise de cronologia acompanham o corpus. Nenhum desses arquivos foi anexado ao prompt atual ou transformado em memória pessoal; a inclusão seletiva e sua avaliação pertencem ao próximo refinamento.
+
 ## Direção principal em Markdown — 05/10/2026
 
 [conversation-directions-v1.md](conversation-directions-v1.md) reúne identidade, prioridade, honestidade, ficção, conversa, reparo e exemplos contextuais. É lido diretamente uma vez na inicialização e incluído uma vez tanto no prompt normal quanto na recuperação. O código monta o prompt e mantém o contrato técnico de expressão; `dialogue-direction.ts` apenas expõe o trecho correspondente desse mesmo arquivo, sem uma segunda inclusão.
