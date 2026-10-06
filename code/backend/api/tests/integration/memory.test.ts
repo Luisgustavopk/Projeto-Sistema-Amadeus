@@ -17,6 +17,7 @@ import {
 } from '../../src/application/memory/extraction.ts';
 import { QuotaExceededError } from '../../src/domain/errors/providers.ts';
 import type { ProviderServices } from '../../src/application/providers/index.ts';
+import type { ProviderOutput } from '../../src/ports/provider.ts';
 import { MEMORY_EMBEDDING_DIMENSIONS } from '../../src/domain/memory/embeddings.ts';
 import {
   FactInputSchema,
@@ -24,6 +25,51 @@ import {
 } from '../../src/domain/memory/model.ts';
 
 const cleanup: (() => Promise<unknown> | void)[] = [];
+
+// These repository/permission fixtures simulate successful model stages.
+// Semantic quality is evaluated separately with real models and adversarial
+// drafts; mirroring a fixture is not evidence of semantic correctness.
+function mockExtraction(
+  execute: ReturnType<typeof vi.fn<ProviderServices['execute']>>,
+  output: ProviderOutput,
+) {
+  const parsed = JSON.parse(output.content);
+  const links = parsed.facts.flatMap(
+    (fact: { supersedes?: unknown }, index: number) =>
+      fact.supersedes
+        ? [{ index, supersedes: fact.supersedes, duplicateOf: null }]
+        : [],
+  );
+  const clean = {
+    ...output,
+    content: JSON.stringify({
+      facts: parsed.facts.map((fact: object) => ({
+        ...fact,
+        supersedes: null,
+      })),
+    }),
+  };
+  execute.mockResolvedValueOnce(clean).mockResolvedValueOnce({
+    ...clean,
+    content: JSON.stringify({
+      facts: JSON.parse(clean.content).facts.map((fact: object) => ({
+        ...fact,
+        support: 'full',
+        contextPreserved: true,
+        context: null,
+        sourceMode: 'asserted',
+      })),
+    }),
+  });
+
+  if (links.length) {
+    execute.mockResolvedValueOnce({
+      ...output,
+      content: JSON.stringify({ links }),
+    });
+  }
+}
+
 afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) {
     await fn();
@@ -69,8 +115,32 @@ async function fixture(url = 'file::memory:') {
     return { id, responseId };
   }
 
-  const execute = vi.fn<ProviderServices['execute']>(async () => ({
-    content: '{"facts":[]}',
+  const execute = vi.fn<ProviderServices['execute']>(async (_role, input) => ({
+    content: JSON.stringify(
+      input.memoryTask === 'reconcile'
+        ? { links: [] }
+        : {
+            facts:
+              input.memoryTask === 'review'
+                ? JSON.parse(input.content).proposals.map(
+                    ({ sourceIds, ...fact }: { sourceIds: string[] }) => ({
+                      ...fact,
+                      support: 'full',
+                      contextPreserved: true,
+                      context: null,
+                      sourceMode: 'asserted',
+                      evidence: sourceIds.map((id) => ({
+                        turnId: id,
+                        quote:
+                          JSON.parse(input.content).currentSources.find(
+                            (s: { turnId: string }) => s.turnId === id,
+                          )?.userText ?? '',
+                      })),
+                    }),
+                  )
+                : [],
+          },
+    ),
     inputTokens: 1,
     outputTokens: 1,
   }));
@@ -97,6 +167,142 @@ const input = (text: string, overrides = {}) =>
     dataClass: 'synthetic',
     ...overrides,
   });
+
+it('não aprova rascunhos quando a revisão falha e só grava o texto revisto ao retomar', async () => {
+  const f = await fixture();
+  await f.service.configure({
+    expectedRevision: 0,
+    enabled: true,
+    personalEnabled: false,
+    extraction: 'llm',
+    retentionDays: null,
+    autoApprove: true,
+  });
+  const turn = await f.add('Gosto principalmente de livros de astronomia.');
+  await f.history.endSession(f.sessionId, 'closed');
+  const draft = {
+    text: 'Só gosto de astronomia.',
+    category: 'preferencia',
+    kind: 'fact',
+    relation: null,
+    supersedes: null,
+    evidence: [
+      {
+        turnId: turn.id,
+        quote: 'Gosto principalmente de livros de astronomia.',
+      },
+    ],
+  };
+  const reviewed = {
+    ...draft,
+    text: 'Usuário gosta principalmente de livros de astronomia.',
+  };
+  const output = (facts: unknown[]) => ({
+    content: JSON.stringify({ facts }),
+    inputTokens: 1,
+    outputTokens: 1,
+  });
+  f.execute
+    .mockResolvedValueOnce(output([draft]))
+    .mockRejectedValueOnce(new QuotaExceededError());
+  const now = Date.now();
+  await f.service.runOnce(now);
+  expect(await f.repo.facts()).toEqual([]);
+  expect((await f.repo.jobs())[0]).toMatchObject({
+    status: 'pending',
+    lastError: 'QUOTA_EXCEEDED',
+  });
+  f.execute.mockResolvedValueOnce(output([draft])).mockResolvedValueOnce(
+    output([
+      {
+        ...reviewed,
+        support: 'full',
+        contextPreserved: true,
+        context: null,
+        sourceMode: 'asserted',
+      },
+    ]),
+  );
+  await f.service.runOnce(now + 60001);
+  expect(
+    (await f.repo.facts()).map((fact) => ({
+      text: fact.text,
+      status: fact.status,
+    })),
+  ).toEqual([{ text: reviewed.text, status: 'confirmed' }]);
+});
+
+it('revalida permissão e versão antes do planejamento, sem enviar fatos revogados', async () => {
+  const f = await fixture();
+  await enableSemantic(f);
+  const fact = await f.service.create(
+    input('Tenho um gato chamado Íris.', { permission: 'eligible' }),
+  );
+  const memories = JSON.stringify({ facts: [fact] });
+  await f.service.edit(fact.id, fact.version, {
+    ...input(fact.text, { permission: 'local-only' }),
+    status: 'confirmed',
+  });
+  expect(
+    await f.service.planAnswer(
+      memories,
+      'Qual é o nome do gato?',
+      'synthetic',
+      new AbortController().signal,
+    ),
+  ).toEqual({ status: 'unavailable', claims: [] });
+  expect(f.execute).not.toHaveBeenCalled();
+});
+
+it('descarta plano se o fato muda durante a inferência e não transforma indisponibilidade em certeza', async () => {
+  const f = await fixture();
+  await enableSemantic(f);
+  const fact = await f.service.create(
+    input('Tenho um gato chamado Íris.', { permission: 'eligible' }),
+  );
+  const memories = JSON.stringify({ facts: [fact] });
+  f.execute.mockImplementationOnce(async () => {
+    await f.repo.editFact(fact.id, fact.version, {
+      ...input('Meu gato se chama Aster.', { permission: 'eligible' }),
+      status: 'confirmed',
+    });
+
+    return {
+      content: JSON.stringify({
+        status: 'answerable',
+        claims: [{ text: fact.text, factIds: [fact.id] }],
+      }),
+      inputTokens: 1,
+      outputTokens: 1,
+    };
+  });
+  expect(
+    await f.service.planAnswer(
+      memories,
+      'Nome do gato?',
+      'synthetic',
+      new AbortController().signal,
+    ),
+  ).toEqual({ status: 'unavailable', claims: [] });
+  const current = (await f.repo.facts())[0]!;
+  f.execute.mockRejectedValueOnce(new QuotaExceededError());
+  const snapshot = JSON.stringify({ facts: [current] });
+  expect(
+    await f.service.planAnswer(
+      snapshot,
+      'Nome?',
+      'synthetic',
+      new AbortController().signal,
+    ),
+  ).toEqual({ status: 'unavailable', claims: [] });
+  await f.service.planAnswer(
+    snapshot,
+    'Nome?',
+    'synthetic',
+    new AbortController().signal,
+  );
+  expect(f.execute).toHaveBeenCalledTimes(2);
+});
 
 it('divide a extração LLM em lotes menores e impede análises paralelas entre processos do mesmo usuário', async () => {
   const f = await fixture();
@@ -187,7 +393,7 @@ it('retoma extração adiada por cota em chamada aberta e recupera nome corrigid
   );
   cleanup.push(() => restarted.stop());
   await restarted.start();
-  f.execute.mockResolvedValueOnce({
+  mockExtraction(f.execute, {
     content: JSON.stringify({
       facts: [
         {
@@ -258,7 +464,7 @@ it('corrige a interpretação de uma fala antiga sem bloquear sua evidência nem
     sql: 'UPDATE call_turns SET created_at = ? WHERE id = ?',
     args: [Date.now() - 10000, source.id],
   });
-  f.execute.mockResolvedValueOnce({
+  mockExtraction(f.execute, {
     content: JSON.stringify({
       facts: [
         {
@@ -289,7 +495,7 @@ it('corrige a interpretação de uma fala antiga sem bloquear sua evidência nem
     fact.text.startsWith('Gosto de'),
   )!;
   await f.service.rebuild(f.conversation.id);
-  f.execute.mockResolvedValueOnce({
+  mockExtraction(f.execute, {
     content: JSON.stringify({
       facts: [
         {
@@ -442,7 +648,7 @@ it('aprova correções por LLM sem confirmação por ID e conserva a origem e o 
     retentionDays: null,
     autoApprove: true,
   });
-  f.execute.mockResolvedValueOnce({
+  mockExtraction(f.execute, {
     content: JSON.stringify({
       facts: [
         {
@@ -512,11 +718,26 @@ it('rejeita apenas uma interpretação automática, preserva fatos da mesma font
     relation: { subject: 'usuário', predicate: 'gosta', object: text },
     evidence: [{ turnId: turn.id, quote: statement }],
   }));
-  f.execute.mockResolvedValue({
-    content: JSON.stringify({ facts: suggestions }),
+  f.execute.mockImplementation(async (_role, request) => ({
+    content: JSON.stringify(
+      request.memoryTask === 'reconcile'
+        ? { links: [] }
+        : {
+            facts:
+              request.memoryTask === 'review'
+                ? suggestions.map((fact) => ({
+                    ...fact,
+                    support: 'full',
+                    contextPreserved: true,
+                    context: null,
+                    sourceMode: 'asserted',
+                  }))
+                : suggestions,
+          },
+    ),
     inputTokens: 10,
     outputTokens: 10,
-  });
+  }));
   await f.service.runOnce();
   const old = (await f.repo.facts()).find(
     (fact) => fact.text === suggestions[1]!.text,
@@ -614,7 +835,7 @@ it('corrige uma memória aprovada automaticamente sem perder a origem ou restaur
     extraction: 'llm',
     retentionDays: null,
   });
-  f.execute.mockResolvedValueOnce({
+  mockExtraction(f.execute, {
     content: JSON.stringify({
       facts: [
         {
@@ -672,7 +893,7 @@ it('rejeita evidência inventada também no modo automático', async () => {
   });
   const turn = await f.add('Imagine que eu gosto de chá em uma história.');
   await f.history.endSession(f.sessionId, 'closed');
-  f.execute.mockResolvedValueOnce({
+  mockExtraction(f.execute, {
     content: JSON.stringify({
       facts: [
         {
@@ -878,7 +1099,7 @@ it('usa contexto anterior para interpretar referências e exige evidência das f
   );
   await f.history.endSession(f.sessionId, 'closed');
   await enableSemantic(f);
-  f.execute.mockResolvedValueOnce({
+  mockExtraction(f.execute, {
     content: JSON.stringify({
       facts: [
         {
@@ -922,7 +1143,7 @@ it('expira acontecimentos temporários sem transformar a condição em fato perm
   const turn = await f.add('Estou cansado hoje.');
   await f.history.endSession(f.sessionId, 'closed');
   await enableSemantic(f);
-  f.execute.mockResolvedValueOnce({
+  mockExtraction(f.execute, {
     content: JSON.stringify({
       facts: [
         {
@@ -981,7 +1202,7 @@ it('aplica uma correção vinculada somente após confirmação e remove a rela�
   const turn = await f.add('Agora prefiro café, não chá.');
   await f.history.endSession(f.sessionId, 'closed');
   await enableSemantic(f);
-  f.execute.mockResolvedValueOnce({
+  mockExtraction(f.execute, {
     content: JSON.stringify({
       facts: [
         {
@@ -1042,7 +1263,7 @@ it('não aplica uma correção se a memória alvo mudou após a extração', asy
   const turn = await f.add('Agora prefiro café, não chá.');
   await f.history.endSession(f.sessionId, 'closed');
   await enableSemantic(f);
-  f.execute.mockResolvedValueOnce({
+  mockExtraction(f.execute, {
     content: JSON.stringify({
       facts: [
         {
@@ -1249,7 +1470,7 @@ it('respeita Retry-After sem esgotar tentativas e valida citações da extraçã
   });
   await f.service.runOnce(now + 119999);
   expect(f.execute).toHaveBeenCalledTimes(1);
-  f.execute.mockResolvedValueOnce({
+  mockExtraction(f.execute, {
     content: JSON.stringify({
       facts: [
         {
@@ -1304,7 +1525,7 @@ it('limita cinco falhas inválidas e não aceita evidência inventada', async ()
     await f.service.runOnce(Date.now() + i * 3600001);
   }
 
-  expect(f.execute).toHaveBeenCalledTimes(5);
+  expect(f.execute).toHaveBeenCalledTimes(10);
   expect(await f.repo.facts()).toEqual([]);
   expect((await f.repo.jobs())[0]).toMatchObject({
     status: 'failed',

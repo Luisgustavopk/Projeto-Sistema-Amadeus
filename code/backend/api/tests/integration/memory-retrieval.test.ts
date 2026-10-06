@@ -622,13 +622,31 @@ it('fornece ao extrator o fato anterior encontrado por significado para aplicar 
     autoApprove: true,
   });
   f.execute.mockImplementation(async (_role, request) => {
-    expect(JSON.parse(request.content).existingFacts).toContainEqual(
-      expect.objectContaining({
-        id: old.id,
-        version: old.version,
-        text: old.text,
-      }),
-    );
+    if (request.memoryTask === 'reconcile') {
+      expect(JSON.parse(request.content).existingFacts).toContainEqual(
+        expect.objectContaining({
+          id: old.id,
+          version: old.version,
+          text: old.text,
+        }),
+      );
+
+      return {
+        content: JSON.stringify({
+          links: [
+            {
+              index: 0,
+              supersedes: { factId: old.id, version: old.version },
+              duplicateOf: null,
+            },
+          ],
+        }),
+        inputTokens: 1,
+        outputTokens: 1,
+      };
+    }
+
+    expect(JSON.parse(request.content).existingFacts).toBeUndefined();
 
     return {
       content: JSON.stringify({
@@ -638,8 +656,16 @@ it('fornece ao extrator o fato anterior encontrado por significado para aplicar 
             category: 'preferencia',
             kind: 'correction',
             relation: null,
-            supersedes: { factId: old.id, version: old.version },
+            supersedes: null,
             evidence: [{ turnId, quote: statement }],
+            ...(request.memoryTask === 'review'
+              ? {
+                  support: 'full',
+                  contextPreserved: true,
+                  context: null,
+                  sourceMode: 'asserted',
+                }
+              : {}),
           },
         ],
       }),
@@ -648,7 +674,7 @@ it('fornece ao extrator o fato anterior encontrado por significado para aplicar 
     };
   });
   await f.service.runOnce(Date.now() + 20000);
-  expect(f.execute).toHaveBeenCalledOnce();
+  expect(f.execute).toHaveBeenCalledTimes(3);
   expect(await f.repo.facts()).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ id: old.id, status: 'superseded' }),
