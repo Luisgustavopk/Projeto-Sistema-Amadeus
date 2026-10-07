@@ -4,6 +4,12 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "prepare:voice-presets": "node --env-file-if-exists=.env scripts/prepare-voice-presets.mjs",
+    "setup:llama": "node --env-file-if-exists=.env scripts/setup-llama.mjs",
+    "check:llama-jev": "node --env-file-if-exists=.env scripts/check-llama-jev.mjs",
+    "check:voice-latency": "node --env-file-if-exists=.env scripts/check-voice-latency.mjs",
+    "check:memory-review": "node --env-file-if-exists=.env scripts/check-memory-review.mjs",
+    "check:input-clarity": "node --env-file-if-exists=.env scripts/check-input-clarity.mjs",
     "dev": "node --env-file-if-exists=.env --watch src/main.ts",
     "build": "node scripts/build.mjs",
     "start": "node --env-file-if-exists=.env dist/main.js",

@@ -28,6 +28,28 @@ process.exitCode = result.status ?? 1;
 
 if (process.exitCode === 0) {
   await copyFile(
+    new URL('../src/application/persona/voice-runtime-v1.md', import.meta.url),
+    resolve(output, 'application/persona/voice-runtime-v1.md'),
+  );
+  await copyFile(
+    new URL('../src/application/persona/jev-clarity-v1.md', import.meta.url),
+    resolve(output, 'application/persona/jev-clarity-v1.md'),
+  );
+  await copyFile(
+    new URL(
+      '../src/application/persona/jev-memory-review-v1.md',
+      import.meta.url,
+    ),
+    resolve(output, 'application/persona/jev-memory-review-v1.md'),
+  );
+  await copyFile(
+    new URL(
+      '../src/application/persona/jev-tone-rubric-v1.md',
+      import.meta.url,
+    ),
+    resolve(output, 'application/persona/jev-tone-rubric-v1.md'),
+  );
+  await copyFile(
     new URL(
       '../src/application/voice/provider-wait-presets.json',
       import.meta.url,
@@ -42,6 +64,7 @@ if (process.exitCode === 0) {
     'memory-answer-v1.md',
     'memory-speech-review-v1.md',
     'memory-answer-direction-v1.md',
+    'memory-use-v1.md',
   ]) {
     await copyFile(
       new URL('../src/application/memory/' + file, import.meta.url),
@@ -52,6 +75,7 @@ if (process.exitCode === 0) {
     'conversation-directions-v1.md',
     'reaction-catalog-v0.2.md',
     'reaction-repertoire-v0.2.md',
+    'canon-conversation-v1.md',
   ]) {
     await copyFile(
       new URL('../../assets/persona/' + file, import.meta.url),
