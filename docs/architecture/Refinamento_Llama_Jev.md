@@ -1,5 +1,29 @@
 # Refinamento com Llama e Jev
 
+## Limites pagos desativados pelo proprietário — 07/10/2026
+
+A instalação ativa agora usa `llm.limits.enforced: false` no Llama pago e `configuration.localLimitsEnabled: false` na análise Jev. Pedidos e tokens continuam contabilizados sob a mesma identidade: mudar essa opção não zera contadores. Os valores numéricos anteriores permanecem para reversão, mas são ignorados nesse modo. Os tetos iniciais documentados abaixo são históricos, não o bloqueio atualmente ativo.
+
+O saldo e os limites remotos do OpenRouter continuam valendo, inclusive limites definidos na chave. A aplicação não consulta saldo a cada turno, não recarrega créditos nem altera os tetos de preço por token. Saldo insuficiente (402) e rate limits mantêm seu tratamento de pausa/fallback. Jev pode ficar indisponível sem bloquear a resposta principal. Reservas gratuitas, extrator independente, STT e TTS mantêm seus limites e permissões.
+
+O schema restringe a isenção ao Llama pago e ao perfil de contabilização Jev; reservas que herdam números do principal continuam com limites locais aplicados. `setup:llama` preserva a escolha já salva. O modo `--require-primary` do ensaio textual respeita `enforced`: não bloqueia pelos números antigos quando a aplicação dos tetos está desligada, mas ainda invalida a rodada caso ocorra fallback.
+
+Após a alteração, uma saudação sintética real foi respondida pelo Llama sem fallback: “Tudo certo por aqui. E você?”, com cabeçalho válido e duração total aproximada de 4,1 segundos. Não usou STT, Cartesia, Jev ou dados pessoais; um único caso não aprova toda a naturalidade da versão.
+
+Uma classificação sintética real Jev com prazo de diagnóstico respondeu em 680 ms, reportando 642 tokens de entrada. Uma tentativa anterior no serviço com prazo de 600 ms ficou indisponível; o prazo ativo não foi alterado. Isso distingue timeout de teto local: a análise opcional pode ser descartada por demora, mesmo com créditos disponíveis. As duas tentativas foram contabilizadas e não consumiram Cartesia. A suíte final passou em 526 testes, com tipos, lint, formatação e build válidos.
+
+Na investigação de `INTERNAL_ERROR` após a fala de espera, foi reproduzido `SQLITE_BUSY` quando uma gravação concorria com uma transação aberta de reserva. Operações do mesmo cliente SQLite agora compartilham uma fila, mantida durante a transação até commit/rollback/close. Não há inferência remota dentro dessa fila. Os testes físicos de commit/rollback verificam que a entrega aguarda e segue, sem perder as escritas. Isso corrige uma condição compatível com o evento reportado; o evento antigo não continha a causa interna necessária para provar sua origem retrospectivamente.
+
+## Rodada de presença e continuidade — 0.4.19
+
+Atuação primeiro, otimização depois: os complementos em Markdown mantêm exemplos de continuidade, apelidos, discordância e concisão. A função contextual da curadoria canônica é adaptada para novas conversas, sem copiar a relação com Okabe ou impor sarcasmo. O controlador de presença é separado da LLM; negocia ofertas com o cliente e dá prioridade à pessoa. Saudações e iniciativas ficam diferenciadas no histórico, sem virarem falas pessoais ou fontes de extração.
+
+PAD/energia persistem no SQLite, separados por proprietário e classificação, e retornam gradualmente ao equilíbrio. Familiaridade no prompt continua baseada no histórico retido e elegível. O evento interno de iniciativa não é analisado pelo Jev como se fosse uma fala do usuário. Isso não adiciona classificação por polling nem uma nova LLM ao caminho normal. [Implementação e limites](Presenca_e_Autonomia_Amadeus.md).
+
+Na verificação de 07/10, o Llama estava com 100/100 pedidos locais. Os limites foram preservados; a nova qualidade artística não foi declarada aprovada por testes com reservas. `check:conversation -- --run --require-primary` impede iniciar uma rodada quando o teto local está esgotado e invalida resultados que precisarem de fallback. Testes automáticos com provedores simulados cobrem estado, negociação e interrupção, sem consumir Cartesia; não medem naturalidade, primeiro áudio real ou expressão vocal.
+
+A sequência aprovada é validar atuação/presença → otimizar latência → fase 5 → fase 6, com fase 4 adiada. Pesquisa, integrações, acesso ao computador e iniciativa fora da chamada ficam para novas funcionalidades depois da fase 6.
+
 ## Continuidade, presença e revisão seletiva — persona 0.4.18
 
 Esta seção prevalece sobre os formatos, posições da curadoria e política de revisão das rodadas anteriores. A implementação segue a ordem acordada: continuidade/memória, atuação contextual e otimização. Autonomia, pesquisa, backchannels e notificações são extensões descritas em [Presença e autonomia](Presenca_e_Autonomia_Amadeus.md).

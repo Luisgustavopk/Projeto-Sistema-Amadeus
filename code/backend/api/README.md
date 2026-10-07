@@ -1,6 +1,28 @@
 # API
 
+## Presença e estado persistente da persona
+
+A versão 0.4.19 adiciona presença moderada durante a chamada e PAD/energia no SQLite. Reinicie `npm run dev` para aplicar a migração `0010_call_initiatives`; recarregue também o voice-test. A caixa de presença permite saudação uma vez e iniciativas ocasionais. Falar, gerar ou reproduzir áudio impede uma nova iniciativa; captura nova cancela a fala espontânea. Pausar o microfone ou ocultar a página suspende a presença.
+
+Depois de interação real, a iniciativa exige 90 segundos de silêncio e 180 segundos desde a última oferta, com no máximo duas ofertas por chamada. Não há consulta periódica a modelo. Ofertas aceitas consomem LLM/TTS normalmente. Backchannels e reconhecimentos gravados continuam pendentes; a validação automatizada usa TTS simulado, sem consumo de Cartesia.
+
+As rotas autenticadas `GET /v1/persona/state?dataClass=personal` e `DELETE` na mesma URL consultam e reiniciam o estado artístico. Também aceitam `synthetic` e `local-only`, isoladamente. O reset não apaga fatos ou histórico, nem reinicia a familiaridade calculada por interações retidas. Energia e humor variam gradualmente com atividade e tempo; a direção permanece subordinada à personalidade canônica.
+
+Para avaliar a atuação em diálogos encadeados quando houver cota:
+
+```powershell
+npm run check:conversation -- --run --require-primary --only=saudacao,apelido,opiniao-e-continuidade,correcao-e-concisao
+```
+
+Esse ensaio é textual e sintético, sem STT/Cartesia/Jev ou extração remota. Consome cota do LLM. Com `--require-primary`, o teto local já esgotado impede iniciar chamadas; uma troca para reserva invalida a rodada e interrompe os próximos cenários. As memórias do ensaio são fixtures; ele não valida recuperação real. [Arquitetura, implementação e sequência de fases](../../../docs/architecture/Presenca_e_Autonomia_Amadeus.md).
+
+`--suite=presence` seleciona o [roteiro de 18 conversas e 45 turnos](../../../docs/analysis/Roteiro_Naturalidade_Presenca_v1.md), incluindo saudação/iniciativa sem fala da pessoa, callbacks, correção de nome, memória fornecida, referências em inglês e retomada após interrupção simulada. Usa a direção administrativa ativa e estado artístico isolado; gera também transcrição Markdown para revisão. O agendamento e a arbitragem de presença são verificados separadamente nos testes do runtime/controlador. A [avaliação de 07/10/2026](../../../docs/analysis/Avaliacao_Naturalidade_Presenca_2026-10-07.md) registra acertos e falhas de atuação que persistem.
+
 ## Llama principal e Jev auxiliar
+
+Na instalação atual, por decisão do proprietário, os tetos locais pagos estão desativados: Llama usa `limits.enforced: false` e Jev usa `localLimitsEnabled: false`. Os números de pedidos/tokens anteriores ficam disponíveis para eventual reativação, mas não bloqueiam chamadas nesse modo. A contabilização diária permanece; saldo, limite da chave, rate limits e indisponibilidade são impostos pelo OpenRouter. HTTP 402 ainda permite tentar as reservas gratuitas elegíveis. Os limites do extrator, áudio e reservas não foram removidos. O script `setup:llama` preserva essa escolha quando reexecutado.
+
+O SQLite coordena operações do mesmo cliente e aguarda o término das transações curtas: a persistência da fala de espera não disputa escrita com a reserva do próximo provedor. Chamadas remotas ficam fora da fila do banco. A proteção não substitui a coordenação entre processos distintos.
 
 O refinamento usa Llama 3.3 70B Instruct pago no OpenRouter como principal, com os modelos gratuitos existentes como reservas para cota, crédito ou indisponibilidade. Jev usa a mesma `OPENROUTER_API_KEY` para uma direção curta de tom, com orçamento próprio e prazo padrão de 600 ms. A revisão de lembranças tem prazo próprio de 2 segundos; o extrator de novas memórias permanece independente. Falha da análise de tom não impede a resposta. Com a API encerrada, `npm run setup:llama` mostra a proposta e `npm run setup:llama -- --apply` salva a configuração, com backup local. Reinicie com `npm run dev`.
 
