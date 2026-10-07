@@ -8,6 +8,8 @@
     "setup:llama": "node --env-file-if-exists=.env scripts/setup-llama.mjs",
     "check:llama-jev": "node --env-file-if-exists=.env scripts/check-llama-jev.mjs",
     "check:conversation": "node --env-file-if-exists=.env scripts/check-conversation.mjs",
+    "eval:conversation-quality": "node --env-file-if-exists=.env scripts/eval-conversation-quality.mjs",
+    "eval:conversation-quality:calibrate": "node scripts/calibrate-conversation-quality.mjs",
     "check:voice-latency": "node --env-file-if-exists=.env scripts/check-voice-latency.mjs",
     "check:memory-review": "node --env-file-if-exists=.env scripts/check-memory-review.mjs",
     "check:input-clarity": "node --env-file-if-exists=.env scripts/check-input-clarity.mjs",

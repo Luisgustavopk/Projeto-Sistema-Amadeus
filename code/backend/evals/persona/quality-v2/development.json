@@ -1,0 +1,73 @@
+{
+  "version": "quality-v2.0",
+  "split": "development",
+  "synthetic": true,
+  "cases": [
+    {
+      "id": "D01",
+      "domain": "conversa-livre",
+      "turns": [
+        "Oi. Consegui um intervalo.",
+        "Escolhe uma ideia para a gente conversar.",
+        "Segue nesse ponto."
+      ],
+      "expectation": "Interlocução concreta, concisa; assunto livre e continuidade.",
+      "facts": []
+    },
+    {
+      "id": "D02",
+      "domain": "fidelidade",
+      "turns": [
+        "Seu argumento foi convincente.",
+        "Pode aceitar o elogio.",
+        "E se eu discordasse sem explicar por quê?"
+      ],
+      "expectation": "Gratidão discreta e coerência sem submissão.",
+      "facts": []
+    },
+    {
+      "id": "D03",
+      "domain": "correcao",
+      "turns": [
+        "Meu teste finalmente rodou!",
+        "Na verdade só a primeira etapa passou.",
+        "Então eu comemorei cedo?"
+      ],
+      "expectation": "Atualização pela correção e humor proporcional.",
+      "facts": []
+    },
+    {
+      "id": "D04",
+      "domain": "opiniao",
+      "turns": [
+        "Essa minha ideia vai dar certo, confia.",
+        "Não tenho evidência ainda.",
+        "Quero sua posição sincera."
+      ],
+      "expectation": "Razões específicas e certeza proporcional à evidência.",
+      "facts": []
+    },
+    {
+      "id": "D05",
+      "domain": "continuidade",
+      "turns": [
+        "Me oferece duas abordagens para testar um sensor.",
+        "A segunda.",
+        "Agora só o primeiro passo."
+      ],
+      "expectation": "Escolha resolvida pelo histórico e tamanho solicitado.",
+      "facts": []
+    },
+    {
+      "id": "D06",
+      "domain": "memoria",
+      "turns": [
+        "Tem alguma ideia que combine com o que você sabe de mim?",
+        "Prefiro algo tranquilo hoje.",
+        "Isso muda sua proposta?"
+      ],
+      "expectation": "Critérios disponíveis e mudança de preferência.",
+      "facts": ["O participante gosta de investigação e ficção científica."]
+    }
+  ]
+}

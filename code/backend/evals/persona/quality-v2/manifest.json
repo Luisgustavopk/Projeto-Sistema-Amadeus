@@ -1,0 +1,12 @@
+{
+  "version": "quality-v2.0",
+  "frozenAt": "2026-10-07T20:27:36.258Z",
+  "files": {
+    "heldout.json": "bd76c5b8fe98bf4e835788c817c637bd9ffcf0228206918119cb36b9dec0d024",
+    "development.json": "cda6707365c0ebd2385cc158dc95437f598c83e9534bcddfd7902771e17ee87a",
+    "regression.json": "23ecd554cacd940098a71e1a8eaa7f1074be87dd6467fa841c67890a729927bd",
+    "core-positive.md": "578ddef0bcd013ccc844854758406078cac8bc4837a57c84dea0cbfc419b4ddb",
+    "turn-direction.md": "60bc0d9271285078998567ddccfe9d723d0d42baeb2028f75377510d1d85f28b",
+    "rubric.md": "c36d61455d83aa7c81a560b13057021514142856f9a4bbfce150460c18d6c0ac"
+  }
+}
