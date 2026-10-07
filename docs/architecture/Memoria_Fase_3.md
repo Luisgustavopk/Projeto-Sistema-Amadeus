@@ -1,5 +1,7 @@
 # Fase 3: memória híbrida e retomada
 
+Atualização do refinamento após o Voice Test em 06/10/2026: o fluxo vocal deixou de planejar toda resposta com o extrator remoto. A LLM declara os fatos persistentes utilizados no cabeçalho técnico; conversa comum segue diretamente à síntese, enquanto lembranças passam pela conferência factual Jev por bloco e revalidação local. O extrator independente continua cuidando de novos registros em segundo plano. As seções sobre planejamento abaixo preservam a implementação anterior e as APIs de avaliação. [Correção, arquitetura atual e medições](Refinamento_Llama_Jev.md#otimização-do-fluxo-vocal--persona-0415).
+
 Arquitetura aprovada pelo usuário em 05/10/2026. Implementação: SQLite local, fatos revisáveis, resumos extrativos, grafo leve e recuperação seletiva. A melhoria posterior autorizada nesta data acrescenta embeddings multilíngues locais para recuperar fatos por significado. LangGraph e banco de grafos separado não são dependências desta fase. Treinamento e associações por reforço continuam reservados ao refinamento.
 
 ## O que muda na conversa

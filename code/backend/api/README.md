@@ -1,6 +1,18 @@
 # API
 
+## Llama principal e Jev auxiliar
+
+O refinamento usa Llama 3.3 70B Instruct pago no OpenRouter como principal, com os modelos gratuitos existentes como reservas para cota, crédito ou indisponibilidade. Jev usa a mesma `OPENROUTER_API_KEY` para uma direção curta de tom, com orçamento próprio e prazo padrão de 600 ms. Também confere respostas que declaram uso de fatos persistentes, com prazo próprio de 2 segundos; o extrator de novas memórias permanece independente. Falha da análise de tom não impede a resposta. Com a API encerrada, `npm run setup:llama` mostra a proposta e `npm run setup:llama -- --apply` salva a configuração, com backup local. Reinicie com `npm run dev`.
+
+Os tetos iniciais são 100 pedidos e 1 milhão de tokens/dia para Llama; 100 pedidos e 200 mil tokens/dia para Jev. O preço máximo do Llama é US$ 0,15/M de entrada e US$ 0,40/M de saída; os modelos `:free` continuam com preço zero. `npm run check:llama-jev` compara três cenários sintéticos e consome créditos. [Arquitetura, configuração, reversão e resultados](../../../docs/architecture/Refinamento_Llama_Jev.md).
+
+Persona 0.4.16: a conversa comum não passa pelo planejamento de memória nem pela revisão factual remota. O primeiro cabeçalho contém somente `{"memory":[]}` ou índices inteiros de fatos realmente usados; intenção/emoção vêm ao final da fala. O prompt vocal usa uma versão operacional dos documentos, preservando as fontes e o prompt completo de avaliação. Uma primeira parte completa pode sair após 700 ms de texto falável, com pelo menos 24 caracteres; os demais blocos têm até 220 caracteres. Cartesia entrega PCM mono de 24 kHz por WebSocket, reutilizando o contexto entre blocos enquanto ele é válido. Cada tentativa de LLM na voz tem até 8 segundos para começar a entregar texto; ultrapassar o prazo aciona o mesmo fallback de indisponibilidade. O prazo não limita a duração total da resposta nem da cadeia de reservas. A revisão de lembranças confere cada bloco antes da síntese, incluindo o trecho já aprovado. `npm run check:voice-latency` testa até oito casos fictícios; `npm run check:memory-review` testa dez decisões Jev. Ambos consomem os créditos/cotas configurados. [Fluxo atual e limites das medições](../../../docs/architecture/Refinamento_Llama_Jev.md#correções-de-conversa-e-memória--persona-0416).
+
 ## Memória híbrida e retomada — fase 3
+
+Persona 0.4.17: fatos confirmados e elegíveis continuam no prompt quando os revisores auxiliares estão sem cota. A verificação mantém as checagens locais de política, permissão, versão e expiração; revisão semântica indisponível retorna `null` e é medida em `memoryReviewUnavailable`, sem fingir aprovação. Rejeição explícita retorna `false` e mantém a recuperação sem fatos rejeitados. A extração de novas memórias continua dependente de cota. [Decisão atual](../../../docs/architecture/Refinamento_Llama_Jev.md#recuperação-independente-da-cota-auxiliar--persona-0417).
+
+No TTS Cartesia, `fallbackVoiceId` define a voz reserva e `fallbackVoiceApiKeyEnv` sua variável de chave. A configuração ativa usa `CARTESIA_API_KEY` na principal e `CARTESIA_FALLBACK_API_KEY` na reserva da conta do parceiro; Qwen está fora da produção. Cota da principal não bloqueia uma reserva com credencial distinta. As duas tentativas compartilham o orçamento local existente. Não há troca após entregar áudio parcial. Com ambas indisponíveis, a resposta pode continuar em texto. Reinicie a API após alterar variáveis no `.env`.
 
 O extrator independente utiliza seu orçamento completo, sem a reserva antiga de 20% para conversas. Nome declarado e correção de grafia no mesmo lote são considerados juntos. A recuperação de fatos usa embeddings multilíngues locais, sem listas de palavras em português ou expressões fixas para perguntas de identidade. A aprovação automática continua dependendo de extração válida e cota disponível.
 
@@ -16,7 +28,7 @@ Fatos selecionados podem incluir `coMentioned`, índices que indicam quais foram
 
 A cota local contabiliza a reserva enquanto a operação está em andamento. Quando uma chamada concluída informa tokens de entrada e saída, passa a contar o consumo reportado; falhas e relatórios parciais conservam a estimativa. Tentativas falhas continuam contando como pedidos. Isso não muda planos, limites remotos, chaves ou as restrições a modelos gratuitos.
 
-Durante a chamada, cota/indisponibilidade da LLM aciona as reservas elegíveis. O evento `reply.wait` acompanha uma fala curta, no máximo uma vez por turno. Edite `src/application/voice/provider-wait-presets.json` para alterar a primeira frase de `phrases` ou use `enabled: false` para desativar a fala. Reinicie a API após editar esse arquivo; o build leva uma cópia para `dist`. A fala passa pelo TTS normal, com a voz ativa, e participa da reprodução/interrupção. Se uma resposta falada já começou, há uma tentativa limitada de continuação com o trecho fornecido, sem iniciar outra resposta do zero. Todas as reservas sem cota ainda resultam em erro; nenhum orçamento ou plano pago é aumentado automaticamente.
+Durante a chamada, cota/indisponibilidade da LLM aciona as reservas elegíveis. `reply.wait` acompanha uma fala curta, no máximo uma vez por turno, enquanto o roteador tenta o próximo modelo. O áudio vem de `data/voice-presets/provider-wait.wav`, preparado uma única vez com a voz ativa por `npm run prepare:voice-presets`. A preparação consome uma síntese; tocar o arquivo não chama TTS nem consome cota remota. Edite `src/application/voice/provider-wait-presets.json` e prepare novamente após mudar frase, clone ou referência; reinicie a API. Use `enabled: false` para desativar. Áudio ausente, inválido ou incompatível com a voz gera somente o texto de espera e `WAIT_PRESET_NOT_READY`, sem síntese durante a falha. O WAV/manifesto ficam ignorados pelo Git; o build copia as instruções, não o áudio pessoal. Reprodução e interrupção continuam confirmando apenas o que foi ouvido. Se uma resposta falada já começou, há uma tentativa limitada de continuação com o trecho fornecido. Todas as reservas sem cota ainda resultam em erro; nenhum orçamento ou plano pago é aumentado automaticamente.
 
 Histórico, checkpoints extrativos, fatos revisáveis e relações entre entidades são persistidos no SQLite. O fluxo de voz recupera somente memória pertinente e autorizada. Por padrão, sugestões precisam de confirmação e fatos/resumos começam restritos ao local. A opção persistida `autoApprove` permite aprovar automaticamente novas extrações validadas. A arquitetura, limites, políticas, exclusão, backup e comandos estão em [Memoria_Fase_3.md](../../../docs/architecture/Memoria_Fase_3.md).
 
@@ -60,7 +72,7 @@ npm run eval:memory-semantic -- --run --profile=config/memory-extractor.zai.exam
 
 `POST /v1/voice/versions` recebe `{"name":"Voz aprovada"}` e registra clone/referência/hash, modelo, configuração TTS, formato PCM, accent, segmentação e presets artísticos, sem valores de credenciais. `GET /v1/voice/versions` lista até 256 versões preservadas. `POST /v1/voice/versions/:id/restore` restaura somente o TTS, preservando LLM/STT. Uma voz local exige reativar sua referência original antes da restauração; a operação respeita o bloqueio de configuração. As versões registram o contrato da API; configurações internas de um serviço local externo e pesos não são reinstalados por esse endpoint.
 
-Persona 0.4.13: a direção principal está em `backend/assets/persona/conversation-directions-v1.md`, carregada diretamente no prompt normal e na recuperação. Reações são orientadas por gatilhos, sem frases prontas nessa direção; correção científica, identidade ficcional, memória da sessão e formato recebem ajustes após o reteste. O código mantém montagem e contrato expressivo. Limite do arquivo: 5.000 caracteres; orçamento do prompt normal completo: 20.000, com rejeição sem truncamento; versão atual: 19.146 caracteres. Reinicie a API após editar Markdown; para `dist`, gere novo build. A skill completa e as fontes originais permanecem preservadas. O histórico confirmado continua limitado a 3.000 caracteres. `npm run eval:persona -- --refinement` valida a rodada curta de oito regressões e quatro situações novas; `--run` consulta o modelo configurado e consome cota. Isso não substitui os 30 casos, continuidade ou revisão humana. [Decisão de avançar para a fase 3 e experimentar técnicas avançadas depois](../../../docs/decisions/Decisao_Persona_Fase_3.md).
+Persona 0.4.14: a direção principal está em `backend/assets/persona/conversation-directions-v1.md`, carregada diretamente no prompt normal e na recuperação. Reações são orientadas por gatilhos, sem frases prontas nessa direção; correção científica, identidade ficcional, memória da sessão e formato recebem ajustes após o reteste. O código mantém montagem e contrato expressivo. Limite do arquivo: 5.000 caracteres; orçamento do prompt base completo: 20.000, com rejeição sem truncamento; versão atual: 19.249 caracteres, antes dos complementos operacionais de memória e tom. Reinicie a API após editar Markdown; para `dist`, gere novo build. A skill completa e as fontes originais permanecem preservadas. O histórico confirmado continua limitado a 3.000 caracteres. `npm run eval:persona -- --refinement` valida a rodada curta de oito regressões e quatro situações novas; `--run` consulta o modelo configurado e consome cota. Isso não substitui os 30 casos, continuidade ou revisão humana. [Decisão de avançar para a fase 3 e experimentar técnicas avançadas depois](../../../docs/decisions/Decisao_Persona_Fase_3.md).
 
 A redução anterior da 0.4.10 resolveu o 413 observado no Groq; cotas continuam valendo. `npm run eval:persona -- --run --interval-ms=60000` espaça os cenários por um minuto sem alterar limites ou faturamento.
 
@@ -68,7 +80,7 @@ O usuário aprovou a qualidade vocal atual em 05/10/2026. O gate aceita `voiceAc
 
 ## Provedores LLM e reservas
 
-O LLM pode usar Gemini, Groq ou Cloudflare Workers AI. Groq e Cloudflare usam endpoints oficiais compatíveis com Chat Completions e suportam entrega SSE. Configure suas chaves somente no ambiente da API (`GEMINI_API_KEY`, `GROQ_API_KEY` e `CLOUDFLARE_AI_TOKEN`); nunca envie valores de segredo no JSON da configuração. Para privilegiar baixa latência, esta instalação local usa Groq como principal, Cloudflare como primeira reserva e Gemini por último. Um smoke test sintético isolado mediu o primeiro texto em 303 ms no Groq e 398 ms no Cloudflare, enquanto o Gemini estava sem cota. Esses valores não representam a conversa completa nem garantem desempenho futuro.
+O LLM pode usar OpenRouter, Gemini, Groq ou Cloudflare Workers AI, com entrega SSE. Configure suas chaves somente no ambiente da API (`OPENROUTER_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY` e `CLOUDFLARE_AI_TOKEN`); nunca envie valores de segredo no JSON da configuração. Nesta instalação, o refinamento usa Llama/OpenRouter como principal e conserva Groq, Cloudflare e OpenRouter gratuito como reservas; Gemini gratuito fica restrito a dados sintéticos. Antes do refinamento, um smoke test sintético isolado mediu o primeiro texto em 303 ms no Groq e 398 ms no Cloudflare, enquanto o Gemini estava sem cota. Esses valores históricos não representam a conversa completa nem garantem desempenho futuro.
 
 O Groq também pode responder HTTP 413 quando o prompt excede o limite de tokens por minuto da conta. Quando o corpo identifica `error.code: "rate_limit_exceeded"` e `error.type: "tokens"`, a API classifica como `QUOTA_EXCEEDED` e permite a mesma cadeia de reservas. Outros erros 413 são tratados como configuração/entrada recusada. A mensagem remota não é exposta. O prompt completo com documento e skill pode exceder o limite do modelo principal mesmo sem histórico; nesse caso, a geração depende de uma reserva elegível e disponível.
 
@@ -255,7 +267,7 @@ Para ativar na instalação existente:
 1. Crie uma chave em [OpenRouter](https://openrouter.ai/settings/keys). O campo
    `Credit limit` limita o gasto autorizado pela chave; não é uma compra de créditos.
    `No limit` remove esse teto, mas não remove as cotas dos modelos gratuitos.
-   O Amadeus restringe esse adaptador a modelos `:free` e preço máximo zero.
+   As reservas deste instalador usam modelos `:free` e preço máximo zero.
    Não é necessário comprar créditos para começar a usar esses modelos.
    A Mistral é opcional: use-a somente se sua conta permitir criar uma chave sem
    pagamento. Embora a documentação descreva acesso gratuito, a conta do usuário
@@ -295,9 +307,10 @@ já estiver configurada, passa a usá-la por último com `localRouting: cloud-fi
 Não instala nem ativa um runtime local novo. O modo híbrido anterior continua
 disponível com `localRouting: hybrid`.
 
-OpenRouter exige um modelo explícito terminado em `:free`; os routers aleatórios
-e os modelos pagos são recusados. Cada pedido também limita os preços de entrada
-e saída a zero. O instalador define um orçamento local conservador de 50 pedidos
+As reservas OpenRouter exigem um modelo explícito terminado em `:free`; routers
+aleatórios e reservas pagas são recusados. Nesses pedidos, os preços de entrada
+e saída são limitados a zero. O principal Llama pago exige a configuração explícita
+descrita na seção de refinamento. O instalador gratuito define 50 pedidos
 por dia UTC, **compartilhado entre os modelos que usam a mesma variável de chave**.
 Pedidos que falham também contam. Em `/v1/usage`, esses modelos exibem a mesma
 contagem agregada; não some suas linhas. Esse orçamento não mede a cota restante
@@ -306,12 +319,12 @@ real do provedor, nem outras aplicações usando a conta.
 Erros de cota e indisponibilidade temporária colocam o modelo em pausa entre
 turnos, compartilhada por execução comum e streaming. `Retry-After` é respeitado;
 sem esse cabeçalho, a pausa é de 60 segundos para cota e 15 segundos para falha
-temporária. Limites confirmados da conta OpenRouter (402 ou 429 com cabeçalhos
-`X-RateLimit-*`) pausam os modelos dessa credencial em conjunto. Um 429 sem esses
+temporária. Falta de crédito do Llama pausa o acesso pago; um 429 gratuito com
+`X-RateLimit-*` pausa as reservas gratuitas dessa credencial em conjunto. Um 429 sem esses
 cabeçalhos pausa somente o modelo, permitindo tentar a próxima reserva gratuita.
 As pausas ficam em memória e são apagadas ao reiniciar a API; a contagem
-de orçamento permanece no SQLite. Falhas após texto entregue nunca iniciam uma
-segunda geração. A API não retoma automaticamente uma fala que já falhou.
+de orçamento permanece no SQLite. Falhas após texto entregue usam somente a
+recuperação limitada descrita no fluxo de retomada, sem iniciar outra resposta do zero.
 
 Para verificar os novos modelos com um cenário sintético por vez:
 

@@ -1,5 +1,9 @@
 # Extrator independente e Jev no refinamento
 
+## Atualização em 06/10/2026
+
+O usuário autorizou créditos OpenRouter para o refinamento: Llama 3.3 70B passa a principal e Jev é integrado inicialmente para direção contextual de tom. Ambos reutilizam `OPENROUTER_API_KEY`, com limites próprios e tetos de preço. As reservas gratuitas e o extrator independente permanecem. O primeiro ensaio confirma funcionamento, sem demonstrar ganho consistente de personalidade. Supervisão da fidelidade e controles adicionais de TTS permanecem posteriores. A [arquitetura atual e os resultados](../architecture/Refinamento_Llama_Jev.md) atualizam a decisão anterior de adiar Jev; o restante deste documento preserva o histórico da fase 3.
+
 Decisão do usuário em 05/10/2026: aplicar extração semântica na fase 3 com um modelo independente das LLMs da conversa e zero gasto adicional com API. Provisoriamente, foi escolhido Groq `openai/gpt-oss-20b`. As ideias de Jev para personalidade e voz ficam para depois da fase 3, junto aos experimentos de fine-tuning e módulos de contexto.
 
 ## Decisão implementada para a memória
