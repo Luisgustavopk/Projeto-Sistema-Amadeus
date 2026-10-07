@@ -4,6 +4,10 @@ import { z } from 'zod';
 const MemoryResponseObjectSchema = z.discriminatedUnion('use', [
   z.strictObject({ use: z.literal('none'), facts: z.array(z.never()).max(0) }),
   z.strictObject({
+    use: z.literal('context'),
+    facts: z.array(z.number().int().min(0).max(11)).min(1).max(12),
+  }),
+  z.strictObject({
     use: z.literal('recall'),
     facts: z.array(z.number().int().min(0).max(11)).min(1).max(12),
   }),

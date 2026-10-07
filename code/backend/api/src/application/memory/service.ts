@@ -51,7 +51,10 @@ export function createMemoryService(
     'reviewMemory'
   > &
     Partial<
-      Pick<import('../persona/analysis.ts').PersonaAnalysis, 'canReviewMemory'>
+      Pick<
+        import('../persona/analysis.ts').PersonaAnalysis,
+        'canReviewMemory' | 'reviewMode'
+      >
     >,
 ) {
   const semantic = createSemanticMemorySearch(repository, embeddings);
@@ -86,6 +89,7 @@ export function createMemoryService(
     queries: string[],
     dataClass: DataClass,
     budget = MEMORY_CONTEXT_CHARACTERS,
+    focused = false,
   ) {
     // Query vectors are cached; background indexing handles ordinary updates.
     // A cache miss still indexes missing passages to preserve cross-language
@@ -126,7 +130,9 @@ export function createMemoryService(
 
           // Relevance is not a calibrated truth probability. A very strong
           // generic match must not suppress a weaker complementary detail.
-          const cutoff = 0.05;
+          const cutoff = focused
+            ? Math.max(0.05, Math.max(...values) * 0.2)
+            : 0.05;
           const accepted = new Map(
             pool.flatMap((fact, index) =>
               values[index]! >= cutoff
@@ -173,6 +179,7 @@ export function createMemoryService(
         budget,
         scores,
         semantic.status().state === 'ready',
+        focused,
       ),
     };
   }
@@ -327,7 +334,64 @@ export function createMemoryService(
     }
   }
 
+  async function validateContext(
+    memories: string,
+    dataClass: DataClass,
+    signal: AbortSignal,
+  ) {
+    try {
+      signal.throwIfAborted();
+      const policy = await repository.policy();
+
+      if (
+        !policy.enabled ||
+        (dataClass !== 'synthetic' && !policy.personalEnabled)
+      ) {
+        return false;
+      }
+
+      const snapshot = JSON.parse(memories) as {
+        facts: { id: string; version: number; text: string }[];
+      };
+
+      if (!Array.isArray(snapshot.facts)) {
+        return false;
+      }
+
+      const current = await repository.candidateFacts(
+        [],
+        dataClass,
+        snapshot.facts.map((fact) => fact.id),
+      );
+      signal.throwIfAborted();
+      const active = await repository.policy();
+
+      return (
+        active.enabled &&
+        (dataClass === 'synthetic' || active.personalEnabled) &&
+        snapshot.facts.every((saved) =>
+          current.some(
+            (fact) =>
+              fact.id === saved.id &&
+              fact.version === saved.version &&
+              fact.text === saved.text &&
+              fact.status === 'confirmed' &&
+              memoryEligible(fact, dataClass) &&
+              (fact.expiresAt === null || fact.expiresAt > Date.now()),
+          ),
+        )
+      );
+    } catch {
+      signal.throwIfAborted();
+
+      return false;
+    }
+  }
+
   const service = {
+    validateContext,
+    reviewMode: async () =>
+      (await responseReviewer?.reviewMode?.()) ?? ('strict' as const),
     prepareForConfiguration: prepareMutation,
     async start() {
       await repository.recover();
@@ -376,38 +440,7 @@ export function createMemoryService(
           return false;
         }
 
-        const snapshot = JSON.parse(memories) as {
-          facts: { id: string; version: number; text: string }[];
-        };
-
-        const permitted = async () => {
-          const activePolicy = await repository.policy();
-
-          if (
-            !activePolicy.enabled ||
-            (dataClass !== 'synthetic' && !activePolicy.personalEnabled)
-          ) {
-            return false;
-          }
-
-          const current = await repository.candidateFacts(
-            [],
-            dataClass,
-            snapshot.facts.map((f) => f.id),
-          );
-
-          return snapshot.facts.every((s) =>
-            current.some(
-              (f) =>
-                f.id === s.id &&
-                f.version === s.version &&
-                f.text === s.text &&
-                f.status === 'confirmed' &&
-                memoryEligible(f, dataClass) &&
-                (f.expiresAt === null || f.expiresAt > Date.now()),
-            ),
-          );
-        };
+        const permitted = () => validateContext(memories, dataClass, signal);
 
         if (!(await permitted())) {
           return false;
@@ -704,6 +737,8 @@ export function createMemoryService(
       const { selected: facts, candidates } = await relevantFacts(
         queries,
         dataClass,
+        MEMORY_CONTEXT_CHARACTERS,
+        true,
       );
       const sources = new Map<string, number[]>();
 

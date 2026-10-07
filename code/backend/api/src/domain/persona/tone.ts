@@ -20,6 +20,7 @@ export const PersonaAnalysisConfigurationSchema = z
     timeoutMs: z.number().int().min(100).max(2500).default(600),
     clarityTimeoutMs: z.number().int().min(100).max(2500).default(1000),
     memoryReviewTimeoutMs: z.number().int().min(100).max(4000).default(2000),
+    memoryReviewMode: z.enum(['strict', 'selective']).default('selective'),
     minimumConfidence: z.number().min(0.5).max(1).default(0.7),
     requestsPerDay: z.number().int().min(0).max(1000).default(100),
     tokensPerDay: z.number().int().min(0).max(1000000).default(200000),

@@ -131,6 +131,9 @@ export function createPersonaAnalysis(dependencies: {
 
   return {
     get,
+    async reviewMode() {
+      return (await get()).configuration.memoryReviewMode;
+    },
     async canReviewMemory(dataClass: DataClass) {
       const { configuration: config } = await get();
 
