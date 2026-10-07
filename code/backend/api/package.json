@@ -7,6 +7,7 @@
     "prepare:voice-presets": "node --env-file-if-exists=.env scripts/prepare-voice-presets.mjs",
     "setup:llama": "node --env-file-if-exists=.env scripts/setup-llama.mjs",
     "check:llama-jev": "node --env-file-if-exists=.env scripts/check-llama-jev.mjs",
+    "check:conversation": "node --env-file-if-exists=.env scripts/check-conversation.mjs",
     "check:voice-latency": "node --env-file-if-exists=.env scripts/check-voice-latency.mjs",
     "check:memory-review": "node --env-file-if-exists=.env scripts/check-memory-review.mjs",
     "check:input-clarity": "node --env-file-if-exists=.env scripts/check-input-clarity.mjs",
