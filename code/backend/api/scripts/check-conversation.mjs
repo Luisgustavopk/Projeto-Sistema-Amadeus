@@ -1,6 +1,6 @@
 import { createClient } from '@libsql/client';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { SqliteProviderConfigurationRepository } from '../src/adapters/database/provider-configuration-repository.ts';
 import { SqliteProviderUsageRepository } from '../src/adapters/database/provider-usage-repository.ts';
@@ -11,8 +11,13 @@ import { createTurnProcessor } from '../src/application/voice/turn-processor.ts'
 import { createVoiceMetrics } from '../src/application/voice/metrics.ts';
 import { LLAMA_REFINEMENT_MODEL } from '../src/domain/providers/openrouter.ts';
 import { PERSONA_VERSION } from '../src/domain/persona/expression.ts';
+import { createRevisionRepository } from '../src/adapters/database/revision-repository.ts';
+import { createPersonaConfiguration } from '../src/application/persona/configuration.ts';
+import { createPersistentPersonaState } from '../src/application/persona/persistent-state.ts';
+import { buildVoicePersonaPrompt } from '../src/application/persona/voice-prompt.ts';
+import { buildPresenceDirection } from '../src/application/persona/presence-direction.ts';
 
-const scenarios = [
+const standardScenarios = [
   {
     id: 'saudacao',
     turns: ['Eae Amadeus, tudo bem?'],
@@ -100,15 +105,38 @@ const scenarios = [
   },
 ];
 
+const suite =
+  process.argv.find((argument) => argument.startsWith('--suite='))?.slice(8) ??
+  'standard';
+if (!['standard', 'presence'].includes(suite))
+  throw new Error('Suite inválida.');
+const scenarios =
+  suite === 'presence'
+    ? JSON.parse(
+        await readFile(
+          new URL('./fixtures/conversation-presence.json', import.meta.url),
+          'utf8',
+        ),
+      )
+    : standardScenarios;
+
 const only = process.argv
   .find((argument) => argument.startsWith('--only='))
   ?.slice(7)
   .split(',');
+const requirePrimary = process.argv.includes('--require-primary');
 if (only?.some((id) => !scenarios.some((scenario) => scenario.id === id)))
   throw new Error('Cenário inválido.');
 if (
   process.argv[2] !== '--run' ||
-  process.argv.slice(3).some((argument) => !argument.startsWith('--only='))
+  process.argv
+    .slice(3)
+    .some(
+      (argument) =>
+        !argument.startsWith('--only=') &&
+        !argument.startsWith('--suite=') &&
+        argument !== '--require-primary',
+    )
 ) {
   console.log(
     'Ensaio textual com cenários fictícios. Usa a cota e os créditos do LLM ativo; não usa STT, Cartesia, Jev ou extração remota. Execute com --run.',
@@ -122,6 +150,11 @@ const database = createClient({
 try {
   const ownerId = process.env.OWNER_ID ?? 'primary';
   const configuration = new SqliteProviderConfigurationRepository(database);
+  const persona = createPersonaConfiguration(
+    createRevisionRepository(database),
+    ownerId,
+  );
+  const personaConfiguration = await persona.get();
   const row = (
     await database.execute({
       sql: 'SELECT config_json FROM foundation_provider_config WHERE owner_id = ?',
@@ -136,6 +169,22 @@ try {
     throw new Error(
       'O ensaio exige o Llama pago já autorizado como principal; não altera a configuração.',
     );
+  if (requirePrimary) {
+    const usage = await new SqliteProviderUsageRepository(database).usage(
+      ownerId,
+      'llm',
+      active.llm,
+    );
+    if (
+      active.llm.limits.enforced !== false &&
+      (usage.requests >= active.llm.limits.requestsPerDay ||
+        usage.budgetTokens >= active.llm.limits.tokensPerDay)
+    ) {
+      throw new Error(
+        'Llama no limite local. Avaliação exclusiva adiada; nenhum modelo foi chamado.',
+      );
+    }
+  }
   let routing = [];
   const providers = createProviderServices({
     configuration,
@@ -146,10 +195,23 @@ try {
     onFallback: (notice) => routing.push(notice),
   });
   const report = {
+    createdAt: new Date().toISOString(),
+    suite,
     personaVersion: PERSONA_VERSION,
+    promptFingerprint: createHash('sha256')
+      .update(
+        buildVoicePersonaPrompt() +
+          buildPresenceDirection('greeting') +
+          buildPresenceDirection('initiative') +
+          personaConfiguration.direction,
+      )
+      .digest('hex'),
+    administrativeDirectionRevision: personaConfiguration.revision,
+    requirePrimary,
     synthetic: true,
     memorySource:
       'fixtures; qualidade de recuperação e verificação semântica não é medida neste ensaio',
+    noAudio: true,
     cases: [],
   };
   const directory = new URL('../data/refinement/', import.meta.url);
@@ -158,7 +220,7 @@ try {
   for (const scenario of scenarios.filter(
     (scenario) => !only || only.includes(scenario.id),
   )) {
-    const recent = [];
+    const recent = (scenario.history ?? []).map((turn) => ({ ...turn }));
     let sentText = '';
     let rawReply = '';
     const metrics = createVoiceMetrics();
@@ -182,6 +244,13 @@ try {
     }));
     const observedProviders = {
       ...providers,
+      execute: async (...args) => {
+        if (args[0] !== 'llm') throw new Error('O ensaio proíbe STT/TTS.');
+        return providers.execute(...args);
+      },
+      executeAudioStream: () => {
+        throw new Error('O ensaio proíbe áudio.');
+      },
       executeStream: async function* (...args) {
         for await (const chunk of providers.executeStream(...args)) {
           rawReply += chunk.content;
@@ -189,11 +258,29 @@ try {
         }
       },
     };
+    // State is isolated from the owner profile, but uses the production service
+    // and SQLite repository. Recreate the service each turn to exercise reload.
+    const stateDatabase = createClient({ url: ':memory:' });
+    await stateDatabase.execute(
+      'CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
+    );
+    const stateRepository = createRevisionRepository(stateDatabase);
+    const stateOwner = randomUUID();
+    const persistentState = {
+      snapshot: (...args) =>
+        createPersistentPersonaState(stateRepository, stateOwner).snapshot(
+          ...args,
+        ),
+      observe: (...args) =>
+        createPersistentPersonaState(stateRepository, stateOwner).observe(
+          ...args,
+        ),
+    };
     const processor = createTurnProcessor(
       observedProviders,
       history,
       metrics,
-      undefined,
+      persona,
       {
         retrieve: async () => (facts.length ? JSON.stringify({ facts }) : ''),
         interruptBackground: () => {},
@@ -201,6 +288,8 @@ try {
         reviewMode: async () => 'selective',
         verifyAnswer: async () => null,
       },
+      undefined,
+      persistentState,
     );
     const conversationId = randomUUID();
     const result = {
@@ -210,7 +299,10 @@ try {
       turns: [],
       metrics: null,
     };
-    for (const [index, text] of scenario.turns.entries()) {
+    for (const [index, item] of scenario.turns.entries()) {
+      const text = typeof item === 'string' ? item : '';
+      const initiativeKind =
+        typeof item === 'string' ? undefined : item.initiativeKind;
       sentText = '';
       rawReply = '';
       routing = [];
@@ -226,6 +318,7 @@ try {
             responseId: randomUUID(),
             dataClass: 'synthetic',
             text,
+            ...(initiativeKind ? { initiativeKind } : {}),
             profile: null,
             signal: AbortSignal.timeout(60000),
             speechEndedAt: start,
@@ -242,8 +335,14 @@ try {
       } catch (error) {
         errors.push(error?.code ?? 'TEST_TURN_FAILED');
       }
+      if (errors.length) process.exitCode = 1;
+      if (requirePrimary && routing.length) {
+        errors.push('PRIMARY_UNAVAILABLE');
+        process.exitCode = 1;
+      }
       result.turns.push({
         user: text,
+        ...(initiativeKind ? { initiativeKind } : {}),
         assistant: sentText,
         rawReply,
         primary: { adapter: active.llm.adapter, model: active.llm.model },
@@ -253,15 +352,18 @@ try {
       });
       recent.push({
         userText: text,
+        ...(initiativeKind ? { initiativeKind } : {}),
         generatedText: '',
         sentText,
         dataClass: 'synthetic',
         responseStatus: errors.length ? 'failed' : 'completed',
         partiallyPlayed: false,
       });
-      if (errors.length) break;
+      if (errors.length || (requirePrimary && routing.length)) break;
     }
     result.metrics = metrics.snapshot();
+    result.artisticState = await persistentState.snapshot('synthetic');
+    stateDatabase.close();
     report.cases.push(result);
     await writeFile(
       new URL(filename, directory),
@@ -274,12 +376,40 @@ try {
         errors: result.turns.flatMap((turn) => turn.errors),
       }),
     );
-    if (result.turns.some((turn) => turn.errors.includes('QUOTA_EXCEEDED')))
+    if (
+      result.turns.some(
+        (turn) =>
+          turn.errors.includes('QUOTA_EXCEEDED') ||
+          (requirePrimary && turn.routing.length),
+      )
+    )
       break;
   }
   await writeFile(
     new URL(filename, directory),
     JSON.stringify(report, null, 2),
+  );
+  const transcript =
+    [
+      '# Ensaio textual de presença e naturalidade',
+      `Persona: ${report.personaVersion}. Suíte: ${suite}. Som desativado.`,
+      'Memórias são fixtures sintéticas; este ensaio não mede extração nem busca semântica. Iniciativas recebem o evento de aplicação real, mas seus relógios são verificados nos testes do controlador.',
+      ...report.cases.flatMap((item) => [
+        `## ${item.id}`,
+        `Critério: ${item.criteria}`,
+        ...(item.facts.length
+          ? [`Contexto fornecido: ${item.facts.join(' ')}`]
+          : []),
+        ...item.turns.flatMap((turn) => [
+          `**${turn.initiativeKind ? 'Aplicação' : 'Participante'}:** ${turn.initiativeKind ?? turn.user}`,
+          `**Amadeus:** ${turn.assistant || '(sem resposta)'}`,
+          `Tempo total: ${turn.milliseconds} ms. Erros: ${turn.errors.join(', ') || 'nenhum'}.`,
+        ]),
+      ]),
+    ].join('\n\n') + '\n';
+  await writeFile(
+    new URL(filename.replace('.json', '.md'), directory),
+    transcript,
   );
   console.log(`Relatório local: data/refinement/${filename}`);
 } finally {
