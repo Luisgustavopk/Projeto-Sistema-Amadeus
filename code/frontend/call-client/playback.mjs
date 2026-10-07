@@ -13,6 +13,8 @@ export function createPlayback(context, send, onError, onStart) {
     }
   };
   const progress = (item, ended = false, force = false) => {
+    // Queue offsets do not prove playback; timers run for future sources too.
+    if (context.currentTime < item.start) return;
     const playedSamples = Math.max(
       item.last,
       Math.min(
@@ -25,6 +27,7 @@ export function createPlayback(context, send, onError, onStart) {
       ),
     );
     const totalPlayed = item.offset + playedSamples;
+    item.segment.heard = Math.max(item.segment.heard ?? 0, totalPlayed);
     const final = totalPlayed === item.meta.sampleCount;
     if (
       totalPlayed > item.segment.last &&
@@ -82,6 +85,83 @@ export function createPlayback(context, send, onError, onStart) {
     segment.scheduled += count;
   };
   return {
+    abortStream(meta) {
+      if (
+        pending?.streaming &&
+        pending.meta.segmentId === meta.segmentId &&
+        meta.turnId === turnId
+      )
+        pending = null;
+    },
+    startStream(meta) {
+      if (meta.turnId !== turnId) return;
+      if (![16000, 24000].includes(meta.sampleRate) || pending) {
+        onError(new Error("Invalid streaming audio metadata"));
+        return;
+      }
+      const capacity = meta.sampleRate * 90;
+      pending = {
+        meta: { ...meta, sampleCount: capacity, frameCount: 4500 },
+        streaming: true,
+        frameSamples: meta.sampleRate / 50,
+        next: 0,
+        pcm: new Int16Array(capacity),
+        scheduled: 0,
+        last: 0,
+      };
+    },
+    endStream(meta) {
+      if (meta.turnId !== turnId) return;
+      if (
+        !pending?.streaming ||
+        pending.meta.segmentId !== meta.segmentId ||
+        pending.meta.responseId !== meta.responseId ||
+        !Number.isInteger(meta.sampleCount) ||
+        meta.sampleCount < 1 ||
+        meta.sampleCount > pending.pcm.length ||
+        Math.ceil(meta.sampleCount / pending.frameSamples) !==
+          meta.frameCount ||
+        meta.frameCount < pending.next ||
+        meta.frameCount > pending.next + 1
+      ) {
+        onError(new Error("Invalid streaming audio end"));
+        return;
+      }
+      Object.assign(pending.meta, {
+        sampleCount: meta.sampleCount,
+        frameCount: meta.frameCount,
+      });
+      pending.streaming = false;
+      if (pending.next === meta.frameCount) {
+        schedule(pending, meta.sampleCount);
+        const started = [...confirmations].filter(
+          (item) =>
+            item.segment === pending && context.currentTime >= item.start,
+        );
+        const latest = started.reduce(
+          (previous, item) =>
+            !previous || item.offset > previous.offset ? item : previous,
+          null,
+        );
+        if (latest) progress(latest, false, true);
+        // A short stream may finish playing before its final size arrives.
+        if (
+          pending.heard >= meta.sampleCount &&
+          pending.last < meta.sampleCount
+        ) {
+          send({
+            type: "playback.progress",
+            responseId: meta.responseId,
+            segmentId: meta.segmentId,
+            playedSamples: meta.sampleCount,
+          });
+          pending.last = meta.sampleCount;
+          lastProgressTime = context.currentTime;
+        }
+        pending = null;
+        finish();
+      }
+    },
     isPlaying() {
       return [...confirmations].some(
         (item) =>
@@ -153,6 +233,7 @@ export function createPlayback(context, send, onError, onStart) {
       if (
         buffer.byteLength !== 8 + pending.frameSamples * 2 ||
         view.getUint32(0, true) !== pending.next ||
+        pending.next >= pending.meta.frameCount ||
         view.getUint32(4, true) !== turnId
       ) {
         onError(new Error("Invalid audio sequence"));
@@ -164,11 +245,11 @@ export function createPlayback(context, send, onError, onStart) {
       }
       pending.next++;
       // Start after 100 ms of received PCM; do not await a whole segment.
-      // The backend still generates complete segments before sending them.
+      // Progressive streams may still be generating the rest of this segment.
       if (pending.next % 5 === 0 || pending.next === pending.meta.frameCount) {
         schedule(pending, pending.next * pending.frameSamples);
       }
-      if (pending.next === pending.meta.frameCount) {
+      if (!pending.streaming && pending.next === pending.meta.frameCount) {
         pending = null;
         finish();
       }

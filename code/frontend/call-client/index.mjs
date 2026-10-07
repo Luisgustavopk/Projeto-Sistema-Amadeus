@@ -118,6 +118,9 @@ export async function createCallClient(options, runtime = {}) {
       if (value.type === "audio.segment") {
         playback.metadata(value);
       }
+      if (value.type === "audio.start") playback.startStream(value);
+      if (value.type === "audio.end") playback.endStream(value);
+      if (value.type === "audio.abort") playback.abortStream(value);
       if (value.type === "reply.done") {
         playback.done(value.responseId);
       }

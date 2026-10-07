@@ -55,6 +55,175 @@ function fill(f) {
   }
 }
 
+function liveFrames(f, count) {
+  for (let index = 0; index < count; index++) {
+    const data = new ArrayBuffer(648);
+    const view = new DataView(data);
+    view.setUint32(0, index, true);
+    view.setUint32(4, 1, true);
+    f.player.frame(data);
+  }
+}
+
+test("receiving the end of a queued minute does not confirm unheard audio", (t) => {
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  const f = fixture();
+  try {
+    f.player.startStream({
+      turnId: 1,
+      responseId: "response",
+      segmentId: "live",
+      sampleRate: 16000,
+    });
+    liveFrames(f, 3000);
+    t.mock.timers.tick(500);
+    assert.equal(f.sent.length, 0);
+    f.player.endStream({
+      turnId: 1,
+      responseId: "response",
+      segmentId: "live",
+      sampleCount: 960000,
+      frameCount: 3000,
+    });
+    assert.equal(f.sent.length, 0);
+    f.context.currentTime = 0.07;
+    f.player.stop();
+    assert.equal(f.sent.length, 1);
+    assert.equal(f.sent[0].playedSamples, 800);
+  } finally {
+    f.player.stop();
+  }
+});
+
+test("stream end emits one cumulative confirmation for the part actually heard", () => {
+  const f = fixture();
+  try {
+    f.player.startStream({
+      turnId: 1,
+      responseId: "response",
+      segmentId: "live",
+      sampleRate: 16000,
+    });
+    liveFrames(f, 100);
+    f.context.currentTime = 0.27;
+    f.player.endStream({
+      turnId: 1,
+      responseId: "response",
+      segmentId: "live",
+      sampleCount: 32000,
+      frameCount: 100,
+    });
+    assert.equal(f.sent.length, 1);
+    assert.ok(Math.abs(f.sent[0].playedSamples - 4000) <= 1);
+    f.context.currentTime = 0.37;
+    f.player.stop();
+    assert.ok(Math.abs(f.sent.at(-1).playedSamples - 5600) <= 1);
+  } finally {
+    f.player.stop();
+  }
+});
+
+test("late stream end does not duplicate a final confirmation", () => {
+  const f = fixture();
+  try {
+    f.player.startStream({
+      turnId: 1,
+      responseId: "response",
+      segmentId: "live",
+      sampleRate: 16000,
+    });
+    liveFrames(f, 5);
+    f.context.currentTime = 0.12;
+    f.sources[0].onended();
+    f.player.endStream({
+      turnId: 1,
+      responseId: "response",
+      segmentId: "live",
+      sampleCount: 1600,
+      frameCount: 5,
+    });
+    assert.equal(
+      f.sent.filter((event) => event.type === "playback.progress").length,
+      1,
+    );
+    assert.equal(f.sent[0].playedSamples, 1600);
+  } finally {
+    f.player.stop();
+  }
+});
+
+test("plays a live stream before its final size and excludes padding from confirmation", () => {
+  const f = fixture();
+  f.player.startStream({
+    turnId: 1,
+    responseId: "response",
+    segmentId: "live",
+    sampleRate: 24000,
+  });
+  const frame = (index) => {
+    const data = new ArrayBuffer(968);
+    const view = new DataView(data);
+    view.setUint32(0, index, true);
+    view.setUint32(4, 1, true);
+    f.player.frame(data);
+  };
+  for (let index = 0; index < 5; index++) frame(index);
+  assert.equal(f.sources.length, 1);
+  f.player.endStream({
+    turnId: 1,
+    responseId: "response",
+    segmentId: "live",
+    sampleCount: 2500,
+    frameCount: 6,
+  });
+  frame(5);
+  assert.equal(f.sources.at(-1).buffer.duration, 100 / 24000);
+  f.player.done("response");
+  f.context.currentTime = 1;
+  for (const source of f.sources) source.onended();
+  assert.equal(
+    f.sent.filter((event) => event.type === "playback.progress").at(-1)
+      .playedSamples,
+    2500,
+  );
+  assert.equal(f.sent.at(-1).type, "playback.ended");
+  f.player.stop();
+});
+
+test("interruption of a stream confirms only heard samples and accepts a new stream", () => {
+  const f = fixture();
+  f.player.startStream({
+    turnId: 1,
+    responseId: "response",
+    segmentId: "live",
+    sampleRate: 16000,
+  });
+  for (let index = 0; index < 5; index++) {
+    const data = new ArrayBuffer(648);
+    const view = new DataView(data);
+    view.setUint32(0, index, true);
+    view.setUint32(4, 1, true);
+    f.player.frame(data);
+  }
+  f.context.currentTime = 0.07;
+  f.player.stop(2);
+  assert.equal(f.sent[0].playedSamples, 800);
+  f.player.startStream({
+    turnId: 2,
+    responseId: "next",
+    segmentId: "fresh",
+    sampleRate: 24000,
+  });
+  f.player.endStream({
+    turnId: 1,
+    responseId: "response",
+    segmentId: "live",
+    sampleCount: 1600,
+    frameCount: 5,
+  });
+  f.player.stop();
+});
+
 test("24 kHz preserves samples, timing and interruption progress, then plays a 16 kHz fallback", () => {
   const f = fixture();
   f.player.metadata({
