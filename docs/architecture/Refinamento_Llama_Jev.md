@@ -1,5 +1,41 @@
 # Refinamento com Llama e Jev
 
+## Continuidade, presença e revisão seletiva — persona 0.4.18
+
+Esta seção prevalece sobre os formatos, posições da curadoria e política de revisão das rodadas anteriores. A implementação segue a ordem acordada: continuidade/memória, atuação contextual e otimização. Autonomia, pesquisa, backchannels e notificações são extensões descritas em [Presença e autonomia](Presenca_e_Autonomia_Amadeus.md).
+
+O histórico agora distingue texto enviado de áudio confirmado. A migração `0009_speech_text_delivery` registra `text_sent` por segmento; rascunhos não enviados não entram no contexto. Registros antigos com áudio gerado recebem o marcador; textos antigos sem essa evidência não são presumidos como entregues. Memória e fontes continuam usando áudio confirmado. A geração recebe mensagens com papéis reais e a fala atual literal, conservando status de entrega separado. Assim, uma escolha “1” pode continuar opções mostradas mesmo se o áudio estiver indisponível, sem afirmar que foram ouvidas ou aceitas.
+
+O complemento [conversation-presence-v1.md](../../code/backend/api/src/application/persona/conversation-presence-v1.md) reúne nome de tratamento, proporcionalidade, opiniões, reparo, continuidade e callbacks. Integra a voz e o prompt completo de comparação. A persona, skill operacional e curadoria canônica ficam no prefixo estável do sistema; direção variável, memórias e contrato ficam depois. Os documentos originais e a fonte externa permanecem preservados; não se envia o corpus bruto inteiro por turno. Familiaridade passa a considerar interações retidas do mesmo proprietário, com isolamento de classificação e exclusão de fontes bloqueadas. Não implementa PAD persistente nem mede intimidade humana.
+
+Um único cabeçalho inicial contém memória, intenção, emoção e intensidade. As rodadas detectaram instabilidade com cabeçalho e rodapé separados. O parser preserva compatibilidade com formatos anteriores válidos; uma declaração vazia tardia pode ser descartada, mas não autoriza lembranças retroativamente. Referências não vazias no rodapé, objetos arbitrários, vazamentos estruturais e JSON malformado continuam rejeitados. Rótulo artístico desconhecido pode usar expressão neutra, sem transformar erro de emoção em perda do texto válido.
+
+### Seleção e revisão
+
+A busca semântica multilíngue e o classificador local continuam presentes. Para a conversa, priorizar três fatos diretos, mantendo empates próximos e até dois complementos de uma fonte direta. O teto é oito fatos, sujeito ao orçamento de 3.000 caracteres; checkpoints conservam seu orçamento separado. Não criar listas de gêneros, idiomas ou expressões de identidade. Coocorrência fornece contexto, nunca uma nova relação factual por inferência. A seleção para extração em segundo plano conserva seus limites anteriores.
+
+`memoryReviewMode`, na configuração autenticada de análise da persona, tem padrão `selective`; `strict` mantém revisão semântica de todo bloco com fatos. No modo seletivo, `recall` ou declaração ausente exige revisão; `context` (critérios para proposta nova) e `none` dispensam o juiz. Em ambos, política, permissão, versão e expiração são revalidadas localmente antes da geração e da entrega. Revogação anterior à primeira fala pode iniciar uma única geração sem fatos; contexto já recusado antes da primeira geração não causa resposta duplicada. Extração permanece assíncrona e independente.
+
+Essa otimização **não garante que o modelo classifique seu próprio uso corretamente**. Sem juiz para `context`/`none`, há menos supervisão da resposta final. Fonte válida também não garante inferência válida. `null` na revisão continua significando indisponibilidade, sem fingir aprovação. O modo estrito está disponível quando essa troca não for aceitável.
+
+### Cache e observabilidade
+
+OpenRouter recebe `session_id` estável por conversa; a montagem conserva o prefixo para favorecer reaproveitamento quando o endpoint oferece cache. Métricas `llmUsage` registram tokens, cache e custo reportados uma vez por geração. `cacheReportedGenerations` e `costReportedGenerations` distinguem ausência de informação de zero medido. Não foram fixados novos provedores nem relaxados preços, políticas ou reservas.
+
+Cache depende de modelo e endpoint; afinidade de sessão também pode ceder diante de fallback. Não elimina geração, STT ou TTS, e não promete desconto nesta instalação. [Documentação de cache do OpenRouter](https://openrouter.ai/docs/guides/best-practices/prompt-caching).
+
+### Ensaios e limites
+
+O novo `npm run check:conversation -- --run` usa o processador real com dez casos fictícios, histórico textual e memórias fixas; não chama STT/TTS, Jev ou extrator, nem grava fatos pessoais. Registra roteamento e critérios para leitura humana, sem notas artísticas automáticas. Mantém preços, cotas e contabilização da configuração ativa.
+
+A primeira rodada expôs erros de formato e respostas genéricas, apesar de escolhas numéricas/em inglês acompanharem o histórico. Depois das correções, a repetição seletiva de cinco casos completou **nove turnos sem erro de protocolo**, com dez gerações reportadas, 37.652 tokens de entrada e 650 de saída. Todas as nove respostas tiveram fallback do principal por `QUOTA_EXCEEDED`; usaram Groq e/ou Cloudflare. Portanto essa repetição **não é um teste exclusivo do Llama pago**. Os limites não foram elevados ou zerados.
+
+O relatório local `data/refinement/1791351120583-conversation-quality.json` registra os detalhes. Houve escolha correta e uso do primeiro nome pedido, mas também apresentação genérica e callback sem retomar o plano fornecido. A fidelidade artística continua parcial. Os valores medianos por cenário até o primeiro segmento textual variaram de aproximadamente 0,62 a 8,42 segundos; não medem primeiro áudio nem estabelecem redução de latência frente a uma linha de base equivalente. Os eventos reportados somaram zero tokens de cache; não foi demonstrada economia de cache. Custos ausentes não são tratados como gratuidade comprovada.
+
+Regressões locais cobrem histórico enviado/ouvido, isolamento, classificação, familiaridade entre conversas, papéis, orçamento do histórico, métricas SSE, revisão seletiva/estrita, revogação, seleção focada, complementos e metadados. Retestar a qualidade exclusiva do principal quando sua cota estiver disponível, sem substituir resultado de reserva por evidência sobre o principal.
+
+Verificação final: **507 testes em 65 arquivos**, tipos, lint, formatação, build e `git diff --check` passaram. Os prompts compilados foram importados: vocal com 12.015 caracteres (teto 12.500) e comparação com 25.613 (teto 27.000). O complemento de presença aumenta o prefixo em troca de direção comportamental; a rodada não comprova menor latência fim a fim. Nenhuma chamada Cartesia foi feita nesta validação.
+
 ## Recuperação independente da cota auxiliar — persona 0.4.17
 
 A recuperação de memórias confirmadas e elegíveis não depende da disponibilidade de Jev ou GPT-OSS. A checagem introduzida na versão anterior omitia os fatos quando ambos estavam sem cota, causando respostas como “não tenho como saber seus gostos” apesar de eles estarem salvos. Essa condição foi removida.
