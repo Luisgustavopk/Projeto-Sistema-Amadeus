@@ -26,14 +26,31 @@ export function providerAttempts(
   role: Role,
   config: ProviderConfig,
 ): ProviderConfig[] {
-  const { fallbackModel, fallbackProviders, speechFallback, ...primary } =
-    config;
+  const {
+    fallbackModel,
+    fallbackProviders,
+    speechFallback,
+    fallbackVoiceId,
+    fallbackVoiceApiKeyEnv,
+    ...primary
+  } = config;
   delete primary.localProvider;
   delete primary.localRouting;
 
   if (role !== 'llm') {
     return [
       primary,
+      ...(role === 'tts' && fallbackVoiceId
+        ? [
+            {
+              ...primary,
+              voiceId: fallbackVoiceId,
+              ...(fallbackVoiceApiKeyEnv
+                ? { apiKeyEnv: fallbackVoiceApiKeyEnv }
+                : {}),
+            },
+          ]
+        : []),
       ...(speechFallback ? [{ ...speechFallback, limits: config.limits }] : []),
     ];
   }

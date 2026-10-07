@@ -111,6 +111,30 @@ const temporaryFailure = async function* (): AsyncIterable<ProviderOutput> {
   yield await Promise.reject(new ProviderTemporarilyUnavailableError());
 };
 
+it('troca para a reserva no prazo inicial, sem esperar uma LLM que ignora cancelamento', async () => {
+  vi.useFakeTimers();
+  const test = setup(async function* () {
+    yield { content: '', inputTokens: 4, outputTokens: 0 };
+    await new Promise(() => {});
+    yield output;
+  });
+
+  try {
+    const result = collect(
+      test.services.executeStream(input, undefined, {
+        firstChunkTimeoutMs: 100,
+      }),
+    );
+    await vi.advanceTimersByTimeAsync(100);
+    expect((await result).at(-1)).toEqual(output);
+    expect(test.factory).toHaveBeenCalledTimes(2);
+    expect(test.notify).toHaveBeenCalledOnce();
+    expect(test.settle).toHaveBeenCalledWith('gemini-3.8-flash', null);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 it('usa reserva após 503 antes de qualquer chunk e contabiliza cada modelo', async () => {
   const test = setup(temporaryFailure);
   expect(await collect(test.services.executeStream(input))).toEqual([output]);

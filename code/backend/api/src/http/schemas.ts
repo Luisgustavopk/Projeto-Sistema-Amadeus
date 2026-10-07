@@ -79,7 +79,7 @@ export const CapabilitiesSchema = z.object({
         testedVoiceControls: z.array(z.string()),
       }),
       capabilitySource: z.literal('adapter-reported'),
-      transport: z.enum(['buffered-json', 'sse']),
+      transport: z.enum(['buffered-json', 'sse', 'websocket']),
       nativeStreaming: z.boolean(),
     }),
   ),

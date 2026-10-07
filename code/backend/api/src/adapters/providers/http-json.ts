@@ -203,6 +203,9 @@ export function createProvider(
                 role,
                 model: config.model ?? null,
                 ...input,
+                // Cartesia context reuse is internal to its streaming adapter;
+                // buffered local speech services reject this extra field.
+                speechContextId: undefined,
                 systemPrompt: undefined,
                 content: input.systemPrompt
                   ? `${input.systemPrompt}\n${input.content}`

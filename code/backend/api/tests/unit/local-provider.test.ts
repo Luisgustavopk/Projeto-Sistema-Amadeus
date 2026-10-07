@@ -8,6 +8,54 @@ import {
 
 afterEach(() => vi.unstubAllGlobals());
 
+it('não envia contexto Cartesia ao contrato HTTP de fala', async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>(async (_url, init) => {
+    const input = JSON.parse(String(init?.body));
+
+    if ('speechContextId' in input) {
+      return new Response('{}', { status: 422 });
+    }
+
+    expect(input.voice).toMatchObject({ referenceFile: 'reference.wav' });
+
+    return new Response(
+      JSON.stringify({
+        content: '',
+        inputTokens: null,
+        outputTokens: null,
+        audio: {
+          pcmBase64: Buffer.alloc(4800).toString('base64'),
+          sampleRate: 24000,
+          channels: 1,
+        },
+      }),
+    );
+  });
+  vi.stubGlobal('fetch', fetch);
+  const provider = createProviderFactory({ LOCAL_TTS_API_KEY: 'test-key' })(
+    'tts',
+    ProviderSchema.parse({
+      adapter: 'http-json',
+      endpoint: 'http://127.0.0.1:8002',
+      apiKeyEnv: 'LOCAL_TTS_API_KEY',
+      dataPolicy: 'local-approved',
+    }),
+  );
+  await expect(
+    provider.execute({
+      content: 'Olá.',
+      dataClass: 'synthetic',
+      maxTokens: 1,
+      speechContextId: 'stream-context',
+      voice: {
+        id: '43df381e-ea60-4277-bd90-91ceb0c71007',
+        referenceFile: 'reference.wav',
+        referenceSha256: 'a'.repeat(64),
+      },
+    }),
+  ).resolves.toMatchObject({ audio: { sampleRate: 24000 } });
+});
+
 const local = {
   adapter: 'openai-local',
   endpoint: 'http://127.0.0.1:8003/v1/chat/completions',

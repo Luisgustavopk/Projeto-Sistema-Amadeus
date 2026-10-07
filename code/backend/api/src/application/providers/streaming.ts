@@ -4,6 +4,7 @@ import {
 } from './cooldowns.ts';
 import { selectProviderAttempts } from './routing.ts';
 import { setTimeout as delay } from 'node:timers/promises';
+import { withFirstChunkDeadline } from './first-chunk.ts';
 import type { ProviderConfigurationRepository } from '../../ports/provider-configuration-repository.ts';
 import type { ProviderUsageRepository } from '../../ports/provider-usage-repository.ts';
 import type {
@@ -29,6 +30,7 @@ import {
 } from './fallback.ts';
 
 export type ProviderStreamOptions = {
+  firstChunkTimeoutMs?: number;
   onFallback?: (notice: ProviderFallbackNotice) => void | Promise<void>;
 };
 
@@ -144,11 +146,16 @@ export function createProviderStreaming(
               inputTokens: null,
               outputTokens: null,
             };
-            const source = provider.stream
-              ? provider.stream(input, signal)
-              : (async function* () {
-                  yield await provider.execute(input, signal);
-                })();
+            const source = withFirstChunkDeadline(
+              (attemptSignal) =>
+                provider.stream
+                  ? provider.stream(input, attemptSignal)
+                  : (async function* () {
+                      yield await provider.execute(input, attemptSignal);
+                    })(),
+              signal,
+              options.firstChunkTimeoutMs,
+            );
 
             for await (const chunk of source) {
               signal?.throwIfAborted();
@@ -163,7 +170,7 @@ export function createProviderStreaming(
               output.content += chunk.content;
               output.inputTokens = chunk.inputTokens ?? output.inputTokens;
               output.outputTokens = chunk.outputTokens ?? output.outputTokens;
-              delivered = true;
+              delivered ||= Boolean(chunk.content);
               yield chunk;
             }
 

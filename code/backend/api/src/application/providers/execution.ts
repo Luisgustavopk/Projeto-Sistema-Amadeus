@@ -70,7 +70,9 @@ export function createProviderExecution(
           const config = attempts[index]!;
           assertProviderCanExecute(config, input.dataClass);
           const blocked =
-            role === 'llm' ? cooldowns.blocked(config) : undefined;
+            role === 'llm' || config.adapter === 'cartesia'
+              ? cooldowns.blocked(config)
+              : undefined;
 
           if (blocked) {
             const next = attempts[index + 1];
@@ -87,6 +89,12 @@ export function createProviderExecution(
 
           try {
             if (input.purpose === 'memory') {
+              if (config.openRouterPaid) {
+                throw new QuotaExceededError(
+                  'A memória permanece em modelos gratuitos independentes.',
+                );
+              }
+
               if (config.adapter === 'gemini' && config.geminiTier === 'paid') {
                 throw new QuotaExceededError(
                   'Trabalhos de memória não usam o plano pago do Gemini.',
@@ -155,7 +163,7 @@ export function createProviderExecution(
           try {
             result = await factory(role, config).execute(input, signal);
           } catch (error) {
-            if (role === 'llm') {
+            if (role === 'llm' || config.adapter === 'cartesia') {
               cooldowns.record(config, error, signal);
             }
 

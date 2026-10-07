@@ -11,6 +11,7 @@ import {
 } from '../../domain/errors/providers.ts';
 import { NoSpeechDetectedError } from '../../domain/errors/voice.ts';
 import { NO_CAPABILITIES } from './http-json.ts';
+import { cartesiaStreaming } from './cartesia-stream.ts';
 
 const DeepgramResponse = z.object({
   results: z.object({
@@ -332,8 +333,9 @@ export function createCartesiaProvider(
 
   return {
     role,
-    transport: 'buffered-json',
-    nativeStreaming: false,
+    transport: 'websocket',
+    nativeStreaming: true,
+    ...cartesiaStreaming(key, voiceId, CARTESIA_VERSION, providerError),
     async health() {
       try {
         const response = await fetchResponse(
@@ -358,6 +360,8 @@ export function createCartesiaProvider(
           capabilities: {
             ...NO_CAPABILITIES,
             customVoice: true,
+            incrementalGeneration: true,
+            progressiveDelivery: true,
           },
         };
       } catch {

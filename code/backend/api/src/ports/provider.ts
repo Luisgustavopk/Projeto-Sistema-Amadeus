@@ -21,8 +21,10 @@ export type ProviderInput = {
   maxTokens: number;
   audio?: { pcmBase64: string; sampleRate: 16000; channels: 1 } | undefined;
   voice?: { id: string; referenceFile: string; referenceSha256: string };
+  speechContextId?: string;
 };
 export type ProviderOutput = {
+  progressiveAudio?: boolean;
   content: string;
   inputTokens: number | null;
   outputTokens: number | null;
@@ -31,12 +33,17 @@ export type ProviderOutput = {
 
 export interface Provider {
   role: Role;
-  transport: 'buffered-json' | 'sse';
+  transport: 'buffered-json' | 'sse' | 'websocket';
   nativeStreaming: boolean;
   health(): Promise<{ available: boolean; capabilities: ProviderCapabilities }>;
   stream?(
     input: ProviderInput,
     signal?: AbortSignal,
   ): AsyncIterable<ProviderOutput>;
+  streamAudio?(
+    input: ProviderInput,
+    signal?: AbortSignal,
+  ): AsyncIterable<ProviderOutput>;
+  closeSpeech?(contextId: string): void;
   execute(input: ProviderInput, signal?: AbortSignal): Promise<ProviderOutput>;
 }

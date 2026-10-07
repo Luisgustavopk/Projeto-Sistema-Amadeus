@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { LocalLlmSchema, LocalCompletionEndpointSchema } from './local.ts';
+import { OpenRouterPaidSchema, validOpenRouterPayment } from './openrouter.ts';
 
 export const RoleSchema = z.enum(['llm', 'stt', 'tts']);
 export type Role = z.infer<typeof RoleSchema>;
@@ -99,6 +100,7 @@ const LlmFallbackSchema = z
 
 export const ProviderSchema = z
   .strictObject({
+    openRouterPaid: OpenRouterPaidSchema.optional(),
     adapter: z.enum([
       'disabled',
       'http-json',
@@ -116,6 +118,8 @@ export const ProviderSchema = z
     apiKeyEnv: ApiKeyEnvSchema.optional(),
     model: z.string().min(1).max(128).optional(),
     voiceId: z.uuid().optional(),
+    fallbackVoiceId: z.uuid().optional(),
+    fallbackVoiceApiKeyEnv: ApiKeyEnvSchema.optional(),
     speechFallback: LocalSpeechFallbackSchema.optional(),
     accountId: z
       .string()
@@ -232,10 +236,11 @@ export const ProviderSchema = z
       });
     }
 
-    if (p.adapter === 'openrouter' && !p.model?.endsWith(':free')) {
+    if (!validOpenRouterPayment(p)) {
       ctx.addIssue({
         code: 'custom',
-        message: 'OpenRouter exige um modelo explícito com sufixo :free.',
+        message:
+          'OpenRouter exige :free ou Llama 3.3 com autorização explícita e teto de preço.',
       });
     }
 
@@ -299,10 +304,27 @@ export const ProviderSchema = z
       });
     }
 
+    if (
+      p.fallbackVoiceId &&
+      (p.adapter !== 'cartesia' || p.fallbackVoiceId === p.voiceId)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Voz reserva exige Cartesia e deve diferir da principal.',
+      });
+    }
+
     if (p.speechFallback && !['deepgram', 'cartesia'].includes(p.adapter)) {
       ctx.addIssue({
         code: 'custom',
         message: 'Fallback local só se aplica aos provedores de fala remotos.',
+      });
+    }
+
+    if (p.fallbackVoiceApiKeyEnv && !p.fallbackVoiceId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Credencial da voz reserva exige fallbackVoiceId.',
       });
     }
 
@@ -377,6 +399,7 @@ export const ProvidersSchema = z
 
     for (const role of ['stt', 'tts'] as const) {
       if (
+        providers[role].openRouterPaid ||
         providers[role].fallbackModel ||
         providers[role].fallbackProviders?.length ||
         providers[role].localProvider ||

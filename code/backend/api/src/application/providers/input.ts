@@ -30,6 +30,7 @@ const InputSchema = z.strictObject({
     })
     .optional(),
   maxTokens: z.number().int().min(1).max(1000000),
+  speechContextId: z.uuid().optional(),
 });
 
 export function validateProviderInput(role: Role, input: ProviderInput) {
@@ -38,6 +39,7 @@ export function validateProviderInput(role: Role, input: ProviderInput) {
     !RoleSchema.safeParse(role).success ||
     (role !== 'llm' && input.systemPrompt !== undefined) ||
     (role !== 'llm' && input.purpose !== undefined) ||
+    (role !== 'tts' && input.speechContextId !== undefined) ||
     (input.memoryTask !== undefined && input.purpose !== 'memory') ||
     (role === 'stt' ? !input.audio : !input.content.trim())
   ) {
