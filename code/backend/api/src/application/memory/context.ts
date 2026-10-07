@@ -8,24 +8,40 @@ const answerDirection = readFileSync(
   new URL('./memory-answer-direction-v1.md', import.meta.url),
   'utf8',
 ).trim();
+const useDirection = readFileSync(
+  new URL('./memory-use-v1.md', import.meta.url),
+  'utf8',
+).trim();
 
 if (
   !direction ||
-  direction.length > 2000 ||
+  direction.length > 3500 ||
   !answerDirection ||
-  answerDirection.length > 2000
+  answerDirection.length > 2000 ||
+  !useDirection ||
+  useDirection.length > 3000
 ) {
   throw new Error('Direção de memória inválida.');
 }
 
-export function memoryDirection(memories: string) {
+export function memoryDirection(
+  memories: string,
+  speechOnly = false,
+  voiceFormat = false,
+) {
   return (
     '\nMEMÓRIA OPERACIONAL: o aplicativo oferece memória persistente. ' +
     (memories
-      ? 'Neste turno a API forneceu memórias autorizadas no contexto. Use os fatos relevantes para responder naturalmente, sem negar essa capacidade.'
-      : 'Neste turno a API não forneceu memórias relevantes autorizadas. Se o detalhe também não estiver no histórico, diga que não tem essa informação disponível agora; não conclua que o aplicativo não possui memória persistente.') +
+      ? 'Neste turno há fatos autorizados no contexto; sua relevância depende da fala atual.'
+      : 'Neste turno não há fatos persistentes selecionados; converse normalmente. Apenas se a pessoa pedir uma lembrança ausente também do histórico, reconheça que essa informação não está disponível.') +
     '\n' +
-    direction
+    (memories ? direction : '') +
+    '\n' +
+    (!memories
+      ? useDirection.split('\n\n')[0]
+      : speechOnly || voiceFormat
+        ? useDirection.split('\n\nFORMATO ADICIONAL:')[0]
+        : useDirection)
   );
 }
 

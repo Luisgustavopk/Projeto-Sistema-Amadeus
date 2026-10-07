@@ -254,6 +254,224 @@ it('revalida permissão e versão antes do planejamento, sem enviar fatos revoga
   expect(f.execute).not.toHaveBeenCalled();
 });
 
+it('revisor rápido conserva revalidação local e evita usar o extrator sem cota', async () => {
+  const f = await fixture();
+  await enableSemantic(f);
+  const fact = await f.service.create(
+    input('Tenho um gato chamado Íris.', { permission: 'eligible' }),
+  );
+  const reviewMemory = vi.fn(async () => true);
+  const service = createMemoryService(
+    f.repo,
+    { execute: f.execute },
+    () => false,
+    undefined,
+    undefined,
+    { reviewMemory },
+  );
+  cleanup.push(() => service.stop());
+  const memories = JSON.stringify({ facts: [fact] });
+  expect(
+    await service.verifyAnswer(
+      memories,
+      'Qual é o nome do gato?',
+      'Íris.',
+      'synthetic',
+      new AbortController().signal,
+    ),
+  ).toBe(true);
+  expect(f.execute).not.toHaveBeenCalled();
+  reviewMemory.mockImplementationOnce(async () => {
+    await f.repo.editFact(fact.id, fact.version, {
+      ...input(fact.text, { permission: 'local-only' }),
+      status: 'confirmed',
+    });
+
+    return true;
+  });
+  expect(
+    await service.verifyAnswer(
+      memories,
+      'Qual é o nome do gato?',
+      'Íris.',
+      'synthetic',
+      new AbortController().signal,
+    ),
+  ).toBe(false);
+});
+
+it.each([
+  { fast: true, backup: false },
+  { fast: false, backup: true },
+  { fast: false, backup: false },
+])(
+  'recupera fatos confirmados independentemente da cota dos revisores: $fast/$backup',
+  async ({ fast, backup }) => {
+    const f = await fixture();
+    await enableSemantic(f);
+    const fact = await f.service.create(
+      input('Tenho um gato chamado Íris.', { permission: 'eligible' }),
+    );
+    const service = createMemoryService(
+      f.repo,
+      { execute: f.execute, canReviewMemory: async () => backup },
+      () => false,
+      undefined,
+      undefined,
+      { reviewMemory: async () => null, canReviewMemory: async () => fast },
+    );
+    cleanup.push(() => service.stop());
+    const context = await service.retrieve(
+      f.conversation.id,
+      'Qual é o nome do meu gato?',
+      'synthetic',
+    );
+    expect(context.includes('Íris')).toBe(true);
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(
+      (await f.repo.facts()).some(
+        (f) => f.id === fact.id && f.status === 'confirmed',
+      ),
+    ).toBe(true);
+  },
+);
+
+it.each(['quota', 'revoked', 'disabled'])(
+  'distingue revisor indisponível de permissão inválida: %s',
+  async (failure) => {
+    const f = await fixture();
+    await enableSemantic(f);
+    const fact = await f.service.create(
+      input('Tenho um gato chamado Íris.', { permission: 'eligible' }),
+    );
+    const reviewMemory = vi.fn(async () => {
+      if (failure === 'revoked') {
+        await f.repo.editFact(fact.id, fact.version, {
+          ...input(fact.text, { permission: 'local-only' }),
+          status: 'confirmed',
+        });
+      } else if (failure === 'disabled') {
+        const policy = await f.repo.policy();
+        await f.repo.updatePolicy({ ...policy, enabled: false });
+      }
+
+      throw new QuotaExceededError('Cota indisponível.');
+    });
+    const service = createMemoryService(
+      f.repo,
+      { execute: f.execute, canReviewMemory: async () => false },
+      () => false,
+      undefined,
+      undefined,
+      { reviewMemory },
+    );
+    cleanup.push(() => service.stop());
+    expect(
+      await service.verifyAnswer(
+        JSON.stringify({ facts: [fact] }),
+        'Qual é o nome do gato?',
+        'Íris.',
+        'synthetic',
+        new AbortController().signal,
+      ),
+    ).toBe(failure === 'quota' ? null : false);
+    expect(f.execute).not.toHaveBeenCalled();
+  },
+);
+
+it('não chama revisores sem cota e revalida a permissão mesmo assim', async () => {
+  const f = await fixture();
+  await enableSemantic(f);
+  const fact = await f.service.create(
+    input('Tenho um gato chamado Íris.', { permission: 'eligible' }),
+  );
+  const reviewMemory = vi.fn(async () => true);
+  const service = createMemoryService(
+    f.repo,
+    { execute: f.execute, canReviewMemory: async () => false },
+    () => false,
+    undefined,
+    undefined,
+    { reviewMemory, canReviewMemory: async () => false },
+  );
+  cleanup.push(() => service.stop());
+  const memories = JSON.stringify({ facts: [fact] });
+  expect(
+    await service.verifyAnswer(
+      memories,
+      'Nome do gato?',
+      'Íris.',
+      'synthetic',
+      new AbortController().signal,
+    ),
+  ).toBeNull();
+  await f.repo.editFact(fact.id, fact.version, {
+    ...input(fact.text, { permission: 'local-only' }),
+    status: 'confirmed',
+  });
+  expect(
+    await service.verifyAnswer(
+      memories,
+      'Nome do gato?',
+      'Íris.',
+      'synthetic',
+      new AbortController().signal,
+    ),
+  ).toBe(false);
+  expect(reviewMemory).not.toHaveBeenCalled();
+  expect(f.execute).not.toHaveBeenCalled();
+});
+
+it.each([null, false, 'failure'] as const)(
+  'encaminha revisão inconclusiva à reserva sem ignorar rejeição=%s',
+  async (decision) => {
+    const f = await fixture();
+    await enableSemantic(f);
+    const fact = await f.service.create(
+      input('Tenho um gato chamado Íris.', { permission: 'eligible' }),
+    );
+    f.execute.mockResolvedValueOnce({
+      content: '{"verdict":"supported"}',
+      inputTokens: 10,
+      outputTokens: 5,
+    });
+    const service = createMemoryService(
+      f.repo,
+      { execute: f.execute },
+      () => false,
+      undefined,
+      undefined,
+      {
+        reviewMemory: async () => {
+          if (decision === 'failure') {
+            throw new QuotaExceededError();
+          }
+
+          return decision;
+        },
+      },
+    );
+    cleanup.push(() => service.stop());
+    expect(
+      await service.verifyAnswer(
+        JSON.stringify({ facts: [fact] }),
+        'Qual é o nome do gato?',
+        'Íris.',
+        'synthetic',
+        new AbortController().signal,
+      ),
+    ).toBe(decision !== false);
+    expect(f.execute).toHaveBeenCalledTimes(decision !== false ? 1 : 0);
+
+    if (decision !== false) {
+      expect(f.execute.mock.calls[0]![1]).toMatchObject({
+        purpose: 'memory',
+        memoryTask: 'verify-answer',
+      });
+    }
+  },
+);
+
 it('descarta plano se o fato muda durante a inferência e não transforma indisponibilidade em certeza', async () => {
   const f = await fixture();
   await enableSemantic(f);

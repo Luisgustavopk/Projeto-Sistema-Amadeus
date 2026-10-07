@@ -22,6 +22,9 @@ import type {
 } from '../../ports/activity-gate.ts';
 import { createProviderExecution } from '../providers/execution.ts';
 import { configuredProviderAttempts } from '../providers/routing.ts';
+import { providerCanProcessDataClass } from '../../domain/providers/data-policy.ts';
+import type { DataClass } from '../../domain/providers/model.ts';
+import { MEMORY_SPEECH_REVIEW_MINIMUM_BUDGET } from './review.ts';
 
 export function createMemoryProvider(dependencies: {
   revisions: RevisionRepository;
@@ -100,6 +103,24 @@ export function createMemoryProvider(dependencies: {
 
   return {
     get,
+    async canReviewMemory(dataClass: DataClass) {
+      const { provider } = await get();
+
+      if (
+        provider.adapter === 'disabled' ||
+        !providerCanProcessDataClass(provider, dataClass)
+      ) {
+        return false;
+      }
+
+      const used = await usage.usage(usageOwner, 'llm', provider);
+
+      return (
+        used.requests < provider.limits.requestsPerDay &&
+        used.budgetTokens + MEMORY_SPEECH_REVIEW_MINIMUM_BUDGET <=
+          provider.limits.tokensPerDay
+      );
+    },
     async configure(input: unknown) {
       const edit = MemoryExtractorEditSchema.parse(input);
       const release = gate.beginConfiguration();

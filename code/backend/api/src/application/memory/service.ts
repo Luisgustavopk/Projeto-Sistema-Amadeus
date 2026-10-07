@@ -42,10 +42,17 @@ import {
 export function createMemoryService(
   repository: MemoryRepository,
   providers: Pick<ProviderServices, 'execute'> &
-    Partial<Pick<MemoryProvider, 'describeMemory'>>,
+    Partial<Pick<MemoryProvider, 'describeMemory' | 'canReviewMemory'>>,
   isBusy: () => boolean,
   embeddings?: MemoryEmbeddings,
   reranker?: MemoryReranker,
+  responseReviewer?: Pick<
+    import('../persona/analysis.ts').PersonaAnalysis,
+    'reviewMemory'
+  > &
+    Partial<
+      Pick<import('../persona/analysis.ts').PersonaAnalysis, 'canReviewMemory'>
+    >,
 ) {
   const semantic = createSemanticMemorySearch(repository, embeddings);
   let rankingRetryAt = 0;
@@ -80,6 +87,9 @@ export function createMemoryService(
     dataClass: DataClass,
     budget = MEMORY_CONTEXT_CHARACTERS,
   ) {
+    // Query vectors are cached; background indexing handles ordinary updates.
+    // A cache miss still indexes missing passages to preserve cross-language
+    // recall immediately after an edit or restart.
     const semanticResults = await semantic.search(queries, dataClass);
     const query = queries.join(' ');
     let candidates = await repository.candidateFacts(
@@ -361,7 +371,6 @@ export function createMemoryService(
 
         if (
           !policy.enabled ||
-          policy.extraction !== 'llm' ||
           (dataClass !== 'synthetic' && !policy.personalEnabled)
         ) {
           return false;
@@ -372,6 +381,15 @@ export function createMemoryService(
         };
 
         const permitted = async () => {
+          const activePolicy = await repository.policy();
+
+          if (
+            !activePolicy.enabled ||
+            (dataClass !== 'synthetic' && !activePolicy.personalEnabled)
+          ) {
+            return false;
+          }
+
           const current = await repository.candidateFacts(
             [],
             dataClass,
@@ -395,17 +413,57 @@ export function createMemoryService(
           return false;
         }
 
-        const supported = await verifyMemorySpeech(
-          providers,
-          memories,
-          question,
-          reply,
-          dataClass,
-          AbortSignal.any([signal, AbortSignal.timeout(8000)]),
-          recent,
-        );
+        // Optional semantic quality review must not hide confirmed memories
+        // when its quota/service is unavailable. Permission checks remain strict.
+        let supported: boolean | null = null;
 
-        return supported && (await permitted());
+        try {
+          const fastAvailable =
+            responseReviewer &&
+            (!responseReviewer.canReviewMemory ||
+              (await responseReviewer.canReviewMemory(dataClass)));
+          const fastReview = fastAvailable
+            ? await responseReviewer
+                .reviewMemory(
+                  {
+                    memories,
+                    question,
+                    reply,
+                    dataClass,
+                    recentConversation: JSON.stringify(recent.slice(-2)),
+                  },
+                  signal,
+                )
+                .catch(() => {
+                  signal.throwIfAborted();
+
+                  return null;
+                })
+            : null;
+          supported = fastReview ?? null;
+
+          if (
+            supported === null &&
+            policy.extraction === 'llm' &&
+            (!providers.canReviewMemory ||
+              (await providers.canReviewMemory(dataClass)))
+          ) {
+            supported = await verifyMemorySpeech(
+              providers,
+              memories,
+              question,
+              reply,
+              dataClass,
+              AbortSignal.any([signal, AbortSignal.timeout(8000)]),
+              recent,
+            );
+          }
+        } catch {
+          signal.throwIfAborted();
+          supported = null;
+        }
+
+        return (await permitted()) ? supported : false;
       } catch {
         signal.throwIfAborted();
 

@@ -34,6 +34,10 @@ export const MEMORY_REVIEW_PROMPT = prompt('./memory-review-v1.md');
 export const MEMORY_RECONCILE_PROMPT = prompt('./memory-reconcile-v1.md');
 export const MEMORY_ANSWER_PROMPT = prompt('./memory-answer-v1.md');
 const MEMORY_SPEECH_REVIEW_PROMPT = prompt('./memory-speech-review-v1.md');
+// Conservative accounting uses UTF-8 bytes plus max output. The request data
+// adds to this floor; passing preflight does not reserve the full operation.
+export const MEMORY_SPEECH_REVIEW_MINIMUM_BUDGET =
+  Buffer.byteLength(MEMORY_SPEECH_REVIEW_PROMPT, 'utf8') + 800;
 
 type Execution = Pick<ProviderServices, 'execute'>;
 
@@ -248,10 +252,6 @@ export async function planMemoryAnswer(
     throw new ProviderInvalidError('Classe de memória incompatível.');
   }
 
-  if (!snapshot.facts.length) {
-    return { status: 'unknown' as const, claims: [] };
-  }
-
   const output = await providers.execute(
     'llm',
     {
@@ -333,5 +333,7 @@ export async function verifyMemorySpeech(
     JSON.parse(output.content),
   );
 
-  return verdict === 'supported' || verdict === 'unrelated';
+  return verdict === 'uncertain'
+    ? null
+    : verdict === 'supported' || verdict === 'unrelated';
 }
