@@ -13,6 +13,8 @@ export type ProviderCapabilities = {
   testedVoiceControls: string[];
 };
 export type ProviderInput = {
+  history?: { role: 'user' | 'assistant'; content: string }[];
+  sessionId?: string;
   content: string;
   systemPrompt?: string;
   dataClass: DataClass;
@@ -24,6 +26,13 @@ export type ProviderInput = {
   speechContextId?: string;
 };
 export type ProviderOutput = {
+  cache?: {
+    readTokens: number | null;
+    writeTokens: number | null;
+    costUsd: number | null;
+    provider: string | null;
+    generationId: string | null;
+  };
   progressiveAudio?: boolean;
   content: string;
   inputTokens: number | null;

@@ -23,6 +23,8 @@ import {
 } from '../../domain/providers/openrouter.ts';
 
 const Completion = z.object({
+  id: z.string().optional(),
+  provider: z.string().optional(),
   choices: z.array(
     z.object({
       finish_reason: z.string().nullable().optional(),
@@ -35,11 +37,20 @@ const Completion = z.object({
     .object({
       prompt_tokens: z.number().int().nonnegative().optional(),
       completion_tokens: z.number().int().nonnegative().optional(),
+      cost: z.number().nonnegative().nullish(),
+      prompt_tokens_details: z
+        .object({
+          cached_tokens: z.number().int().nonnegative().optional(),
+          cache_write_tokens: z.number().int().nonnegative().optional(),
+        })
+        .optional(),
     })
     .optional(),
 });
 
 const StreamChunk = z.object({
+  id: z.string().optional(),
+  provider: z.string().optional(),
   choices: z
     .array(
       z.object({
@@ -54,6 +65,13 @@ const StreamChunk = z.object({
     .object({
       prompt_tokens: z.number().int().nonnegative().optional(),
       completion_tokens: z.number().int().nonnegative().optional(),
+      cost: z.number().nonnegative().nullish(),
+      prompt_tokens_details: z
+        .object({
+          cached_tokens: z.number().int().nonnegative().optional(),
+          cache_write_tokens: z.number().int().nonnegative().optional(),
+        })
+        .optional(),
     })
     .optional(),
 });
@@ -314,6 +332,8 @@ export function createOpenAiCompatibleProvider(
       systemPrompt?: string;
       purpose?: 'conversation' | 'memory';
       memoryTask?: ProviderInput['memoryTask'];
+      history?: ProviderInput['history'];
+      sessionId?: ProviderInput['sessionId'];
     },
     stream: boolean,
     signal?: AbortSignal,
@@ -333,6 +353,7 @@ export function createOpenAiCompatibleProvider(
             ...(input.systemPrompt
               ? [{ role: 'system', content: input.systemPrompt }]
               : []),
+            ...(input.history ?? []),
             { role: 'user', content: input.content },
           ],
           max_tokens: input.maxTokens,
@@ -371,6 +392,7 @@ export function createOpenAiCompatibleProvider(
             : {}),
           ...(config.adapter === 'openrouter'
             ? {
+                ...(input.sessionId ? { session_id: input.sessionId } : {}),
                 provider: {
                   max_price: {
                     prompt: config.openRouterPaid?.maxPromptPrice ?? 0,
@@ -522,6 +544,13 @@ export function createOpenAiCompatibleProvider(
       let inputTokens: number | null = null;
       let outputTokens: number | null = null;
       let deliveredContent = false;
+      const cache: NonNullable<ProviderOutput['cache']> = {
+        readTokens: null,
+        writeTokens: null,
+        costUsd: null,
+        provider: null,
+        generationId: null,
+      };
 
       try {
         for await (const value of decodeServerSentEvents(response)) {
@@ -558,6 +587,15 @@ export function createOpenAiCompatibleProvider(
 
           inputTokens = chunk.usage?.prompt_tokens ?? inputTokens;
           outputTokens = chunk.usage?.completion_tokens ?? outputTokens;
+          cache.readTokens =
+            chunk.usage?.prompt_tokens_details?.cached_tokens ??
+            cache.readTokens;
+          cache.writeTokens =
+            chunk.usage?.prompt_tokens_details?.cache_write_tokens ??
+            cache.writeTokens;
+          cache.costUsd = chunk.usage?.cost ?? cache.costUsd;
+          cache.provider = chunk.provider ?? cache.provider;
+          cache.generationId = chunk.id ?? cache.generationId;
           const content = choice?.delta?.content ?? '';
 
           if (content) {
@@ -580,7 +618,14 @@ export function createOpenAiCompatibleProvider(
       }
 
       if (inputTokens !== null || outputTokens !== null) {
-        yield { content: '', inputTokens, outputTokens };
+        yield {
+          content: '',
+          inputTokens,
+          outputTokens,
+          ...(Object.values(cache).some((value) => value !== null)
+            ? { cache }
+            : {}),
+        };
       }
     },
     async execute(input, signal): Promise<ProviderOutput> {
@@ -632,6 +677,24 @@ export function createOpenAiCompatibleProvider(
           content,
           inputTokens: completion.usage?.prompt_tokens ?? null,
           outputTokens: completion.usage?.completion_tokens ?? null,
+          ...(completion.id ||
+          completion.provider ||
+          completion.usage?.prompt_tokens_details ||
+          completion.usage?.cost != null
+            ? {
+                cache: {
+                  readTokens:
+                    completion.usage?.prompt_tokens_details?.cached_tokens ??
+                    null,
+                  writeTokens:
+                    completion.usage?.prompt_tokens_details
+                      ?.cache_write_tokens ?? null,
+                  costUsd: completion.usage?.cost ?? null,
+                  provider: completion.provider ?? null,
+                  generationId: completion.id ?? null,
+                },
+              }
+            : {}),
         };
       } catch (error) {
         if (
