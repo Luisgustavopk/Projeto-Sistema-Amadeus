@@ -34,3 +34,6 @@ code/backend/assets/voice-profiles/voice-direction-*.md
 **/.pytest_cache/
 
 **/.ruff_cache/
+
+# Local backend export includes environment credentials and personal data
+/code/backend.zip
