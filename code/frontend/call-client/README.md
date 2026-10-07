@@ -1,5 +1,7 @@
 # Cliente técnico de chamadas
 
+Presença é opcional: `createCallClient({ ...options, presence: true })` e `client.setPresence(boolean)`. O padrão do módulo é desligado. Exige a capacidade `presenceAvailable` negociada pelo servidor. O cliente informa disponibilidade, recusa ofertas durante captura, reconhecimento, geração ou reprodução e reserva identificadores na mesma sequência dos turnos normais. Ocultar a página ou pausar o microfone suspende iniciativas; iniciar o microfone ou reativar a presença libera novamente. Um aceite cancelado pelo servidor não fecha a conexão. Fechar o cliente remove também o listener de visibilidade.
+
 Módulo JavaScript independente e sem interface visual. Não importa código do backend nem introduz um pacote `shared`. Requer navegador com AudioWorklet/Web Audio, localhost ou HTTPS, autorização do microfone e um gesto do usuário para iniciar áudio.
 
 `createCallClient` cria conversa/ticket, negocia protocolo 1.1 e disponibiliza `text`, `startMicrophone`, `stopMicrophone`, `interrupt` e `close`. A credencial da API é usada para obter o ticket; a chave Gemini permanece no backend. Trate a credencial da API como um segredo de uso pessoal e não a publique numa página distribuída.

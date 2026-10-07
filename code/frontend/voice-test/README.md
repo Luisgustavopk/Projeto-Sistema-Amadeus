@@ -1,5 +1,9 @@
 # Teste local de voz
 
+A opção de presença, marcada inicialmente, permite uma saudação espontânea e iniciativas moderadas durante a chamada. Reinicie a API e recarregue a página para usar a negociação nova. Conecte sem enviar nada para ouvir a saudação; uma mensagem imediata sua a dispensa. Após conversar, mantenha a página visível e a presença ativa: uma iniciativa pode vir depois de 90 segundos de silêncio, respeitando também 180 segundos desde a última oferta. O limite é duas iniciativas por chamada. Pausar o microfone, ocultar a página ou desmarcar a opção suspende esse comportamento. Não há backchannels gravados nesta versão.
+
+As falas espontâneas usam os provedores configurados e consomem suas cotas. Sua validação automática utiliza serviços simulados; um teste manual com voz consome TTS normalmente.
+
 Interface temporária da fase 1, independente da interface definitiva. Usa o cliente de chamadas da pasta vizinha sem importar código do backend. Não precisa instalar dependências.
 
 ## Iniciar

@@ -24,6 +24,8 @@
     <section class="panel conversation-panel" aria-labelledby="conversation-title">
       <div class="section-heading"><h2 id="conversation-title">Conversa</h2><span id="microphone-status" class="muted">Microfone desligado</span></div>
       <div class="actions"><button id="microphone" disabled>Iniciar microfone</button><button id="interrupt" class="secondary" disabled>Interromper resposta</button></div>
+      <label><input id="presence" type="checkbox" checked> Permitir saudação e iniciativa ocasional nesta chamada</label>
+      <p class="muted">A iniciativa espera sua disponibilidade e respeita a fala e a reprodução. Ao pausar o microfone ou ocultar a página, ela é suspensa.</p>
       <p class="hint">Use fones. Ao terminar sua frase, faça uma pausa: o envio é automático.</p>
       <div id="conversation" class="conversation" role="log" aria-live="polite"><p class="empty">Conecte a API e inicie o microfone. A voz será reproduzida automaticamente.</p></div>
       <form id="text-form" class="text-form"><label class="sr-only" for="text">Mensagem de teste</label><input id="text" maxlength="4000" placeholder="Ou envie uma pergunta por texto…" disabled required><button id="send" disabled>Enviar</button></form>

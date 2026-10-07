@@ -350,6 +350,7 @@ async function inspect() {
   }
 }
 
+element("presence").addEventListener("change", () => client?.setPresence(element("presence").checked));
 element("connect-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   if (client || state === "connecting" || diagnosticBusy) return;
@@ -371,6 +372,7 @@ element("connect-form").addEventListener("submit", async (event) => {
     client = await createCallClient({
       ...options,
       ...resumeOptions,
+      presence: element("presence").checked,
       onEvent: (value) => {
         if (current === generation) receive(value);
       },
