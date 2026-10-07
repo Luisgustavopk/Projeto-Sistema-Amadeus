@@ -22,6 +22,13 @@ export type ProviderFallbackNotice = {
 };
 export type NotifyProviderFallback = (notice: ProviderFallbackNotice) => void;
 
+export function localBudgetLimits(limits: ProviderConfig['limits']) {
+  const local = { ...limits };
+  delete local.enforced;
+
+  return local;
+}
+
 export function providerAttempts(
   role: Role,
   config: ProviderConfig,
@@ -69,7 +76,10 @@ export function providerAttempts(
   }
 
   for (const fallback of fallbackProviders ?? []) {
-    attempts.push({ ...fallback, limits: fallback.limits ?? config.limits });
+    attempts.push({
+      ...fallback,
+      limits: fallback.limits ?? localBudgetLimits(config.limits),
+    });
   }
 
   return attempts;

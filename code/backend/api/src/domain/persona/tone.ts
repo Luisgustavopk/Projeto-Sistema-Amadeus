@@ -17,6 +17,7 @@ export type PersonaTone = z.infer<typeof ToneSchema>;
 export const PersonaAnalysisConfigurationSchema = z
   .strictObject({
     enabled: z.boolean().default(false),
+    localLimitsEnabled: z.boolean().default(true),
     timeoutMs: z.number().int().min(100).max(2500).default(600),
     clarityTimeoutMs: z.number().int().min(100).max(2500).default(1000),
     memoryReviewTimeoutMs: z.number().int().min(100).max(4000).default(2000),

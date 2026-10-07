@@ -14,6 +14,7 @@ import { createRevisionRepository } from '../../src/adapters/database/revision-r
 import { SqliteProviderUsageRepository } from '../../src/adapters/database/provider-usage-repository.ts';
 import { openDatabase } from '../../src/adapters/database/index.ts';
 import type { PersonaDecisionClient } from '../../src/ports/persona-decision.ts';
+import { QuotaExceededError } from '../../src/domain/errors/providers.ts';
 
 afterEach(() => vi.unstubAllGlobals());
 const request = {
@@ -203,6 +204,60 @@ async function fixture(client: PersonaDecisionClient) {
 
   return { database, repository, usage, service };
 }
+
+it('Jev sem teto local contabiliza tom e revisão, mas mantém bloqueio remoto e políticas', async () => {
+  const decide = vi.fn<PersonaDecisionClient['decide']>(async () => result);
+  const { database, service } = await fixture({
+    decide,
+    reviewMemory: async () => ({
+      verdict: 'supported',
+      confidence: 1,
+      inputTokens: 1,
+      outputTokens: 1,
+      costUsd: 0,
+    }),
+  });
+
+  try {
+    await service.configure({
+      revision: 0,
+      configuration: PersonaAnalysisConfigurationSchema.parse({
+        enabled: true,
+        localLimitsEnabled: false,
+        requestsPerDay: 0,
+        tokensPerDay: 0,
+      }),
+    });
+
+    for (let i = 0; i < 2; i++) {
+      await service.analyze(
+        { text: 'Synthetic', recentConversation: '', dataClass: 'synthetic' },
+        new AbortController().signal,
+      );
+    }
+
+    expect(decide).toHaveBeenCalledTimes(2);
+    expect((await service.describe()).usage).toMatchObject({
+      requests: 2,
+      budgetTokens: 220,
+      limits: { enforced: false },
+    });
+    expect(await service.canReviewMemory('synthetic')).toBe(true);
+    expect(await service.canReviewMemory('personal')).toBe(false);
+    expect(await service.canReviewMemory('local-only')).toBe(false);
+    decide.mockRejectedValueOnce(new QuotaExceededError());
+    const input = {
+      text: 'Synthetic',
+      recentConversation: '',
+      dataClass: 'synthetic' as const,
+    };
+    expect(await service.analyze(input, new AbortController().signal)).toBe('');
+    expect(await service.analyze(input, new AbortController().signal)).toBe('');
+    expect(decide).toHaveBeenCalledTimes(3);
+  } finally {
+    database.client.close();
+  }
+});
 
 it('desativado/local-only/pessoal não aprovado não envia dados; ativado usa apenas direção curada e orçamento persistente', async () => {
   const decide = vi.fn<PersonaDecisionClient['decide']>(async () => result);

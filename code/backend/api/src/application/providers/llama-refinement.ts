@@ -68,6 +68,9 @@ export function buildLlamaRefinement(
       apiKeyEnv: 'OPENROUTER_API_KEY',
       openRouterPaid: { maxPromptPrice: 0.15, maxCompletionPrice: 0.4 },
       limits: {
+        ...(current.llm.openRouterPaid && current.llm.limits.enforced === false
+          ? { enforced: false }
+          : {}),
         requestsPerDay: 100,
         tokensPerDay: 1000000,
         source: 'operator',

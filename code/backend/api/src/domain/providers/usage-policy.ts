@@ -6,6 +6,10 @@ export function assertBudgetAvailable(
   usage: { requests: number; tokens: number },
   requestedTokens: number,
 ) {
+  if (limits.enforced === false) {
+    return;
+  }
+
   if (
     usage.requests >= limits.requestsPerDay ||
     usage.tokens + requestedTokens > limits.tokensPerDay

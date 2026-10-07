@@ -1,4 +1,5 @@
 import { configuredProviderAttempts } from './routing.ts';
+import { localBudgetLimits } from './fallback.ts';
 import type { ProviderConfigurationRepository } from '../../ports/provider-configuration-repository.ts';
 import type { ProviderUsageRepository } from '../../ports/provider-usage-repository.ts';
 import type { ProviderFactory } from '../../ports/provider.ts';
@@ -60,7 +61,7 @@ export function createProviderQueries(
                     dataPolicy: config.llm.localProvider.dataPolicy,
                     ...(await factory('llm', {
                       ...config.llm.localProvider,
-                      limits: config.llm.limits,
+                      limits: localBudgetLimits(config.llm.limits),
                     }).health()),
                   },
                 }

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { LocalLlmSchema, LocalCompletionEndpointSchema } from './local.ts';
 import { OpenRouterPaidSchema, validOpenRouterPayment } from './openrouter.ts';
+import { JEV_ENDPOINT, JEV_MODEL } from '../persona/tone.ts';
 
 export const RoleSchema = z.enum(['llm', 'stt', 'tts']);
 export type Role = z.infer<typeof RoleSchema>;
@@ -141,6 +142,7 @@ export const ProviderSchema = z
     policyReference: z.string().url().optional(),
     limits: z
       .strictObject({
+        enforced: z.boolean().optional(),
         requestsPerDay: z.number().int().min(0).max(100000).default(0),
         tokensPerDay: z.number().int().min(0).max(100000000).default(0),
         source: z.enum(['operator', 'provider']).default('operator'),
@@ -148,6 +150,22 @@ export const ProviderSchema = z
       .default({ requestsPerDay: 0, tokensPerDay: 0, source: 'operator' }),
   })
   .superRefine((p, ctx) => {
+    if (
+      p.limits.enforced === false &&
+      !(p.adapter === 'openrouter' && p.openRouterPaid) &&
+      !(
+        p.adapter === 'http-json' &&
+        p.endpoint === JEV_ENDPOINT &&
+        p.model === JEV_MODEL
+      )
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          'Limites locais só podem ser desativados para Llama pago ou contabilização Jev.',
+      });
+    }
+
     if (p.localRouting && !p.localProvider) {
       ctx.addIssue({
         code: 'custom',

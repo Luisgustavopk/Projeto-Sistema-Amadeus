@@ -1,7 +1,7 @@
 import type { ProviderConfig, Role } from '../../domain/providers/model.ts';
 import type { ProviderInput } from '../../ports/provider.ts';
 import { isCasualConversation } from '../../domain/providers/conversation-routing.ts';
-import { providerAttempts } from './fallback.ts';
+import { providerAttempts, localBudgetLimits } from './fallback.ts';
 
 function currentUtterance(content: string): string {
   const boundary = '\nNova fala:\n';
@@ -36,7 +36,10 @@ export function configuredProviderAttempts(
   const attempts = providerAttempts(role, config);
 
   return role === 'llm' && config.localProvider
-    ? [...attempts, { ...config.localProvider, limits: config.limits }]
+    ? [
+        ...attempts,
+        { ...config.localProvider, limits: localBudgetLimits(config.limits) },
+      ]
     : attempts;
 }
 
@@ -53,7 +56,7 @@ export function selectProviderAttempts(
 
   const local: ProviderConfig = {
     ...config.localProvider,
-    limits: config.limits,
+    limits: localBudgetLimits(config.limits),
   };
 
   if (input.dataClass === 'local-only') {

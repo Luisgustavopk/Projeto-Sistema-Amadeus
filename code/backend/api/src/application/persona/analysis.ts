@@ -89,6 +89,7 @@ export const personaAnalysisProfile = (config: PersonaAnalysisConfiguration) =>
     policyReviewedAt: config.policyReviewedAt,
     policyReference: config.policyReference,
     limits: {
+      enforced: config.localLimitsEnabled,
       requestsPerDay: config.requestsPerDay,
       tokensPerDay: config.tokensPerDay,
       source: 'operator',
@@ -155,8 +156,9 @@ export function createPersonaAnalysis(dependencies: {
       );
 
       return (
-        used.requests < config.requestsPerDay &&
-        used.budgetTokens + minimumReviewBudget <= config.tokensPerDay
+        !config.localLimitsEnabled ||
+        (used.requests < config.requestsPerDay &&
+          used.budgetTokens + minimumReviewBudget <= config.tokensPerDay)
       );
     },
     async configure(input: z.infer<typeof PersonaAnalysisEditSchema>) {

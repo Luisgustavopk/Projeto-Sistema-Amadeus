@@ -13,6 +13,48 @@ import { providerKey } from '../../src/adapters/database/keys.ts';
 import { createProviderCooldowns } from '../../src/application/providers/cooldowns.ts';
 import { QuotaExceededError } from '../../src/domain/errors/providers.ts';
 import { MemoryExtractorProviderSchema } from '../../src/domain/memory/extractor.ts';
+import { providerAttempts } from '../../src/application/providers/fallback.ts';
+
+it('retira o teto somente do Llama pago, preserva contagem e mantém limites das reservas', async () => {
+  const database = await openDatabase('file::memory:');
+
+  try {
+    const profile = paid();
+    const unlimited = ProviderSchema.parse({
+      ...profile,
+      limits: { ...profile.limits, enforced: false },
+    });
+    expect(providerKey('llm', profile)).toBe(providerKey('llm', unlimited));
+    const usage = new SqliteProviderUsageRepository(database.client);
+    await usage.reserve('test', 'llm', profile, 1);
+    await usage.reserve('test', 'llm', unlimited, 10001);
+    expect(await usage.usage('test', 'llm', unlimited)).toMatchObject({
+      requests: 2,
+      budgetTokens: 10002,
+    });
+    await expect(
+      usage.reserve('test', 'llm', profile, 1),
+    ).rejects.toMatchObject({ code: 'QUOTA_EXCEEDED' });
+    expect(
+      ProviderSchema.safeParse({ ...free(), limits: unlimited.limits }).success,
+    ).toBe(false);
+    const inherited = providerAttempts('llm', {
+      ...unlimited,
+      fallbackProviders: [
+        {
+          adapter: 'groq',
+          model: 'test',
+          apiKeyEnv: 'GROQ_API_KEY',
+          dataPolicy: 'synthetic-only',
+        },
+      ],
+    })[1]!;
+    expect(inherited.limits.enforced).not.toBe(false);
+    expect(ProviderSchema.safeParse(inherited).success).toBe(true);
+  } finally {
+    database.client.close();
+  }
+});
 
 afterEach(() => vi.unstubAllGlobals());
 const paid = () =>
@@ -172,7 +214,11 @@ it.each([false, true])(
       });
       vi.stubGlobal('fetch', fetch);
       const config = ProvidersSchema.parse({
-        llm: { ...paid(), fallbackProviders: [free()] },
+        llm: {
+          ...paid(),
+          limits: { ...paid().limits, enforced: false },
+          fallbackProviders: [free()],
+        },
         stt: { adapter: 'disabled' },
         tts: { adapter: 'disabled' },
       });

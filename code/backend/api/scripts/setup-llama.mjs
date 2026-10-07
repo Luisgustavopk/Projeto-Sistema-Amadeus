@@ -49,6 +49,10 @@ async function main() {
       revision: revision + 1,
       configuration: PersonaAnalysisConfigurationSchema.parse({
         enabled: !args.includes('--disable-jev'),
+        localLimitsEnabled: previousAnalysis
+          ? PersonaAnalysisStateSchema.parse(JSON.parse(previousAnalysis))
+              .configuration.localLimitsEnabled
+          : true,
         dataPolicy: 'personal-approved',
         policyReviewedAt: new Date().toISOString(),
         policyReference: 'https://openrouter.ai/privacy',
