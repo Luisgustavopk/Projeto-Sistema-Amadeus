@@ -1,0 +1,158 @@
+{
+  "repository": "https://github.com/FrancescoCaracciolo/Amadeus",
+  "revision": "9d4726bd37dce9919af37904e442e49205f329b8",
+  "inspectedAt": "2026-10-06",
+  "declaredRepositoryLicense": "GPL-3.0 (see original LICENSE)",
+  "thirdPartyFictionAndAudioRights": "not-independently-established",
+  "productionEnabled": true,
+  "productionMode": "curated-style-only",
+  "runtimeReference": "../../canon-conversation-v1.md",
+  "rawCorpusInPrompt": false,
+  "translated": false,
+  "statistics": {
+    "repositoryFiles": 15,
+    "bytes": 5168821,
+    "dialogueTurns": 2002,
+    "speakers": {
+      "Nakabachi": 24,
+      "Okabe": 537,
+      "???": 4,
+      "Kurisu": 769,
+      "Daru": 244,
+      "Professor": 1,
+      "Mayuri": 225,
+      "Luka": 64,
+      "Luka's Father": 4,
+      "Suzuha": 79,
+      "Tennouji": 7,
+      "Moeka": 26,
+      "Nae": 5,
+      "Faris": 5,
+      "Attacker　A": 2,
+      "Policeman": 1,
+      "Master": 1,
+      "Viral Attacker A": 1,
+      "Male　Staff-Member": 1,
+      "Female Reporter": 1,
+      "Presenter": 1
+    },
+    "kurisuTurns": 769,
+    "emptyKurisuTurns": 11,
+    "styleCandidates": 758,
+    "uniqueStyleTexts": 733,
+    "storyChunks": 40,
+    "storyHeadings": [
+      "Prologue",
+      "Chapter 1 — Time Travel Paranoia",
+      "Chapter 2 — Interpreter Rendezvous",
+      "Chapter 3 — Butterfly Effect’s Divergence",
+      "Chapter 4 — Chaos Theory Homeostasis",
+      "Chapter 5 — Dogma in Event Horizon",
+      "Chapter 6 — Metaphysics Necrosis",
+      "Irreversible Reboot",
+      "Chapter 7 — Made in Complex",
+      "Isolated Jamais Vu",
+      "Chapter 8 — Fractal Androgynous",
+      "Link of Corruption and Rebirth",
+      "Chapter 9 — Endless Apoptosis",
+      "Chapter 10 — Paradox Meltdown",
+      "Stardust Sky (Mayuri's Ending)",
+      "Kurisu Ending",
+      "Chapter 11 — Open The Steins Gate"
+    ],
+    "emails": 74,
+    "emailsWithoutSender": 64
+  },
+  "files": [
+    {
+      "path": ".gitignore",
+      "bytes": 4688,
+      "sha256": "48b33f9f89ef24f8a66f461ea9278e7ecf21b4660c26088989d231e53c578724",
+      "blob": "b7faf403d915ca307532bb0eb9cceaf0214e8e5b"
+    },
+    {
+      "path": "Dialogues/SG_Dialogues_EN.md",
+      "bytes": 168921,
+      "sha256": "c98534a953f3f657c1a814a8b3e1ad90a03a6f2455835d865ea396dfcc5443b0",
+      "blob": "df73d9a52cdcd77c54320773fa3ff5225b938c09"
+    },
+    {
+      "path": "Dialogues/emails.json",
+      "bytes": 17362,
+      "sha256": "b0badb3c1606509372f24d039c4ac74e5e71ac28083164a5ca30b59c2580d2b1",
+      "blob": "748a5039d24c60beaab013c16de794efb2baf646"
+    },
+    {
+      "path": "Extensions/divergence.py",
+      "bytes": 2898,
+      "sha256": "60e4c8389e937e73895b06ebf2a7ba7c4048575ac8840bd3a5128a78105a26a0",
+      "blob": "60a7dae38e4980614c249cad4f00367b4c2efc92"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 35149,
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "blob": "f288702d2fa16d3cdf0035b15a9fcbc552cd88e7"
+    },
+    {
+      "path": "Prompts/Kurisu_EN.md",
+      "bytes": 991,
+      "sha256": "e5280b70d6356ecc7ce7f9d91002f3c4d15bc9378cad26f3eac080ad386a0575",
+      "blob": "153fdbfe3f5e469298c2a2ba3cfeed2b472033d5"
+    },
+    {
+      "path": "Prompts/Story_EN.md",
+      "bytes": 68071,
+      "sha256": "ee31134e455258e1a5f98f3a2706eb11f8460d46d1a9d5a388a732a15ac8509e",
+      "blob": "22c6f5ca1c2dd4a8d6356a4939c239270a482bd6"
+    },
+    {
+      "path": "README.md",
+      "bytes": 20980,
+      "sha256": "b251fa7bb92dcb4263ba98d469ae1a00aafc487b72b91ec5eda95d4d168b3ad8",
+      "blob": "a867a89b14e100af3da4600faa2abb44df5d8748"
+    },
+    {
+      "path": "Voices/OneShot/CRS_EN.wav",
+      "bytes": 830348,
+      "sha256": "661d3a1686c8361e1463188c6bd8ec2e1f52f84234fbdcaf13c8d595afb4eca3",
+      "blob": "33401cbe6ff648907c0ce4bd52fa0501509b2860"
+    },
+    {
+      "path": "Voices/OneShot/CRS_EN.wav.txt",
+      "bytes": 101,
+      "sha256": "e15b5d304dd17c316a2c24ee473d70e026b29e408ecec67c546a1e3e0d484ab4",
+      "blob": "5aace750ab7a70153f680c7c65953a4883b91768"
+    },
+    {
+      "path": "Voices/OneShot/CRS_IT.wav",
+      "bytes": 2257024,
+      "sha256": "6d3fac2a61d03e3940781233a5f255fb1c10d98f72ac753b47cde03cbbb168f9",
+      "blob": "5b4722428ec2e110ec7f1bc3675dd53ceae672b2"
+    },
+    {
+      "path": "Voices/OneShot/CRS_IT.wav.txt",
+      "bytes": 412,
+      "sha256": "7982e17f541b034c30280add89ea72edcdda8c3e0c63a13eef1a8a6117a7df2a",
+      "blob": "ba67f4df1b213cb74a0d0ab6124f8366662e8fa2"
+    },
+    {
+      "path": "Voices/OneShot/CRS_IT_LONG.mp3",
+      "bytes": 801629,
+      "sha256": "459daa8238180e926633026f3197732a8bbbd748947f4c430ccfa840b1b7333f",
+      "blob": "4fd046347c5b06e795454b58945ef53eccbb21be"
+    },
+    {
+      "path": "Voices/OneShot/CRS_JP.wav",
+      "bytes": 960078,
+      "sha256": "235904e2baf0fb35d991e46cfc8e9d57ce8bed32e8165c5130388d5fb38308b4",
+      "blob": "84b272ef6295253cefdec39f9c737d120d7cfeb6"
+    },
+    {
+      "path": "Voices/OneShot/CRS_JP.wav.txt",
+      "bytes": 169,
+      "sha256": "1fc80238993343aa2f321cfb3fab06daa0dc882dd139355ed1f5b173db07de08",
+      "blob": "023ce69cdb31932f31a02364be74cb606ead5bfe"
+    }
+  ]
+}

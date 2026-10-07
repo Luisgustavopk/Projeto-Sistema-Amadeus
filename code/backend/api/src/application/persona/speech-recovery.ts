@@ -12,6 +12,7 @@ import {
   readPersonaResponse,
   validateSpokenSegment,
 } from './response-stream.ts';
+import type { MemoryResponseUse } from '../../domain/memory/response-use.ts';
 
 /** Repair format before speech; optionally resume once after a provider failure. */
 export async function* streamPersonaSpeech(
@@ -25,6 +26,7 @@ export async function* streamPersonaSpeech(
   onRecovery: () => void,
   validateStyle?: (text: string, delivered: boolean) => void,
   onProviderRecovery?: () => Promise<void>,
+  onMemoryUse?: (use: MemoryResponseUse | null) => void,
 ): AsyncIterable<string> {
   let delivered = false;
   const spoken: string[] = [];
@@ -41,6 +43,7 @@ export async function* streamPersonaSpeech(
           readPersonaResponse(
             source(streamSignal, speechOnly, spoken.join(' ')),
             onExpression,
+            onMemoryUse,
           ),
         signal,
       )) {

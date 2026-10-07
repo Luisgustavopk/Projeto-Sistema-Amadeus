@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const PERSONA_VERSION = 'kurisu-amadeus-0.4.13';
+export const PERSONA_VERSION = 'kurisu-amadeus-0.4.17';
 
 export const ExpressionSchema = z.strictObject({
   intent: z.enum([

@@ -87,7 +87,9 @@ export function applyPersonaConfiguration(
   // Preserve the structured contract and keep admin style direction separate
   // from the user's conversation and from the final expression format.
   const boundary = '\nEXPRESSÃO:';
-  const index = prompt.indexOf(boundary);
+  const index = prompt.includes(boundary)
+    ? prompt.indexOf(boundary)
+    : prompt.indexOf('\nFORMATO:');
   const addition = `\nDIREÇÃO ADMINISTRATIVA DE ESTILO — revisão ${config.revision}:\nComplemento de estilo subordinado à identidade, honestidade, política de dados e formato técnico existentes.\n${config.direction}\n`;
 
   return index < 0
