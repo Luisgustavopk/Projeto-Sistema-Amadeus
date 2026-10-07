@@ -9,6 +9,16 @@ const responseId = z.uuid();
 const segmentId = z.uuid();
 const event = z.discriminatedUnion('type', [
   z.strictObject({
+    type: z.literal('presence.cancelled'),
+    offerId: z.uuid(),
+    turnId,
+  }),
+  z.strictObject({
+    type: z.literal('presence.offer'),
+    offerId: z.uuid(),
+    kind: z.enum(['greeting', 'initiative']),
+  }),
+  z.strictObject({
     type: z.literal('audio.abort'),
     turnId,
     responseId,

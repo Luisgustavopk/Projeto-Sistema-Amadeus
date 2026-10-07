@@ -8,6 +8,7 @@ import {
 } from '../../application/persona/configuration.ts';
 import { VoiceVersionSchema } from '../../application/voice/versions.ts';
 import { security, errors } from './schemas/common.ts';
+import { PersonaStateSchema } from '../../application/persona/persistent-state.ts';
 import {
   PersonaAnalysisEditSchema,
   PersonaAnalysisStateSchema,
@@ -18,6 +19,42 @@ export function registerPersonaRoutes(
   services: HttpServices,
 ) {
   const app = instance.withTypeProvider<ZodTypeProvider>();
+  const stateQuery = z.object({
+    dataClass: z
+      .enum(['personal', 'synthetic', 'local-only'])
+      .default('personal'),
+  });
+  app.get(
+    '/v1/persona/state',
+    {
+      schema: {
+        security,
+        querystring: stateQuery,
+        response: {
+          200: PersonaStateSchema.omit({ lastResponseIds: true }).extend({
+            familiarity: z.enum(['F0', 'F1', 'F2']),
+          }),
+          ...errors,
+        },
+      },
+    },
+    (req) => services.persistentState.snapshot(req.query.dataClass),
+  );
+  app.delete(
+    '/v1/persona/state',
+    {
+      schema: {
+        security,
+        querystring: stateQuery,
+        response: { 200: z.object({ reset: z.literal(true) }), ...errors },
+      },
+    },
+    async (req) => {
+      await services.persistentState.reset(req.query.dataClass);
+
+      return { reset: true as const };
+    },
+  );
   app.get(
     '/v1/persona/analysis',
     {

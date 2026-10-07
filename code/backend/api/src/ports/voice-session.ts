@@ -3,6 +3,8 @@ import type { Expression } from '../domain/persona/expression.ts';
 import type { describeDelivery } from '../domain/persona/expression.ts';
 
 export type VoiceEvent =
+  | { type: 'presence.offer'; offerId: string; kind: 'greeting' | 'initiative' }
+  | { type: 'presence.cancelled'; offerId: string; turnId: number }
   | {
       type: 'audio.abort';
       turnId: number;

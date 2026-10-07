@@ -24,6 +24,7 @@ import { ActivityGate } from '../application/runtime/activity-gate.ts';
 import { createHealthService } from '../application/diagnostics/health.ts';
 import { createRevisionRepository } from '../adapters/database/revision-repository.ts';
 import { createPersonaConfiguration } from '../application/persona/configuration.ts';
+import { createPersistentPersonaState } from '../application/persona/persistent-state.ts';
 import { createVoiceVersions } from '../application/voice/versions.ts';
 import { createMemoryRepository } from '../adapters/database/memory-repository.ts';
 import { createMemoryService } from '../application/memory/service.ts';
@@ -96,6 +97,10 @@ export async function createContext(
   const voiceMetrics = createVoiceMetrics();
   const revisions = createRevisionRepository(database.client);
   const persona = createPersonaConfiguration(revisions, config.OWNER_ID);
+  const persistentState = createPersistentPersonaState(
+    revisions,
+    config.OWNER_ID,
+  );
   const personaAnalysis = createPersonaAnalysis({
     repository: revisions,
     usage,
@@ -146,6 +151,7 @@ export async function createContext(
     persona,
     memory,
     analysis: personaAnalysis,
+    persistentState,
   });
 
   return {
@@ -154,6 +160,7 @@ export async function createContext(
       providers,
       voiceProfiles,
       persona,
+      persistentState,
       personaAnalysis,
       memory,
       memoryProvider,

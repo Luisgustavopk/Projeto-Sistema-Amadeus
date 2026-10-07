@@ -328,6 +328,117 @@ async function fixture(
   };
 }
 
+it('negocia saudação, preserva continuidade e não extrai evento da aplicação como fala pessoal', async () => {
+  const f = await fixture({
+    llmResponses: [
+      '<expression>{"memory":[],"intent":"conversar","emotion":"calor_discreto","intensity":0.2}</expression>Ah, oi.',
+      '<expression>{"memory":[],"intent":"conversar","emotion":"curiosidade","intensity":0.3}</expression>Vamos conversar.',
+    ],
+  });
+  f.send({ type: 'presence.update', enabled: true, available: true });
+  await vi.waitFor(
+    () => expect(f.events.some((e) => e.type === 'presence.offer')).toBe(true),
+    { timeout: 2500 },
+  );
+  expect(f.requests.filter((r) => r.role === 'llm')).toHaveLength(0);
+  const offer = f.events.find((e) => e.type === 'presence.offer')!;
+  f.send({ type: 'presence.accept', offerId: offer.offerId, turnId: 1 });
+  await vi.waitFor(() =>
+    expect(
+      f.events.some((e) => e.type === 'reply.done' && e.turnId === 1),
+    ).toBe(true),
+  );
+  const initiative = (
+    await f.database.client.execute(
+      'SELECT user_text, initiative_kind FROM call_turns',
+    )
+  ).rows[0]!;
+  expect(initiative).toMatchObject({
+    user_text: '',
+    initiative_kind: 'greeting',
+  });
+  const history = await createSqliteCallHistory(f.database.client).recent(
+    f.id,
+    'primary',
+    12,
+  );
+  expect(history[0]).toMatchObject({
+    userText: '',
+    initiativeKind: 'greeting',
+    sentText: 'Ah, oi.',
+  });
+  expect(f.requests.find((r) => r.role === 'llm')!.content).toContain(
+    'Tipo de iniciativa: greeting',
+  );
+  expect(
+    (
+      await f.app.inject({
+        url: '/v1/persona/state?dataClass=synthetic',
+        headers,
+      })
+    ).json().interactions,
+  ).toBe(0);
+  f.send({ type: 'text.send', turnId: 2, text: 'Oi, como está?' });
+  await vi.waitFor(() =>
+    expect(
+      f.events.some((e) => e.type === 'reply.done' && e.turnId === 2),
+    ).toBe(true),
+  );
+  const state = (
+    await f.app.inject({
+      url: '/v1/persona/state?dataClass=synthetic',
+      headers,
+    })
+  ).json();
+  expect(state.interactions).toBe(1);
+  expect(state).not.toHaveProperty('lastResponseIds');
+  expect((await f.app.inject({ url: '/v1/persona/state' })).statusCode).toBe(
+    401,
+  );
+  expect(
+    (
+      await f.app.inject({
+        method: 'DELETE',
+        url: '/v1/persona/state?dataClass=synthetic',
+        headers,
+      })
+    ).statusCode,
+  ).toBe(200);
+  expect(
+    (
+      await f.app.inject({
+        url: '/v1/persona/state?dataClass=synthetic',
+        headers,
+      })
+    ).json().interactions,
+  ).toBe(0);
+});
+
+it('descarta aceite atrasado quando a pessoa já começou um turno', async () => {
+  const f = await fixture();
+  f.send({ type: 'presence.update', enabled: true, available: true });
+  await vi.waitFor(
+    () => expect(f.events.some((e) => e.type === 'presence.offer')).toBe(true),
+    { timeout: 2500 },
+  );
+  const offer = f.events.find((e) => e.type === 'presence.offer')!;
+  f.send({
+    type: 'text.send',
+    turnId: 1,
+    text: 'Minha pergunta tem prioridade.',
+  });
+  f.send({ type: 'presence.accept', offerId: offer.offerId, turnId: 2 });
+  await vi.waitFor(() =>
+    expect(f.events.some((e) => e.type === 'reply.done')).toBe(true),
+  );
+  expect(f.requests.filter((r) => r.role === 'llm')).toHaveLength(1);
+  expect(
+    f.events.some(
+      (e) => e.type === 'error' && e.code === 'INVALID_VOICE_EVENT',
+    ),
+  ).toBe(false);
+});
+
 it('recupera fatos confirmados entre conversas sem incluir memória local na nuvem', async () => {
   const f = await fixture({ memoryReview: true });
   const created = await f.app.inject({
@@ -542,7 +653,7 @@ it.each([16000, 24000] as const)(
       intensity: 0.35,
       metadataValid: true,
       deliveryApplied: false,
-      personaVersion: 'kurisu-amadeus-0.4.18',
+      personaVersion: 'kurisu-amadeus-0.4.20',
     });
     expect(f.requests.filter((request) => request.role === 'llm')).toHaveLength(
       1,

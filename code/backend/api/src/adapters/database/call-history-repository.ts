@@ -67,7 +67,7 @@ export function createSqliteCallHistory(client: Client): CallHistoryRepository {
     },
     async beginTurn(input) {
       await client.execute({
-        sql: "INSERT INTO call_turns VALUES (?, ?, ?, ?, ?, ?, '', '', 'processing', ?, NULL)",
+        sql: "INSERT INTO call_turns (id, session_id, conversation_id, client_turn_id, response_id, data_class, user_text, generated_text, status, created_at, completed_at, initiative_kind) VALUES (?, ?, ?, ?, ?, ?, '', '', 'processing', ?, NULL, ?)",
         args: [
           input.id,
           input.sessionId,
@@ -76,6 +76,7 @@ export function createSqliteCallHistory(client: Client): CallHistoryRepository {
           input.responseId,
           input.dataClass,
           Date.now(),
+          input.initiativeKind ?? null,
         ],
       });
     },
@@ -94,12 +95,18 @@ export function createSqliteCallHistory(client: Client): CallHistoryRepository {
     },
     async recent(conversationId, ownerId, limit): Promise<StoredTurn[]> {
       const { rows } = await client.execute({
-        sql: "SELECT t.user_text, COALESCE((SELECT GROUP_CONCAT(text, ' ') FROM (SELECT text FROM speech_segments WHERE response_id = t.response_id AND text_sent = 1 ORDER BY position)), '') AS sent_text, COALESCE((SELECT GROUP_CONCAT(text, ' ') FROM (SELECT text FROM speech_segments WHERE response_id = t.response_id AND sample_count > 0 AND played_samples = sample_count ORDER BY position)), '') AS generated_text, t.data_class, t.status, EXISTS(SELECT 1 FROM speech_segments WHERE response_id = t.response_id AND played_samples > 0 AND played_samples < sample_count) AS partially_played FROM call_turns t JOIN foundation_conversations c ON c.id = t.conversation_id WHERE c.id = ? AND c.owner_id = ? AND t.user_text <> '' AND t.status IN ('completed', 'interrupted', 'failed') AND NOT EXISTS (SELECT 1 FROM memory_blocked_turns b WHERE b.turn_id = t.id AND b.owner_id = c.owner_id) ORDER BY t.created_at DESC, t.rowid DESC LIMIT ?",
+        sql: "SELECT t.user_text, t.initiative_kind, COALESCE((SELECT GROUP_CONCAT(text, ' ') FROM (SELECT text FROM speech_segments WHERE response_id = t.response_id AND text_sent = 1 ORDER BY position)), '') AS sent_text, COALESCE((SELECT GROUP_CONCAT(text, ' ') FROM (SELECT text FROM speech_segments WHERE response_id = t.response_id AND sample_count > 0 AND played_samples = sample_count ORDER BY position)), '') AS generated_text, t.data_class, t.status, EXISTS(SELECT 1 FROM speech_segments WHERE response_id = t.response_id AND played_samples > 0 AND played_samples < sample_count) AS partially_played FROM call_turns t JOIN foundation_conversations c ON c.id = t.conversation_id WHERE c.id = ? AND c.owner_id = ? AND (t.user_text <> '' OR t.initiative_kind IS NOT NULL) AND t.status IN ('completed', 'interrupted', 'failed') AND NOT EXISTS (SELECT 1 FROM memory_blocked_turns b WHERE b.turn_id = t.id AND b.owner_id = c.owner_id) ORDER BY t.created_at DESC, t.rowid DESC LIMIT ?",
         args: [conversationId, ownerId, limit],
       });
 
       return rows.reverse().map((row) => ({
         userText: String(row.user_text),
+        ...(row.initiative_kind
+          ? {
+              initiativeKind: String(row.initiative_kind) as
+                'greeting' | 'initiative',
+            }
+          : {}),
         generatedText: String(row.generated_text),
         sentText: String(row.sent_text),
         dataClass: String(row.data_class) as DataClass,

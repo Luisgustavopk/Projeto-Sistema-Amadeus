@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { buildPresenceDirection } from '../persona/presence-direction.ts';
+import { PERSONA_PRESENCE_REFERENCE } from '../persona/presence-reference.ts';
+import type { PersistentPersonaState } from '../persona/persistent-state.ts';
 import type { ProviderServices } from '../providers/index.ts';
 import type { CallHistoryRepository } from '../../ports/call-history-repository.ts';
 import type { VoiceSink } from '../../ports/voice-session.ts';
@@ -35,6 +38,7 @@ import {
 } from '../../domain/persona/expression.ts';
 
 export type VoiceTurn = {
+  initiativeKind?: 'greeting' | 'initiative';
   sessionId: string;
   conversationId: string;
   ownerId: string;
@@ -71,6 +75,7 @@ export function createTurnProcessor(
       >
     >,
   analysis?: Pick<import('../persona/analysis.ts').PersonaAnalysis, 'analyze'>,
+  persistentState?: Pick<PersistentPersonaState, 'snapshot' | 'observe'>,
 ) {
   const expressionState = createExpressionState();
 
@@ -174,6 +179,11 @@ export function createTurnProcessor(
         };
 
         let text = turn.text;
+
+        if (turn.initiativeKind) {
+          text = `[Evento da aplicação: ${turn.initiativeKind}; a pessoa não enviou uma mensagem.]`;
+        }
+
         let firstAudio = true;
 
         if (turn.audio) {
@@ -186,7 +196,10 @@ export function createTurnProcessor(
           );
         }
 
-        await history.updateTurn(responseId, { userText: text });
+        if (!turn.initiativeKind) {
+          await history.updateTurn(responseId, { userText: text });
+        }
+
         signal.throwIfAborted();
         const recent = await history.recent(
           turn.conversationId,
@@ -223,12 +236,32 @@ export function createTurnProcessor(
         }
 
         const personaConfiguration = await persona?.get();
+        const artisticState = await persistentState
+          ?.snapshot(context.dataClass)
+          .catch(() => {
+            metrics.failure('PERSONA_STATE_UNAVAILABLE');
+
+            return undefined;
+          });
+        const stateDirection = artisticState
+          ? '\n<artistic_state>\n' +
+            JSON.stringify({
+              pleasure: artisticState.pleasure,
+              arousal: artisticState.arousal,
+              dominance: artisticState.dominance,
+              energy: artisticState.energy,
+            }) +
+            '\nControles artísticos graduais. A persona canônica e o contexto atual prevalecem; energia baixa sugere concisão, não reclamação, indisponibilidade ou hostilidade. Não verbalize números ou nomes de variáveis.\n</artistic_state>'
+          : '';
+        const initiativeDirection = turn.initiativeKind
+          ? '\n' + buildPresenceDirection(turn.initiativeKind)
+          : '';
         // Start the short analysis while memory retrieval/planning runs. No late
         // result can mutate a prompt after its generation has started.
         const analysisStarted = performance.now();
         let availableDirection = '';
         let needsClarification = false;
-        const pendingDirection = analysis
+        const pendingDirection = (turn.initiativeKind ? undefined : analysis)
           ?.analyze(
             {
               text,
@@ -253,9 +286,16 @@ export function createTurnProcessor(
           });
         // Observe rejection immediately if the turn is cancelled during memory work.
         void pendingDirection?.catch(() => undefined);
+        const retrievalText =
+          turn.initiativeKind === 'greeting'
+            ? 'Nome de tratamento e identidade da pessoa.'
+            : turn.initiativeKind
+              ? (recent.filter((item) => item.userText.trim()).at(-1)
+                  ?.userText ?? text)
+              : text;
         const memories = await memory?.retrieve(
           turn.conversationId,
-          text,
+          retrievalText,
           context.dataClass,
           buildHistoryContext(recent, 1800),
         );
@@ -306,13 +346,16 @@ export function createTurnProcessor(
 
         context.systemPrompt =
           applyPersonaConfiguration(
-            buildVoicePersonaCore(),
+            buildVoicePersonaCore(true, false),
             personaConfiguration,
           ) +
           memoryDirection +
           contextualDirection +
           context.conversationDirection +
+          stateDirection +
           memoryContent('', memories ?? '') +
+          PERSONA_PRESENCE_REFERENCE +
+          initiativeDirection +
           voiceOutputFormat(factCount);
         let proposal = expressionState.snapshot();
         let metadataValid = false;
@@ -686,16 +729,19 @@ export function createTurnProcessor(
                 systemPrompt:
                   speechOnly || withoutPersistentMemory
                     ? applyPersonaConfiguration(
-                        buildVoicePersonaCore(),
+                        buildVoicePersonaCore(true, false),
                         personaConfiguration,
                       ) +
                       direction +
                       contextualDirection +
                       context.conversationDirection +
+                      stateDirection +
                       memoryContent(
                         '',
                         withoutPersistentMemory ? '' : (memories ?? ''),
                       ) +
+                      PERSONA_PRESENCE_REFERENCE +
+                      initiativeDirection +
                       (continuation
                         ? '\nContinue a resposta a partir do trecho ja fornecido. Nao repita nem recomece esse trecho. Responda somente com a continuacao falavel, sem mencionar modelos, cotas ou a troca de provedor.'
                         : voiceOutputFormat(sourceFactCount, speechOnly))
@@ -895,6 +941,17 @@ export function createTurnProcessor(
         }
 
         await history.updateTurn(responseId, { status: 'completed' });
+        signal.throwIfAborted();
+
+        if (!turn.initiativeKind && persistentState) {
+          await persistentState
+            .observe(context.dataClass, responseId, expression)
+            .catch(() => {
+              signal.throwIfAborted();
+              metrics.failure('PERSONA_STATE_UNAVAILABLE');
+            });
+        }
+
         metrics.count('completed');
         emit({ type: 'reply.done', turnId, responseId });
       } finally {

@@ -15,10 +15,21 @@ export const VOICE_PIPELINE_PROTOCOL = {
     expressionEvent: 'reply.expression',
     association:
       'Cache expression by responseId/segmentId; apply on actual segment playback, not event arrival',
-    stateScope: 'current voice session; reset on reconnect',
+    stateScope:
+      'segment expression within the session; bounded artistic PAD/energy and familiarity persist per owner/data class with decay',
     nativeDeliveryControlsApplied: false,
   },
   clientEventSchema: z.toJSONSchema(ClientEvent),
+  presence: {
+    handshake:
+      'presence.update -> presence.offer -> presence.accept/decline; client reserves the next shared turn ID',
+    greetingOnce: true,
+    silenceMs: 90000,
+    minimumIntervalMs: 180000,
+    maximumInitiativesPerSession: 2,
+    userPriority: true,
+    externalAutonomy: false,
+  },
   serverPayloadSchema: z.toJSONSchema(VoicePayload),
   serverEnvelope: {
     protocolVersion: '1.1',

@@ -17,6 +17,7 @@ export function buildConversationStyle(
   const confirmed = history.filter((turn) => turn.generatedText.trim());
   const complete = confirmed.filter(
     (turn) =>
+      !turn.initiativeKind &&
       !turn.partiallyPlayed &&
       (turn.responseStatus === undefined ||
         turn.responseStatus === 'completed'),

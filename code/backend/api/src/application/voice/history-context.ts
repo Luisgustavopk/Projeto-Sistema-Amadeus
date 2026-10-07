@@ -47,6 +47,7 @@ export function buildHistoryContext(
           }
         : {}),
       responseStatus: turn.responseStatus ?? 'completed',
+      ...(turn.initiativeKind ? { initiativeKind: turn.initiativeKind } : {}),
       partiallyPlayed: turn.partiallyPlayed ?? false,
     };
     const size = JSON.stringify(entry).length;
