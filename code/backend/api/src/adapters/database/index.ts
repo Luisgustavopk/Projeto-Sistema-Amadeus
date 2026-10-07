@@ -5,9 +5,10 @@ import { fileURLToPath } from 'node:url';
 import * as schema from './schema.ts';
 import { backfillMemorySearch } from './memory-search-backfill.ts';
 import { backfillMemoryEquivalence } from './memory-equivalence-backfill.ts';
+import { coordinateDatabaseOperations } from './operation-queue.ts';
 
 export async function openDatabase(url: string) {
-  const client = createClient({ url });
+  const client = coordinateDatabaseOperations(createClient({ url }));
   const db = drizzle(client, { schema });
 
   try {
