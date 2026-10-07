@@ -94,13 +94,14 @@ export function createSqliteCallHistory(client: Client): CallHistoryRepository {
     },
     async recent(conversationId, ownerId, limit): Promise<StoredTurn[]> {
       const { rows } = await client.execute({
-        sql: "SELECT t.user_text, COALESCE((SELECT GROUP_CONCAT(text, ' ') FROM (SELECT text FROM speech_segments WHERE response_id = t.response_id AND sample_count > 0 AND played_samples = sample_count ORDER BY position)), '') AS generated_text, t.data_class, t.status, EXISTS(SELECT 1 FROM speech_segments WHERE response_id = t.response_id AND played_samples > 0 AND played_samples < sample_count) AS partially_played FROM call_turns t JOIN foundation_conversations c ON c.id = t.conversation_id WHERE c.id = ? AND c.owner_id = ? AND t.user_text <> '' AND t.status IN ('completed', 'interrupted', 'failed') AND NOT EXISTS (SELECT 1 FROM memory_blocked_turns b WHERE b.turn_id = t.id AND b.owner_id = c.owner_id) ORDER BY t.created_at DESC, t.rowid DESC LIMIT ?",
+        sql: "SELECT t.user_text, COALESCE((SELECT GROUP_CONCAT(text, ' ') FROM (SELECT text FROM speech_segments WHERE response_id = t.response_id AND text_sent = 1 ORDER BY position)), '') AS sent_text, COALESCE((SELECT GROUP_CONCAT(text, ' ') FROM (SELECT text FROM speech_segments WHERE response_id = t.response_id AND sample_count > 0 AND played_samples = sample_count ORDER BY position)), '') AS generated_text, t.data_class, t.status, EXISTS(SELECT 1 FROM speech_segments WHERE response_id = t.response_id AND played_samples > 0 AND played_samples < sample_count) AS partially_played FROM call_turns t JOIN foundation_conversations c ON c.id = t.conversation_id WHERE c.id = ? AND c.owner_id = ? AND t.user_text <> '' AND t.status IN ('completed', 'interrupted', 'failed') AND NOT EXISTS (SELECT 1 FROM memory_blocked_turns b WHERE b.turn_id = t.id AND b.owner_id = c.owner_id) ORDER BY t.created_at DESC, t.rowid DESC LIMIT ?",
         args: [conversationId, ownerId, limit],
       });
 
       return rows.reverse().map((row) => ({
         userText: String(row.user_text),
         generatedText: String(row.generated_text),
+        sentText: String(row.sent_text),
         dataClass: String(row.data_class) as DataClass,
         responseStatus: String(row.status) as TurnStatus,
         partiallyPlayed: Boolean(row.partially_played),
@@ -108,8 +109,22 @@ export function createSqliteCallHistory(client: Client): CallHistoryRepository {
     },
     async addSegment(segment) {
       await client.execute({
-        sql: "INSERT INTO speech_segments VALUES (?, ?, ?, ?, 0, 0, 'generated')",
+        sql: "INSERT INTO speech_segments (id, response_id, position, text, sample_count, played_samples, status) VALUES (?, ?, ?, ?, 0, 0, 'generated')",
         args: [segment.id, segment.responseId, segment.position, segment.text],
+      });
+    },
+    async familiarity(ownerId, dataClass) {
+      const { rows } = await client.execute({
+        sql: "SELECT COUNT(*) AS turns FROM call_turns t JOIN foundation_conversations c ON c.id = t.conversation_id WHERE c.owner_id = ? AND t.user_text <> '' AND t.status IN ('completed', 'failed') AND (? = 'local-only' OR t.data_class = 'synthetic' OR (? = 'personal' AND t.data_class = 'personal')) AND EXISTS (SELECT 1 FROM speech_segments s WHERE s.response_id = t.response_id AND s.text_sent = 1 AND s.text <> '') AND NOT EXISTS (SELECT 1 FROM memory_blocked_turns b WHERE b.turn_id = t.id AND b.owner_id = c.owner_id)",
+        args: [ownerId, dataClass, dataClass],
+      });
+
+      return Number(rows[0]?.turns ?? 0);
+    },
+    async markTextSent(segmentId) {
+      await client.execute({
+        sql: 'UPDATE speech_segments SET text_sent = 1 WHERE id = ?',
+        args: [segmentId],
       });
     },
     async setAudio(segmentId, sampleCount) {

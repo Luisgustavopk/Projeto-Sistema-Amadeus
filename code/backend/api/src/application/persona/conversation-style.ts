@@ -10,7 +10,10 @@ function boundary(text: string, tail = false) {
   return (tail ? sentences.at(-1) : sentences[0]) ?? '';
 }
 
-export function buildConversationStyle(history: StoredTurn[]) {
+export function buildConversationStyle(
+  history: StoredTurn[],
+  retainedOwnerTurns = 0,
+) {
   const confirmed = history.filter((turn) => turn.generatedText.trim());
   const complete = confirmed.filter(
     (turn) =>
@@ -19,16 +22,19 @@ export function buildConversationStyle(history: StoredTurn[]) {
         turn.responseStatus === 'completed'),
   );
 
+  const familiarTurns = Math.max(complete.length, retainedOwnerTurns);
+
   return {
-    familiarity:
-      complete.length >= 10 ? 'F2' : complete.length >= 3 ? 'F1' : 'F0',
+    familiarity: familiarTurns >= 10 ? 'F2' : familiarTurns >= 3 ? 'F1' : 'F0',
     confirmedTurnsAvailable: complete.length,
+    ...(retainedOwnerTurns ? { retainedOwnerTurns } : {}),
     recentStyle: confirmed.slice(-5).map((turn) => ({
       opening: boundary(turn.generatedText).slice(0, 180),
       closing: boundary(turn.generatedText, true).slice(-180),
     })),
-    scope:
-      'available confirmed history of this conversation; not personal memory',
+    scope: retainedOwnerTurns
+      ? 'eligible retained interactions of this owner; not proof of intimacy or hearing'
+      : 'available confirmed history of this conversation; not personal memory',
   };
 }
 

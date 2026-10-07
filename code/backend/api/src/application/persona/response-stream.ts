@@ -327,6 +327,40 @@ export async function* readPersonaResponse(
   }
 
   if (footer) {
+    // Older/compatible models sometimes move an empty memory declaration to
+    // the end. Discard it without approving or changing the header decision.
+    // Nonempty references cannot authorize speech retroactively.
+    if (!bareFooter && tail.startsWith(OPEN)) {
+      const emptyEnd = tail.indexOf(CLOSE, OPEN.length);
+
+      if (emptyEnd >= 0) {
+        let value: unknown;
+
+        try {
+          value = JSON.parse(tail.slice(OPEN.length, emptyEnd));
+        } catch {
+          /* The normal footer validation below rejects malformed JSON. */
+        }
+
+        if (
+          value &&
+          typeof value === 'object' &&
+          !Array.isArray(value) &&
+          Object.keys(value).join(',') === 'memory' &&
+          Array.isArray((value as { memory: unknown }).memory) &&
+          !(value as { memory: unknown[] }).memory.length
+        ) {
+          tail = tail.slice(emptyEnd + CLOSE.length).trim();
+
+          if (!tail) {
+            return;
+          }
+
+          bareFooter = !tail.startsWith(OPEN);
+        }
+      }
+    }
+
     const end = bareFooter ? objectEnd(tail) : tail.indexOf(CLOSE, OPEN.length);
     const after = bareFooter ? end + 1 : end + CLOSE.length;
 
@@ -337,11 +371,26 @@ export async function* readPersonaResponse(
     }
 
     try {
+      const value = JSON.parse(
+        bareFooter ? tail : tail.slice(OPEN.length, end),
+      );
+
+      if (
+        !value ||
+        typeof value !== 'object' ||
+        Object.keys(value).sort().join(',') !== 'emotion,intensity,intent'
+      ) {
+        throw new ProviderInvalidError(
+          'Objeto desconhecido no rodapé de expressão.',
+        );
+      }
+
+      const expression = ExpressionSchema.safeParse(value);
+      // Invalid artistic labels cannot erase speech already delivered. Unknown
+      // structure, memory changes and malformed JSON remain rejected.
       onExpression(
-        ExpressionSchema.parse(
-          JSON.parse(bareFooter ? tail : tail.slice(OPEN.length, end)),
-        ),
-        true,
+        expression.success ? expression.data : { ...NEUTRAL_EXPRESSION },
+        expression.success,
       );
     } catch {
       throw new ProviderInvalidError('Expressão final inválida.');
@@ -363,7 +412,7 @@ export async function* readPersonaResponse(
 /** Reject structural leakage before either displaying or synthesizing a segment. */
 export function validateSpokenSegment(text: string) {
   if (
-    /<\/?(?:expression|memory|think(?:ing)?|analysis|reasoning)\b|```|[{}]|["'](?:intent|emotion|intensity)["']\s*:/iu.test(
+    /<\/?(?:expression|memory|think(?:ing)?|analysis|reasoning)\b|\(expression\)|```|[{}]|^\s*\[\s*(?:\d+(?:\s*,\s*\d+)*)?\s*\]|["'](?:intent|emotion|intensity)["']\s*:/iu.test(
       text,
     )
   ) {

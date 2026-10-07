@@ -69,6 +69,9 @@ it('carrega a skill real nos dois prompts e preserva formato e enquadramento de 
 
 it('deriva familiaridade e cinco aberturas/fechos apenas do histórico confirmado', () => {
   expect(buildConversationStyle([]).familiarity).toBe('F0');
+  expect(buildConversationStyle([], 3).familiarity).toBe('F1');
+  expect(buildConversationStyle([], 10).familiarity).toBe('F2');
+  expect(buildConversationStyle([], 10).scope).toContain('this owner');
   expect(buildConversationStyle(Array(3).fill(turn)).familiarity).toBe('F1');
   expect(buildConversationStyle(Array(10).fill(turn)).familiarity).toBe('F2');
   expect(

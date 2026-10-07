@@ -28,6 +28,13 @@ process.exitCode = result.status ?? 1;
 
 if (process.exitCode === 0) {
   await copyFile(
+    new URL(
+      '../src/application/persona/conversation-presence-v1.md',
+      import.meta.url,
+    ),
+    resolve(output, 'application/persona/conversation-presence-v1.md'),
+  );
+  await copyFile(
     new URL('../src/application/persona/voice-runtime-v1.md', import.meta.url),
     resolve(output, 'application/persona/voice-runtime-v1.md'),
   );

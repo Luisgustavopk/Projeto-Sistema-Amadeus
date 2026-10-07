@@ -18,6 +18,32 @@ const head = (memory: unknown) =>
     memory,
   });
 
+it.each([true, false])(
+  'descarta declaração vazia tardia sem autorizar memória retroativamente, fragmentado=%s',
+  async (split) => {
+    const raw =
+      'Uma fala.<expression>{"memory":[]}</expression><expression>{"intent":"conversar","emotion":"neutra","intensity":0.15}</expression>';
+    const usage = vi.fn();
+    const output = await collect(
+      readPersonaResponse(
+        (async function* () {
+          if (split) {
+            for (const char of raw) {
+              yield char;
+            }
+          } else {
+            yield raw;
+          }
+        })(),
+        () => {},
+        usage,
+      ),
+    );
+    expect(output).toBe('Uma fala.');
+    expect(usage.mock.calls.every(([value]) => value === null)).toBe(true);
+  },
+);
+
 it.each([
   { verdict: 'supported', expected: true },
   { verdict: 'unrelated', expected: true },
@@ -335,7 +361,7 @@ it.each(
           calls++;
 
           if (calls === 1) {
-            expect(input.content).toContain('trilhas vulcânicas');
+            expect(input.systemPrompt).toContain('trilhas vulcânicas');
 
             try {
               yield {

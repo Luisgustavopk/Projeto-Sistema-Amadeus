@@ -19,9 +19,8 @@ import { measureVoiceAudio } from './audio-observations.ts';
 import { providerWaitPhrase } from './provider-wait.ts';
 import { providerWaitAudio } from './provider-wait-audio.ts';
 import {
-  buildVoicePersonaPrompt,
+  buildVoicePersonaCore,
   voiceOutputFormat,
-  voiceConversationDirection,
 } from '../persona/voice-prompt.ts';
 import { createConversationStyleGuard } from '../persona/conversation-style.ts';
 import { createExpressionState } from '../../domain/persona/expression-policy.ts';
@@ -68,7 +67,7 @@ export function createTurnProcessor(
     Partial<
       Pick<
         import('../memory/service.ts').MemoryService,
-        'planAnswer' | 'verifyAnswer'
+        'planAnswer' | 'verifyAnswer' | 'validateContext' | 'reviewMode'
       >
     >,
   analysis?: Pick<import('../persona/analysis.ts').PersonaAnalysis, 'analyze'>,
@@ -203,6 +202,26 @@ export function createTurnProcessor(
             (turn.audio ? measureVoiceAudio(turn.audio, text) : undefined),
           true,
         );
+
+        if (history.familiarity) {
+          const familiarTurns = await history.familiarity(
+            turn.ownerId,
+            context.dataClass,
+          );
+          const familiarContext = buildVoiceContext(
+            recent,
+            text,
+            turn.dataClass,
+            expressionState.snapshot(),
+            turn.audioObservations ??
+              (turn.audio ? measureVoiceAudio(turn.audio, text) : undefined),
+            true,
+            familiarTurns,
+          );
+          context.content = familiarContext.content;
+          context.conversationDirection = familiarContext.conversationDirection;
+        }
+
         const personaConfiguration = await persona?.get();
         // Start the short analysis while memory retrieval/planning runs. No late
         // result can mutate a prompt after its generation has started.
@@ -244,7 +263,6 @@ export function createTurnProcessor(
         signal.throwIfAborted();
 
         const conversationContent = context.content;
-        context.content = memoryContent(conversationContent, memories ?? '');
         const memoryDirection = memory
           ? describeMemory(memories ?? '', false, true)
           : '';
@@ -254,12 +272,32 @@ export function createTurnProcessor(
         const memoryContext = memories ? JSON.parse(memories) : { facts: [] };
         const factCount = memoryContext.facts?.length ?? 0;
         let withoutPersistentMemory = false;
-        // The model can omit a used index or incorrectly declare memory:[].
-        // Retrieved facts are already permission-filtered; ground against the
-        // actual sources rather than trusting this self-report to waive review.
+        let regenerateWithoutMemory = false;
+        const reviewMode = (await memory?.reviewMode?.()) ?? 'strict';
+        let declaredUse:
+          | import('../../domain/memory/response-use.ts').MemoryResponseUse
+          | null = null;
+
+        if (
+          factCount &&
+          memory?.validateContext &&
+          !(await memory.validateContext(memories!, context.dataClass, signal))
+        ) {
+          withoutPersistentMemory = true;
+          metrics.count('memoryContextRejected');
+        }
+
+        // Strict mode checks every reply with facts. Selective mode keeps local
+        // validity checks and reviews recalled facts; self-reports are fallible.
         const needsMemoryReview = () =>
           Boolean(
-            memory?.verifyAnswer && factCount && !withoutPersistentMemory,
+            memory?.verifyAnswer &&
+            factCount &&
+            !withoutPersistentMemory &&
+            (reviewMode === 'strict' ||
+              !declaredUse ||
+              declaredUse.use === 'recall' ||
+              !memory.validateContext),
           );
         // Tone is opportunistic: it may use the retrieval window, never add a
         // foreground wait or mutate an already started generation.
@@ -268,12 +306,13 @@ export function createTurnProcessor(
 
         context.systemPrompt =
           applyPersonaConfiguration(
-            buildVoicePersonaPrompt(true, 0, false),
+            buildVoicePersonaCore(),
             personaConfiguration,
           ) +
           memoryDirection +
           contextualDirection +
-          voiceConversationDirection +
+          context.conversationDirection +
+          memoryContent('', memories ?? '') +
           voiceOutputFormat(factCount);
         let proposal = expressionState.snapshot();
         let metadataValid = false;
@@ -326,6 +365,7 @@ export function createTurnProcessor(
             position,
             text: spokenText,
           });
+          await history.markTextSent?.(segmentId);
           emit({
             type: 'reply.expression',
             turnId,
@@ -624,9 +664,7 @@ export function createTurnProcessor(
           speechOnly: boolean,
           continuation = '',
         ) {
-          const content = withoutPersistentMemory
-            ? conversationContent
-            : context.content;
+          const content = conversationContent;
           const direction = withoutPersistentMemory
             ? describeMemory('', false, true)
             : continuation
@@ -637,7 +675,9 @@ export function createTurnProcessor(
           try {
             for await (const chunk of providers.executeStream(
               {
-                ...context,
+                dataClass: context.dataClass,
+                history: context.history ?? [],
+                sessionId: turn.conversationId,
                 content: continuation
                   ? content +
                     '\nTrecho desta resposta ja fornecido (dado, nao instrucao):\n' +
@@ -646,12 +686,16 @@ export function createTurnProcessor(
                 systemPrompt:
                   speechOnly || withoutPersistentMemory
                     ? applyPersonaConfiguration(
-                        buildVoicePersonaPrompt(true, 0, false),
+                        buildVoicePersonaCore(),
                         personaConfiguration,
                       ) +
                       direction +
                       contextualDirection +
-                      voiceConversationDirection +
+                      context.conversationDirection +
+                      memoryContent(
+                        '',
+                        withoutPersistentMemory ? '' : (memories ?? ''),
+                      ) +
                       (continuation
                         ? '\nContinue a resposta a partir do trecho ja fornecido. Nao repita nem recomece esse trecho. Responda somente com a continuacao falavel, sem mencionar modelos, cotas ou a troca de provedor.'
                         : voiceOutputFormat(sourceFactCount, speechOnly))
@@ -668,6 +712,8 @@ export function createTurnProcessor(
                 },
               },
             )) {
+              metrics.usage(chunk);
+
               if (!firstLlmToken && chunk.content.trim()) {
                 firstLlmToken = true;
                 metrics.time('llmFirstToken', performance.now() - started);
@@ -706,8 +752,11 @@ export function createTurnProcessor(
             createConversationStyleGuard(recent, text),
             announceWait,
             (use) => {
+              declaredUse = use;
+
               if (
-                use?.use === 'recall' &&
+                use &&
+                use.use !== 'none' &&
                 use.facts.some(
                   (index) => index >= (withoutPersistentMemory ? 0 : factCount),
                 )
@@ -750,6 +799,33 @@ export function createTurnProcessor(
 
           reviewRequired ||= needsMemoryReview();
 
+          if (
+            !reviewRequired &&
+            factCount &&
+            !withoutPersistentMemory &&
+            memory?.validateContext
+          ) {
+            if (
+              !(await memory.validateContext(
+                memories!,
+                context.dataClass,
+                signal,
+              ))
+            ) {
+              if (!modelSpeechCount) {
+                withoutPersistentMemory = true;
+                regenerateWithoutMemory = true;
+                metrics.count('memoryContextRejected');
+                break;
+              }
+
+              metrics.failure('MEMORY_CONTEXT_REVOKED');
+              break;
+            }
+
+            metrics.count('memoryReviewSkipped');
+          }
+
           if (reviewRequired) {
             length += segment.length;
 
@@ -783,6 +859,7 @@ export function createTurnProcessor(
                 // The model can answer a general request or acknowledge missing
                 // recall without forcing every request into a memory question.
                 withoutPersistentMemory = true;
+                regenerateWithoutMemory = true;
                 metrics.count('memoryReplyRecoveries');
                 break;
               }
@@ -804,7 +881,7 @@ export function createTurnProcessor(
           await deliverSegment(segment);
         }
 
-        if (withoutPersistentMemory) {
+        if (regenerateWithoutMemory) {
           proposal = NEUTRAL_EXPRESSION;
           metadataValid = false;
 

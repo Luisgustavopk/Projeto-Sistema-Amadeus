@@ -497,7 +497,8 @@ it('retoma contexto com ticket novo sem repetir áudio ou fala interrompida', as
   const content = f.requests.filter((r) => r.role === 'llm')[1]!.content;
   expect(content).toContain('Minha hipótese sintética anterior.');
   expect(content).toContain('"partiallyPlayed":true');
-  expect(content).not.toContain('Resposta anterior parcialmente ouvida.');
+  expect(content).toContain('Resposta anterior parcialmente ouvida.');
+  expect(content).toContain('texto enviado não comprova leitura nem audição');
   expect(
     (await f.database.client.execute('SELECT * FROM memory_resumptions')).rows,
   ).toHaveLength(1);
@@ -541,7 +542,7 @@ it.each([16000, 24000] as const)(
       intensity: 0.35,
       metadataValid: true,
       deliveryApplied: false,
-      personaVersion: 'kurisu-amadeus-0.4.17',
+      personaVersion: 'kurisu-amadeus-0.4.18',
     });
     expect(f.requests.filter((request) => request.role === 'llm')).toHaveLength(
       1,
@@ -597,7 +598,7 @@ it('aplica uma edição de persona no próximo turno da mesma conexão', async (
   const after = f.requests.filter((r) => r.role === 'llm')[1]!.content;
   expect(before).not.toContain('analogias de astronomia');
   expect(after).toContain('analogias de astronomia');
-  expect(after).toContain('FORMATO:');
+  expect(after).toContain('FORMATO OBRIGAT');
 });
 
 it('reconectar reinicia a expressão mesmo quando a chamada anterior já acumulou intensidade', async () => {
@@ -901,6 +902,7 @@ it('percorre PCM → STT → LLM → voz personalizada e persiste reprodução c
     {
       userText: 'Olá, Amadeus.',
       generatedText: 'Olá. Estou ouvindo.',
+      sentText: 'Olá. Estou ouvindo.',
       dataClass: 'synthetic',
       responseStatus: 'completed',
       partiallyPlayed: false,
@@ -918,6 +920,7 @@ it('percorre PCM → STT → LLM → voz personalizada e persiste reprodução c
     {
       userText: 'Olá, Amadeus.',
       generatedText: '',
+      sentText: 'Olá. Estou ouvindo.',
       dataClass: 'synthetic',
       responseStatus: 'interrupted',
       partiallyPlayed: true,
@@ -1218,7 +1221,9 @@ it('recupera cabeçalho incompleto antes da fala, sem duplicar áudio ou reinici
   );
   const attempts = f.requests.filter((r) => r.role === 'llm');
   expect(attempts).toHaveLength(2);
-  expect(attempts[1]?.content).toContain('somente a fala da personagem');
+  expect(attempts[1]?.content).toContain(
+    'esta é uma reparação única de formato',
+  );
   expect(attempts[1]?.content).toContain(
     '<expression>{"memory":[]}</expression>',
   );
