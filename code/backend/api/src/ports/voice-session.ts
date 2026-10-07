@@ -3,6 +3,27 @@ import type { Expression } from '../domain/persona/expression.ts';
 import type { describeDelivery } from '../domain/persona/expression.ts';
 
 export type VoiceEvent =
+  | {
+      type: 'audio.abort';
+      turnId: number;
+      responseId: string;
+      segmentId: string;
+    }
+  | {
+      type: 'audio.start';
+      turnId: number;
+      responseId: string;
+      segmentId: string;
+      sampleRate: 16000 | 24000;
+    }
+  | {
+      type: 'audio.end';
+      turnId: number;
+      responseId: string;
+      segmentId: string;
+      sampleCount: number;
+      frameCount: number;
+    }
   | (Expression &
       ReturnType<typeof describeDelivery> & {
         type: 'reply.expression';
@@ -63,4 +84,12 @@ export interface VoiceSink {
     sampleRate: 16000 | 24000;
     signal: AbortSignal;
   }): Promise<void>;
+  audioStream?(input: {
+    turnId: number;
+    responseId: string;
+    segmentId: string;
+    sampleRate: 16000 | 24000;
+    chunks: AsyncIterable<Uint8Array>;
+    signal: AbortSignal;
+  }): Promise<number>;
 }

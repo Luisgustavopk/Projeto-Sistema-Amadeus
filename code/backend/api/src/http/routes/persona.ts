@@ -8,12 +8,45 @@ import {
 } from '../../application/persona/configuration.ts';
 import { VoiceVersionSchema } from '../../application/voice/versions.ts';
 import { security, errors } from './schemas/common.ts';
+import {
+  PersonaAnalysisEditSchema,
+  PersonaAnalysisStateSchema,
+} from '../../application/persona/analysis.ts';
 
 export function registerPersonaRoutes(
   instance: FastifyInstance,
   services: HttpServices,
 ) {
   const app = instance.withTypeProvider<ZodTypeProvider>();
+  app.get(
+    '/v1/persona/analysis',
+    {
+      schema: {
+        security,
+        response: {
+          200: PersonaAnalysisStateSchema.extend({
+            model: z.string(),
+            apiKeyEnv: z.string(),
+            usage: z.unknown(),
+            counts: z.unknown(),
+          }),
+          ...errors,
+        },
+      },
+    },
+    () => services.personaAnalysis.describe(),
+  );
+  app.put(
+    '/v1/persona/analysis',
+    {
+      schema: {
+        security,
+        body: PersonaAnalysisEditSchema,
+        response: { 200: PersonaAnalysisStateSchema, ...errors },
+      },
+    },
+    (req) => services.personaAnalysis.configure(req.body),
+  );
   app.get(
     '/v1/persona',
     {

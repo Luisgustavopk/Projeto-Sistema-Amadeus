@@ -43,7 +43,12 @@ export function createVoiceSession(
     if (!(
       error instanceof ApplicationError && error.code === 'PROVIDER_BUSY'
     )) {
-      socket.close(1008, 'Invalid voice event');
+      socket.close(
+        1008,
+        error instanceof RateLimitedError
+          ? error.message
+          : 'Invalid voice event',
+      );
     }
   };
 

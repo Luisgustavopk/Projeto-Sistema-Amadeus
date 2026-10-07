@@ -8,6 +8,9 @@ export function createVoiceMetrics() {
     textFallbacks: 0,
     personaMetadataFallbacks: 0,
     personaRecoveries: 0,
+    inputClarifications: 0,
+    memoryReplyRecoveries: 0,
+    memoryReviewUnavailable: 0,
   };
   const durations = new Map<string, number[]>();
   const failureReasons = new Map<string, number>();

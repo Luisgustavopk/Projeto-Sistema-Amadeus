@@ -30,6 +30,8 @@ import { createMemoryService } from '../application/memory/service.ts';
 import { createMemoryProvider } from '../application/memory/provider.ts';
 import { createLocalMemoryEmbeddings } from '../adapters/embeddings/local.ts';
 import { createLocalMemoryReranker } from '../adapters/embeddings/reranker.ts';
+import { createPersonaAnalysis } from '../application/persona/analysis.ts';
+import { createJevClient } from '../adapters/providers/jev.ts';
 
 export async function createContext(
   options: AppOptions,
@@ -94,6 +96,12 @@ export async function createContext(
   const voiceMetrics = createVoiceMetrics();
   const revisions = createRevisionRepository(database.client);
   const persona = createPersonaConfiguration(revisions, config.OWNER_ID);
+  const personaAnalysis = createPersonaAnalysis({
+    repository: revisions,
+    usage,
+    ownerId: config.OWNER_ID,
+    client: options.personaDecisionClient ?? createJevClient(secrets),
+  });
   const voiceVersions = createVoiceVersions(
     revisions,
     config.OWNER_ID,
@@ -125,6 +133,7 @@ export async function createContext(
       ? (options.memoryReranker ??
           createLocalMemoryReranker(config.MEMORY_MODEL_CACHE_DIRECTORY))
       : undefined,
+    personaAnalysis,
   );
   await memory.start();
   const voiceSessions = createVoiceSessions({
@@ -136,6 +145,7 @@ export async function createContext(
     ownerId: config.OWNER_ID,
     persona,
     memory,
+    analysis: personaAnalysis,
   });
 
   return {
@@ -144,6 +154,7 @@ export async function createContext(
       providers,
       voiceProfiles,
       persona,
+      personaAnalysis,
       memory,
       memoryProvider,
       voiceVersions,

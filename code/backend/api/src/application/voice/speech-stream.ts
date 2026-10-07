@@ -22,6 +22,8 @@ export async function* streamSpeech(
   let count = 0;
   let text = '';
   let length = 0;
+  let firstDeadline = 0;
+  let firstTimer: ReturnType<typeof setTimeout> | undefined;
 
   const enqueue = (value: string) => {
     if (++count > 24) {
@@ -29,7 +31,32 @@ export async function* streamSpeech(
     }
 
     queue.push(value);
+
+    if (firstTimer) {
+      clearTimeout(firstTimer);
+    }
+
     wake();
+  };
+
+  const flushFirst = () => {
+    if (count || done || abort.signal.aborted) {
+      return;
+    }
+
+    const ends = [...text.slice(0, 221).matchAll(/(?<!\d)[.!?](?:\s|$)/gu)];
+    const end = ends.at(-1)?.index;
+
+    if (end === undefined || end < 24) {
+      return;
+    }
+
+    const value = text
+      .slice(0, end + 1)
+      .replace(/\s+/g, ' ')
+      .trim();
+    text = text.slice(end + 1).trimStart();
+    enqueue(value);
   };
 
   const producer = (async () => {
@@ -43,6 +70,15 @@ export async function* streamSpeech(
         }
 
         text += chunk;
+
+        if (text && !firstDeadline) {
+          firstDeadline = Date.now() + 700;
+          firstTimer = setTimeout(flushFirst, 700);
+        }
+
+        if (firstDeadline && Date.now() >= firstDeadline) {
+          flushFirst();
+        }
 
         // Keep short replies in one synthesis request: punctuation is a pause,
         // not a reason to restart the voice. Long replies still stream in order.
@@ -82,6 +118,10 @@ export async function* streamSpeech(
     } catch (error) {
       failure = error;
     } finally {
+      if (firstTimer) {
+        clearTimeout(firstTimer);
+      }
+
       done = true;
       wake();
     }
@@ -110,6 +150,10 @@ export async function* streamSpeech(
       });
     }
   } finally {
+    if (firstTimer) {
+      clearTimeout(firstTimer);
+    }
+
     abort.abort();
     signal.removeEventListener('abort', cancel);
     await producer;

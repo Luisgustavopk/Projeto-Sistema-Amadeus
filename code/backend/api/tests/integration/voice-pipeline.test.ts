@@ -50,6 +50,7 @@ async function fixture(
     llmResponse?: string;
     llmResponses?: string[];
     ttsSampleRate?: 16000 | 24000;
+    memoryReview?: boolean;
   } = {},
 ) {
   const requests: { role: string; content: string }[] = [];
@@ -165,6 +166,26 @@ async function fixture(
   const app = await buildApp({
     token,
     database,
+    ...(options.memoryReview
+      ? {
+          personaDecisionClient: {
+            decide: async () => ({
+              tone: 'neutral' as const,
+              confidence: 1,
+              inputTokens: 1,
+              outputTokens: 0,
+              costUsd: 0,
+            }),
+            reviewMemory: async () => ({
+              verdict: 'supported' as const,
+              confidence: 1,
+              inputTokens: 1,
+              outputTokens: 0,
+              costUsd: 0,
+            }),
+          },
+        }
+      : {}),
     memoryEmbeddings: {
       key: 'test-voice-memory-embedding',
       embed: async (texts) =>
@@ -182,6 +203,20 @@ async function fixture(
     }),
   });
   cleanup.push(() => app.close());
+
+  if (options.memoryReview) {
+    expect(
+      (
+        await app.inject({
+          method: 'PUT',
+          url: '/v1/persona/analysis',
+          headers,
+          payload: { revision: 0, configuration: { enabled: true } },
+        })
+      ).statusCode,
+    ).toBe(200);
+  }
+
   const url = await app.listen({ port: 0, host: '127.0.0.1' });
   const config = Object.fromEntries(
     ['llm', 'stt', 'tts'].map((role) => [
@@ -294,7 +329,7 @@ async function fixture(
 }
 
 it('recupera fatos confirmados entre conversas sem incluir memória local na nuvem', async () => {
-  const f = await fixture();
+  const f = await fixture({ memoryReview: true });
   const created = await f.app.inject({
     method: 'POST',
     url: '/v1/facts',
@@ -323,16 +358,20 @@ it('recupera fatos confirmados entre conversas sem incluir memória local na nuv
     turnId: 1,
     text: 'Qual clone está na Cartesia?',
   });
-  await vi.waitFor(() =>
-    expect(f.events.some((event) => event.type === 'reply.done')).toBe(true),
+  await vi.waitFor(
+    () =>
+      expect(
+        f.events.some((event) => event.type === 'reply.done'),
+        JSON.stringify(f.events),
+      ).toBe(true),
+    { timeout: 3000 },
   );
   const request = f.requests.find((request) => request.role === 'llm')!.content;
   expect(request).toContain('O clone aprovado está na Cartesia.');
   expect(request).not.toContain('dado reservado localmente');
-  expect(request).toContain('Neste turno a API forneceu memórias autorizadas');
-  expect(f.requests.filter((request) => request.role === 'llm')).toHaveLength(
-    1,
-  );
+  expect(request).toContain('Neste turno há fatos autorizados no contexto');
+  const generations = f.requests.filter((request) => request.role === 'llm');
+  expect(generations).toHaveLength(1);
 });
 
 it('distingue falta de memória recuperada da ausência de memória persistente', async () => {
@@ -344,10 +383,10 @@ it('distingue falta de memória recuperada da ausência de memória persistente'
   const request = f.requests.find((request) => request.role === 'llm')!;
   expect(request.content).not.toContain('Memória persistente selecionada');
   expect(request.content).toContain(
-    'Neste turno a API não forneceu memórias relevantes autorizadas',
+    'Neste turno não há fatos persistentes selecionados',
   );
   expect(request.content).toContain(
-    'não conclua que o aplicativo não possui memória persistente',
+    'lembranças relevantes que o aplicativo fornecer',
   );
 });
 
@@ -502,7 +541,7 @@ it.each([16000, 24000] as const)(
       intensity: 0.35,
       metadataValid: true,
       deliveryApplied: false,
-      personaVersion: 'kurisu-amadeus-0.4.13',
+      personaVersion: 'kurisu-amadeus-0.4.17',
     });
     expect(f.requests.filter((request) => request.role === 'llm')).toHaveLength(
       1,
@@ -1180,7 +1219,10 @@ it('recupera cabeçalho incompleto antes da fala, sem duplicar áudio ou reinici
   const attempts = f.requests.filter((r) => r.role === 'llm');
   expect(attempts).toHaveLength(2);
   expect(attempts[1]?.content).toContain('somente a fala da personagem');
-  expect(attempts[1]?.content).not.toContain('<expression>');
+  expect(attempts[1]?.content).toContain(
+    '<expression>{"memory":[]}</expression>',
+  );
+  expect(attempts[1]?.content).toContain('reparação única de formato');
   expect(f.events.filter((e) => e.type === 'reply.start')).toHaveLength(1);
   expect(f.events.filter((e) => e.type === 'error')).toHaveLength(0);
   expect(

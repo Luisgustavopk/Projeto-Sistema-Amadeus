@@ -7,8 +7,8 @@ import type { DataClass } from '../../domain/providers/model.ts';
 import type { VoiceMetrics } from './metrics.ts';
 import { ApplicationError } from '../../domain/errors/application-error.ts';
 import { VoiceInputError } from '../../domain/errors/voice.ts';
+import { ProviderInvalidError } from '../../domain/errors/providers.ts';
 import { streamPersonaSpeech } from '../persona/speech-recovery.ts';
-import { buildSpeechOnlyPersonaPrompt } from '../persona/prompt.ts';
 import { buildVoiceContext } from './context.ts';
 import { buildHistoryContext } from './history-context.ts';
 import {
@@ -17,12 +17,16 @@ import {
 } from '../persona/configuration.ts';
 import { measureVoiceAudio } from './audio-observations.ts';
 import { providerWaitPhrase } from './provider-wait.ts';
+import { providerWaitAudio } from './provider-wait-audio.ts';
+import {
+  buildVoicePersonaPrompt,
+  voiceOutputFormat,
+  voiceConversationDirection,
+} from '../persona/voice-prompt.ts';
 import { createConversationStyleGuard } from '../persona/conversation-style.ts';
 import { createExpressionState } from '../../domain/persona/expression-policy.ts';
 import {
   memoryContent,
-  memoryAnswerContent,
-  memoryAnswerDirection,
   memoryDirection as describeMemory,
 } from '../memory/context.ts';
 import {
@@ -47,7 +51,13 @@ export type VoiceTurn = {
 };
 
 export function createTurnProcessor(
-  providers: Pick<ProviderServices, 'execute' | 'executeStream'>,
+  providers: Pick<ProviderServices, 'execute' | 'executeStream'> &
+    Partial<
+      Pick<
+        ProviderServices,
+        'executeAudioStream' | 'closeSpeech' | 'speechVoiceId'
+      >
+    >,
   history: CallHistoryRepository,
   metrics: VoiceMetrics,
   persona?: { get: () => Promise<PersonaConfiguration> },
@@ -61,6 +71,7 @@ export function createTurnProcessor(
         'planAnswer' | 'verifyAnswer'
       >
     >,
+  analysis?: Pick<import('../persona/analysis.ts').PersonaAnalysis, 'analyze'>,
 ) {
   const expressionState = createExpressionState();
 
@@ -152,387 +163,668 @@ export function createTurnProcessor(
     },
     async process(turn: VoiceTurn, sink: VoiceSink) {
       const { signal, turnId, responseId } = turn;
-      memory?.interruptBackground();
+      let deliveryQueue = Promise.resolve();
+      const toneAbort = new AbortController();
 
-      const emit = (event: Parameters<VoiceSink['send']>[0]) => {
-        signal.throwIfAborted();
-        sink.send(event);
-      };
+      try {
+        memory?.interruptBackground();
 
-      let text = turn.text;
-      let firstAudio = true;
-
-      if (turn.audio) {
-        text = await transcribe(turn, turn.audio, sink);
-      }
-
-      if (!text?.trim() || text.length > 4000) {
-        throw new VoiceInputError(
-          'A fala transcrita deve conter de 1 a 4000 caracteres.',
-        );
-      }
-
-      await history.updateTurn(responseId, { userText: text });
-      signal.throwIfAborted();
-      const recent = await history.recent(
-        turn.conversationId,
-        turn.ownerId,
-        12,
-      );
-      const context = buildVoiceContext(
-        recent,
-        text,
-        turn.dataClass,
-        expressionState.snapshot(),
-        turn.audioObservations ??
-          (turn.audio ? measureVoiceAudio(turn.audio, text) : undefined),
-      );
-      const personaConfiguration = await persona?.get();
-      const memories = await memory?.retrieve(
-        turn.conversationId,
-        text,
-        context.dataClass,
-        buildHistoryContext(recent, 1800),
-      );
-      signal.throwIfAborted();
-
-      context.content = memoryContent(context.content, memories ?? '');
-      const planningStarted = performance.now();
-      const plan = await memory?.planAnswer?.(
-        memories ?? '',
-        text,
-        context.dataClass,
-        signal,
-        buildHistoryContext(recent, 1800),
-      );
-
-      if (memory?.planAnswer) {
-        metrics.time('memoryPlan', performance.now() - planningStarted);
-      }
-
-      signal.throwIfAborted();
-      context.content = memoryAnswerContent(context.content, plan ?? null);
-      const memoryDirection =
-        (memory ? describeMemory(memories ?? '') : '') +
-        memoryAnswerDirection(plan ?? null);
-      context.systemPrompt =
-        applyPersonaConfiguration(context.systemPrompt, personaConfiguration) +
-        memoryDirection;
-      let proposal = expressionState.snapshot();
-      let metadataValid = false;
-      let expression = proposal;
-      const started = performance.now();
-      let firstLlmToken = false;
-
-      const generated: string[] = [];
-      let position = 0;
-      let modelSpeechCount = 0;
-      let waitAnnounced = false;
-
-      const deliverSegment = async (spokenText: string, waiting = false) => {
-        signal.throwIfAborted();
-
-        if (!spokenText) {
-          return;
-        }
-
-        if (!waiting && modelSpeechCount === 0) {
-          expression = expressionState.accept(proposal);
-          metrics.time('llmFirstSpeechSegment', performance.now() - started);
-        }
-
-        if (!waiting) {
-          modelSpeechCount++;
-        }
-
-        generated.push(spokenText);
-        await history.updateTurn(responseId, {
-          generatedText: generated.join(' '),
-        });
-        signal.throwIfAborted();
-        const segmentId = randomUUID();
-        await history.addSegment({
-          id: segmentId,
-          responseId,
-          position,
-          text: spokenText,
-        });
-        emit({
-          type: 'reply.text',
-          turnId,
-          responseId,
-          segmentId,
-          position,
-          text: spokenText,
-        });
-        emit({
-          type: 'reply.expression',
-          turnId,
-          responseId,
-          segmentId,
-          position,
-          personaVersion: PERSONA_VERSION,
-          ...(waiting ? NEUTRAL_EXPRESSION : expression),
-          ...describeDelivery(waiting ? NEUTRAL_EXPRESSION : expression),
-          voiceProfileId: turn.profile?.id ?? null,
-          metadataValid: waiting ? false : metadataValid,
-          deliveryApplied: false,
-        });
-
-        if (!turn.profile) {
-          metrics.count('textFallbacks');
-
-          if (position === 0) {
-            metrics.failure('VOICE_NOT_READY');
-            emit({
-              type: 'error',
-              code: 'VOICE_NOT_READY',
-              recoverable: true,
-            });
-          }
-
-          position++;
-
-          return;
-        }
-
-        let pcm: Buffer;
-        let sampleRate: 16000 | 24000;
-        const synthesisStart = performance.now();
-
-        try {
-          const synthesized = await executeProvider(
-            'tts',
-            {
-              content: spokenText,
-              dataClass: context.dataClass,
-              maxTokens: 1,
-              voice: {
-                id: turn.profile.id,
-                referenceFile: turn.profile.referenceFile,
-                referenceSha256: turn.profile.referenceSha256,
-              },
-            },
-            signal,
-            turnId,
-            sink,
-          );
+        const emit = (event: Parameters<VoiceSink['send']>[0]) => {
           signal.throwIfAborted();
+          sink.send(event);
+        };
 
-          if (!synthesized.audio) {
-            throw new VoiceInputError('O TTS não retornou áudio PCM.');
-          }
+        let text = turn.text;
+        let firstAudio = true;
 
-          sampleRate = synthesized.audio.sampleRate;
+        if (turn.audio) {
+          text = await transcribe(turn, turn.audio, sink);
+        }
 
-          if (
-            ![16000, 24000].includes(sampleRate) ||
-            synthesized.audio.channels !== 1
-          ) {
-            throw new VoiceInputError('Formato de áudio sintetizado inválido.');
-          }
-
-          pcm = Buffer.from(synthesized.audio.pcmBase64, 'base64');
-
-          if (
-            !pcm.length ||
-            pcm.length % 2 ||
-            pcm.length > 3 * 1024 * 1024 ||
-            pcm.toString('base64') !== synthesized.audio.pcmBase64
-          ) {
-            throw new VoiceInputError('Áudio sintetizado inválido.');
-          }
-        } catch (error) {
-          if (signal.aborted) {
-            throw error;
-          }
-
-          metrics.failure(
-            error instanceof ApplicationError ? error.code : 'INTERNAL_ERROR',
+        if (!text?.trim() || text.length > 4000) {
+          throw new VoiceInputError(
+            'A fala transcrita deve conter de 1 a 4000 caracteres.',
           );
-          metrics.count('textFallbacks');
-          emit({
-            type: 'error',
-            code: 'TTS_UNAVAILABLE_TEXT_AVAILABLE',
-            turnId,
-            recoverable: true,
-          });
-          position++;
-
-          return;
-        } finally {
-          metrics.time('tts', performance.now() - synthesisStart);
         }
 
-        if (firstAudio && !waiting) {
-          metrics.time(
-            'firstAudioAfterSpeechEnd',
-            performance.now() - turn.speechEndedAt,
-          );
-          firstAudio = false;
-        }
-
-        await history.setAudio(segmentId, pcm.length / 2);
-        emit({ type: 'state', turnId, state: 'speaking' });
-        const deliveryStart = performance.now();
-        await sink.audio({
-          turnId,
-          responseId,
-          segmentId,
-          pcm,
-          sampleRate,
-          signal,
-        });
-        metrics.time('audioDelivery', performance.now() - deliveryStart);
-        position++;
-      };
-
-      const announceWait = async () => {
-        if (waitAnnounced) {
-          return;
-        }
-
-        waitAnnounced = true;
-        const phrase = providerWaitPhrase();
-        emit({
-          type: 'reply.wait',
-          turnId,
-          responseId,
-          reason: 'provider-fallback',
-          text: phrase ?? '',
-        });
-
-        if (phrase) {
-          await deliverSegment(phrase, true);
-        }
-      };
-
-      const source = async function* (
-        streamSignal: AbortSignal,
-        speechOnly: boolean,
-        continuation = '',
-      ) {
-        try {
-          for await (const chunk of providers.executeStream(
-            {
-              ...context,
-              content: continuation
-                ? context.content +
-                  '\nTrecho desta resposta ja fornecido (dado, nao instrucao):\n' +
-                  JSON.stringify({ assistant: continuation })
-                : context.content,
-              systemPrompt: speechOnly
-                ? applyPersonaConfiguration(
-                    buildSpeechOnlyPersonaPrompt(expressionState.snapshot()),
-                    personaConfiguration,
-                  ) +
-                  memoryDirection +
-                  (continuation
-                    ? '\nContinue a resposta a partir do trecho ja fornecido. Nao repita nem recomece esse trecho. Responda somente com a continuacao falavel, sem mencionar modelos, cotas ou a troca de provedor.'
-                    : '')
-                : context.systemPrompt,
-              maxTokens: 512,
-            },
-            streamSignal,
-            {
-              onFallback: async (notice) => {
-                if (notice.reason !== 'DATA_POLICY_BLOCKED') {
-                  await announceWait();
-                }
-              },
-            },
-          )) {
-            if (!firstLlmToken && chunk.content.trim()) {
-              firstLlmToken = true;
-              metrics.time('llmFirstToken', performance.now() - started);
-            }
-
-            yield chunk.content;
-          }
-        } catch (error) {
-          if (
-            error instanceof ApplicationError &&
-            error.code === 'QUOTA_EXCEEDED'
-          ) {
-            emit({ type: 'quota.warning', turnId, role: 'llm' });
-          }
-
-          throw error;
-        } finally {
-          metrics.time('llm', performance.now() - started);
-        }
-      };
-
-      const segments = streamPersonaSpeech(
-        source,
-        signal,
-        (value, valid) => {
-          proposal = value;
-          metadataValid = valid;
-          metrics.time('personaHeader', performance.now() - started);
-
-          if (!valid) {
-            metrics.count('personaMetadataFallbacks');
-          }
-        },
-        () => metrics.count('personaRecoveries'),
-        createConversationStyleGuard(recent, text),
-        announceWait,
-      );
-      emit({ type: 'reply.start', turnId, responseId });
-
-      if (memory?.verifyAnswer && plan && plan.status !== 'unrelated') {
-        const buffered: string[] = [];
-        let length = 0;
-
-        for await (const segment of segments) {
-          length += segment.length;
-
-          if (length > 6000) {
-            throw new VoiceInputError(
-              'Resposta de memória excede o limite de revisão.',
-            );
-          }
-
-          buffered.push(segment);
-        }
-
-        const reviewStarted = performance.now();
-        const supported = await memory.verifyAnswer(
-          memories ?? '',
+        await history.updateTurn(responseId, { userText: text });
+        signal.throwIfAborted();
+        const recent = await history.recent(
+          turn.conversationId,
+          turn.ownerId,
+          12,
+        );
+        const context = buildVoiceContext(
+          recent,
           text,
-          buffered.join(' '),
+          turn.dataClass,
+          expressionState.snapshot(),
+          turn.audioObservations ??
+            (turn.audio ? measureVoiceAudio(turn.audio, text) : undefined),
+          true,
+        );
+        const personaConfiguration = await persona?.get();
+        // Start the short analysis while memory retrieval/planning runs. No late
+        // result can mutate a prompt after its generation has started.
+        const analysisStarted = performance.now();
+        let availableDirection = '';
+        let needsClarification = false;
+        const pendingDirection = analysis
+          ?.analyze(
+            {
+              text,
+              recentConversation: JSON.stringify(
+                buildHistoryContext(recent, 1800),
+              ),
+              dataClass: context.dataClass,
+            },
+            AbortSignal.any([signal, toneAbort.signal]),
+            (needed) => {
+              needsClarification = needed;
+            },
+          )
+          .then((direction) => {
+            availableDirection = direction;
+            metrics.time(
+              'personaAnalysis',
+              performance.now() - analysisStarted,
+            );
+
+            return direction;
+          });
+        // Observe rejection immediately if the turn is cancelled during memory work.
+        void pendingDirection?.catch(() => undefined);
+        const memories = await memory?.retrieve(
+          turn.conversationId,
+          text,
           context.dataClass,
-          signal,
           buildHistoryContext(recent, 1800),
         );
-        metrics.time('memoryReplyCheck', performance.now() - reviewStarted);
+        metrics.time('memoryRetrieve', performance.now() - analysisStarted);
+        signal.throwIfAborted();
 
-        if (supported) {
-          for (const segment of buffered) {
-            await deliverSegment(segment);
-          }
-        } else {
-          metrics.failure('MEMORY_REPLY_UNVERIFIED');
-          proposal = NEUTRAL_EXPRESSION;
-          metadataValid = false;
-          await deliverSegment(
-            'Não consegui confirmar esse detalhe nas minhas lembranças agora. Pode me lembrar?',
+        const conversationContent = context.content;
+        context.content = memoryContent(conversationContent, memories ?? '');
+        const memoryDirection = memory
+          ? describeMemory(memories ?? '', false, true)
+          : '';
+        const recoveryMemoryDirection = memory
+          ? describeMemory(memories ?? '', true)
+          : '';
+        const memoryContext = memories ? JSON.parse(memories) : { facts: [] };
+        const factCount = memoryContext.facts?.length ?? 0;
+        let withoutPersistentMemory = false;
+        // The model can omit a used index or incorrectly declare memory:[].
+        // Retrieved facts are already permission-filtered; ground against the
+        // actual sources rather than trusting this self-report to waive review.
+        const needsMemoryReview = () =>
+          Boolean(
+            memory?.verifyAnswer && factCount && !withoutPersistentMemory,
           );
-        }
-      } else {
-        for await (const segment of segments) {
+        // Tone is opportunistic: it may use the retrieval window, never add a
+        // foreground wait or mutate an already started generation.
+        const contextualDirection = availableDirection;
+        signal.throwIfAborted();
+
+        context.systemPrompt =
+          applyPersonaConfiguration(
+            buildVoicePersonaPrompt(true, 0, false),
+            personaConfiguration,
+          ) +
+          memoryDirection +
+          contextualDirection +
+          voiceConversationDirection +
+          voiceOutputFormat(factCount);
+        let proposal = expressionState.snapshot();
+        let metadataValid = false;
+        let expression = proposal;
+        const started = performance.now();
+        let firstLlmToken = false;
+
+        const generated: string[] = [];
+        let position = 0;
+        let modelSpeechCount = 0;
+        let waitAnnounced = false;
+        let deliveryFailure: unknown;
+
+        const deliverSegmentNow = async (
+          spokenText: string,
+          waiting = false,
+        ) => {
+          signal.throwIfAborted();
+
+          if (!spokenText) {
+            return;
+          }
+
+          if (!waiting && modelSpeechCount === 0) {
+            expression = expressionState.accept(proposal);
+            metrics.time('llmFirstSpeechSegment', performance.now() - started);
+          }
+
+          if (!waiting) {
+            modelSpeechCount++;
+          }
+
+          generated.push(spokenText);
+          await history.updateTurn(responseId, {
+            generatedText: generated.join(' '),
+          });
+          signal.throwIfAborted();
+          const segmentId = randomUUID();
+          await history.addSegment({
+            id: segmentId,
+            responseId,
+            position,
+            text: spokenText,
+          });
+          emit({
+            type: 'reply.text',
+            turnId,
+            responseId,
+            segmentId,
+            position,
+            text: spokenText,
+          });
+          emit({
+            type: 'reply.expression',
+            turnId,
+            responseId,
+            segmentId,
+            position,
+            personaVersion: PERSONA_VERSION,
+            ...(waiting ? NEUTRAL_EXPRESSION : expression),
+            ...describeDelivery(waiting ? NEUTRAL_EXPRESSION : expression),
+            voiceProfileId: turn.profile?.id ?? null,
+            metadataValid: waiting ? false : metadataValid,
+            deliveryApplied: false,
+          });
+
+          if (!turn.profile) {
+            metrics.count('textFallbacks');
+
+            if (position === 0) {
+              metrics.failure('VOICE_NOT_READY');
+              emit({
+                type: 'error',
+                code: 'VOICE_NOT_READY',
+                recoverable: true,
+              });
+            }
+
+            position++;
+
+            return;
+          }
+
+          let pcm: Buffer;
+          let sampleRate: 16000 | 24000;
+          const synthesisStart = performance.now();
+
+          try {
+            let bufferedOutput:
+              import('../../ports/provider.ts').ProviderOutput | undefined;
+            const cached = waiting
+              ? providerWaitAudio(
+                  spokenText,
+                  turn.profile,
+                  (await providers.speechVoiceId?.()) ?? null,
+                )
+              : null;
+
+            if (waiting && !cached) {
+              // Missing/stale presets stay text-only; never synthesize on failure.
+              metrics.failure('WAIT_PRESET_NOT_READY');
+              position++;
+
+              return;
+            }
+
+            if (!waiting && providers.executeAudioStream && sink.audioStream) {
+              const stream = providers.executeAudioStream(
+                {
+                  content: spokenText,
+                  dataClass: context.dataClass,
+                  maxTokens: 1,
+                  speechContextId: responseId,
+                  voice: {
+                    id: turn.profile.id,
+                    referenceFile: turn.profile.referenceFile,
+                    referenceSha256: turn.profile.referenceSha256,
+                  },
+                },
+                signal,
+              );
+              const iterator = stream[Symbol.asyncIterator]();
+
+              try {
+                const first = await iterator.next();
+
+                if (first.done || !first.value.audio) {
+                  throw new VoiceInputError('Síntese vazia.');
+                }
+
+                const rate = first.value.audio.sampleRate;
+
+                if (!first.value.progressiveAudio) {
+                  bufferedOutput = first.value;
+
+                  if (!(await iterator.next()).done) {
+                    throw new VoiceInputError(
+                      'Síntese sem contrato incremental.',
+                    );
+                  }
+                } else {
+                  // Reserve the upper bound until completion; partial audio must not
+                  // make the entire segment text eligible as confirmed history.
+                  await history.setAudio(segmentId, rate * 90);
+                  let samples = 0;
+
+                  const chunks = async function* () {
+                    let next: IteratorResult<
+                      import('../../ports/provider.ts').ProviderOutput
+                    > = first;
+
+                    while (!next.done) {
+                      signal.throwIfAborted();
+
+                      if (
+                        !next.value.audio ||
+                        next.value.audio.sampleRate !== rate
+                      ) {
+                        throw new VoiceInputError(
+                          'Taxa de áudio mudou durante o segmento.',
+                        );
+                      }
+
+                      const chunk = Buffer.from(
+                        next.value.audio.pcmBase64,
+                        'base64',
+                      );
+                      samples += chunk.length / 2;
+                      yield chunk;
+                      next = await iterator.next();
+                    }
+
+                    await history.setAudio(segmentId, samples);
+                  };
+
+                  emit({ type: 'state', turnId, state: 'speaking' });
+
+                  if (firstAudio) {
+                    metrics.time(
+                      'firstAudioAfterSpeechEnd',
+                      performance.now() - turn.speechEndedAt,
+                    );
+                    firstAudio = false;
+                  }
+
+                  await sink.audioStream({
+                    turnId,
+                    responseId,
+                    segmentId,
+                    sampleRate: rate,
+                    signal,
+                    chunks: chunks(),
+                  });
+                  position++;
+
+                  return;
+                }
+              } finally {
+                await iterator.return?.();
+              }
+            }
+
+            if (cached) {
+              pcm = cached;
+              sampleRate = 24000;
+            } else {
+              const synthesized =
+                bufferedOutput ??
+                (await executeProvider(
+                  'tts',
+                  {
+                    content: spokenText,
+                    dataClass: context.dataClass,
+                    maxTokens: 1,
+                    voice: {
+                      id: turn.profile.id,
+                      referenceFile: turn.profile.referenceFile,
+                      referenceSha256: turn.profile.referenceSha256,
+                    },
+                  },
+                  signal,
+                  turnId,
+                  sink,
+                ));
+              signal.throwIfAborted();
+
+              if (!synthesized.audio) {
+                throw new VoiceInputError('O TTS não retornou áudio PCM.');
+              }
+
+              sampleRate = synthesized.audio.sampleRate;
+
+              if (
+                ![16000, 24000].includes(sampleRate) ||
+                synthesized.audio.channels !== 1
+              ) {
+                throw new VoiceInputError(
+                  'Formato de áudio sintetizado inválido.',
+                );
+              }
+
+              pcm = Buffer.from(synthesized.audio.pcmBase64, 'base64');
+
+              if (
+                !pcm.length ||
+                pcm.length % 2 ||
+                pcm.length > 3 * 1024 * 1024 ||
+                pcm.toString('base64') !== synthesized.audio.pcmBase64
+              ) {
+                throw new VoiceInputError('Áudio sintetizado inválido.');
+              }
+            }
+          } catch (error) {
+            if (signal.aborted) {
+              throw error;
+            }
+
+            if (
+              error instanceof ApplicationError &&
+              error.code === 'QUOTA_EXCEEDED'
+            ) {
+              emit({ type: 'quota.warning', turnId, role: 'tts' });
+            }
+
+            metrics.failure(
+              error instanceof ApplicationError ? error.code : 'INTERNAL_ERROR',
+            );
+            metrics.count('textFallbacks');
+
+            if (sink.audioStream) {
+              emit({ type: 'audio.abort', turnId, responseId, segmentId });
+            }
+
+            emit({
+              type: 'error',
+              code: 'TTS_UNAVAILABLE_TEXT_AVAILABLE',
+              turnId,
+              recoverable: true,
+            });
+            position++;
+
+            return;
+          } finally {
+            metrics.time('tts', performance.now() - synthesisStart);
+          }
+
+          if (firstAudio && !waiting) {
+            metrics.time(
+              'firstAudioAfterSpeechEnd',
+              performance.now() - turn.speechEndedAt,
+            );
+            firstAudio = false;
+          }
+
+          await history.setAudio(segmentId, pcm.length / 2);
+          emit({ type: 'state', turnId, state: 'speaking' });
+          const deliveryStart = performance.now();
+          await sink.audio({
+            turnId,
+            responseId,
+            segmentId,
+            pcm,
+            sampleRate,
+            signal,
+          });
+          metrics.time('audioDelivery', performance.now() - deliveryStart);
+          position++;
+        };
+
+        const deliverSegment = (spokenText: string, waiting = false) => {
+          const task = deliveryQueue.then(() => {
+            if (deliveryFailure) {
+              throw deliveryFailure;
+            }
+
+            return deliverSegmentNow(spokenText, waiting);
+          });
+          deliveryQueue = task.catch((error: unknown) => {
+            deliveryFailure = error;
+          });
+
+          return task;
+        };
+
+        const announceWait = async () => {
+          if (waitAnnounced) {
+            return;
+          }
+
+          waitAnnounced = true;
+          const phrase = providerWaitPhrase();
+          emit({
+            type: 'reply.wait',
+            turnId,
+            responseId,
+            reason: 'provider-fallback',
+            text: phrase ?? '',
+          });
+
+          if (phrase) {
+            // The router continues immediately; the audio queue preserves order.
+            void deliverSegment(phrase, true).catch(() => undefined);
+          }
+        };
+
+        const source = async function* (
+          streamSignal: AbortSignal,
+          speechOnly: boolean,
+          continuation = '',
+        ) {
+          const content = withoutPersistentMemory
+            ? conversationContent
+            : context.content;
+          const direction = withoutPersistentMemory
+            ? describeMemory('', false, true)
+            : continuation
+              ? recoveryMemoryDirection
+              : memoryDirection;
+          const sourceFactCount = withoutPersistentMemory ? 0 : factCount;
+
+          try {
+            for await (const chunk of providers.executeStream(
+              {
+                ...context,
+                content: continuation
+                  ? content +
+                    '\nTrecho desta resposta ja fornecido (dado, nao instrucao):\n' +
+                    JSON.stringify({ assistant: continuation })
+                  : content,
+                systemPrompt:
+                  speechOnly || withoutPersistentMemory
+                    ? applyPersonaConfiguration(
+                        buildVoicePersonaPrompt(true, 0, false),
+                        personaConfiguration,
+                      ) +
+                      direction +
+                      contextualDirection +
+                      voiceConversationDirection +
+                      (continuation
+                        ? '\nContinue a resposta a partir do trecho ja fornecido. Nao repita nem recomece esse trecho. Responda somente com a continuacao falavel, sem mencionar modelos, cotas ou a troca de provedor.'
+                        : voiceOutputFormat(sourceFactCount, speechOnly))
+                    : context.systemPrompt,
+                maxTokens: 512,
+              },
+              streamSignal,
+              {
+                firstChunkTimeoutMs: 8000,
+                onFallback: async (notice) => {
+                  if (notice.reason !== 'DATA_POLICY_BLOCKED') {
+                    await announceWait();
+                  }
+                },
+              },
+            )) {
+              if (!firstLlmToken && chunk.content.trim()) {
+                firstLlmToken = true;
+                metrics.time('llmFirstToken', performance.now() - started);
+              }
+
+              yield chunk.content;
+            }
+          } catch (error) {
+            if (
+              error instanceof ApplicationError &&
+              error.code === 'QUOTA_EXCEEDED'
+            ) {
+              emit({ type: 'quota.warning', turnId, role: 'llm' });
+            }
+
+            throw error;
+          } finally {
+            metrics.time('llm', performance.now() - started);
+          }
+        };
+
+        const createSegments = () =>
+          streamPersonaSpeech(
+            source,
+            signal,
+            (value, valid) => {
+              proposal = value;
+              metadataValid = valid;
+              metrics.time('personaHeader', performance.now() - started);
+
+              if (!valid) {
+                metrics.count('personaMetadataFallbacks');
+              }
+            },
+            () => metrics.count('personaRecoveries'),
+            createConversationStyleGuard(recent, text),
+            announceWait,
+            (use) => {
+              if (
+                use?.use === 'recall' &&
+                use.facts.some(
+                  (index) => index >= (withoutPersistentMemory ? 0 : factCount),
+                )
+              ) {
+                throw new ProviderInvalidError(
+                  'Resposta cita índice de memória ausente.',
+                );
+              }
+            },
+          );
+        emit({ type: 'reply.start', turnId, responseId });
+
+        const provided: string[] = [];
+        let length = 0;
+        let reviewRequired = false;
+
+        // With no retrieved facts there is no grounding request. When sources
+        // are present, new recommendations/general knowledge remain permitted.
+        for await (const segment of createSegments()) {
+          if (!modelSpeechCount) {
+            // Do not wait for classification. A late answer cannot change a
+            // started prompt; only a confident ambiguity found before speech
+            // can replace an invented interpretation with a short repair.
+            toneAbort.abort();
+
+            if (needsClarification) {
+              metrics.count('inputClarifications');
+              proposal = {
+                intent: 'esclarecer',
+                emotion: 'neutra',
+                intensity: 0.15,
+              };
+              metadataValid = true;
+              await deliverSegment(
+                'Não entendi essa última parte. Pode repetir?',
+              );
+              break;
+            }
+          }
+
+          reviewRequired ||= needsMemoryReview();
+
+          if (reviewRequired) {
+            length += segment.length;
+
+            if (length > 6000) {
+              throw new VoiceInputError(
+                'Resposta de memória excede o limite de revisão.',
+              );
+            }
+
+            const reviewStarted = performance.now();
+            // Preserve previous speech for reference resolution. A null decision
+            // means the optional semantic reviewer is unavailable, not rejection.
+            const supported = await memory!.verifyAnswer!(
+              memories ?? '',
+              text,
+              [...provided, segment].join(' '),
+              context.dataClass,
+              signal,
+              buildHistoryContext(recent, 1800),
+            );
+            metrics.time('memoryReplyCheck', performance.now() - reviewStarted);
+
+            if (supported === null) {
+              metrics.count('memoryReviewUnavailable');
+            }
+
+            if (supported === false) {
+              if (!modelSpeechCount) {
+                // Never release the rejected draft or reuse its facts. Close
+                // this stream, then try once with the current conversation only.
+                // The model can answer a general request or acknowledge missing
+                // recall without forcing every request into a memory question.
+                withoutPersistentMemory = true;
+                metrics.count('memoryReplyRecoveries');
+                break;
+              }
+
+              metrics.failure('MEMORY_REPLY_UNVERIFIED');
+              proposal = NEUTRAL_EXPRESSION;
+              metadataValid = false;
+              await deliverSegment(
+                provided.length
+                  ? 'Espera, não consegui confirmar essa última parte. Pode me esclarecer?'
+                  : 'Não consegui confirmar esse detalhe nas minhas lembranças agora. Pode me lembrar?',
+              );
+              break;
+            }
+
+            provided.push(segment);
+          }
+
           await deliverSegment(segment);
         }
-      }
 
-      if (!modelSpeechCount) {
-        throw new VoiceInputError('O modelo não retornou texto falável.');
-      }
+        if (withoutPersistentMemory) {
+          proposal = NEUTRAL_EXPRESSION;
+          metadataValid = false;
 
-      await history.updateTurn(responseId, { status: 'completed' });
-      metrics.count('completed');
-      emit({ type: 'reply.done', turnId, responseId });
+          for await (const segment of createSegments()) {
+            await deliverSegment(segment);
+          }
+        }
+
+        if (!modelSpeechCount) {
+          throw new VoiceInputError('O modelo não retornou texto falável.');
+        }
+
+        await history.updateTurn(responseId, { status: 'completed' });
+        metrics.count('completed');
+        emit({ type: 'reply.done', turnId, responseId });
+      } finally {
+        toneAbort.abort();
+        await deliveryQueue;
+        await providers.closeSpeech?.(responseId).catch(() => undefined);
+      }
     },
   };
 }

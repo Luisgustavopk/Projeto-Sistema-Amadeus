@@ -13,6 +13,7 @@ export type ConversationHttpServices = {
   tickets: Pick<TicketService, 'issue'>;
 };
 export type VoiceHttpServices = {
+  personaAnalysis: import('../application/persona/analysis.ts').PersonaAnalysis;
   persona: ReturnType<
     typeof import('../application/persona/configuration.ts').createPersonaConfiguration
   >;

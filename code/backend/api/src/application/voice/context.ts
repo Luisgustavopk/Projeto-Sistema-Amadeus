@@ -1,5 +1,6 @@
 import type { StoredTurn } from '../../ports/call-history-repository.ts';
 import type { DataClass } from '../../domain/providers/model.ts';
+import { buildVoicePersonaPrompt } from '../persona/voice-prompt.ts';
 import { buildPersonaPrompt } from '../persona/prompt.ts';
 import type { Expression } from '../../domain/persona/expression.ts';
 import { buildHistoryContext } from './history-context.ts';
@@ -12,6 +13,7 @@ export function buildVoiceContext(
   dataClass: DataClass,
   expression?: Expression,
   audioObservations?: ReturnType<typeof measureVoiceAudio>,
+  compact = false,
 ) {
   const classification: DataClass =
     dataClass === 'local-only' ||
@@ -21,7 +23,9 @@ export function buildVoiceContext(
           history.some((turn) => turn.dataClass === 'personal')
         ? 'personal'
         : 'synthetic';
-  const persona = buildPersonaPrompt(expression);
+  const persona = compact
+    ? buildVoicePersonaPrompt()
+    : buildPersonaPrompt(expression);
   const context = buildHistoryContext(history, 3000);
 
   return {

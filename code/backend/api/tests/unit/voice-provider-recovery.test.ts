@@ -11,6 +11,9 @@ import { VoicePayload } from '../../src/realtime/protocol/voice-server-events.ts
 vi.mock('../../src/application/voice/provider-wait.ts', () => ({
   providerWaitPhrase: () => 'Hmm, só um momento.',
 }));
+vi.mock('../../src/application/voice/provider-wait-audio.ts', () => ({
+  providerWaitAudio: () => Buffer.alloc(640),
+}));
 
 function fixture(stream: ProviderServices['executeStream']) {
   const spoken: string[] = [];
@@ -32,9 +35,8 @@ function fixture(stream: ProviderServices['executeStream']) {
     },
     setAudio: async () => {},
   };
-  const execute = vi.fn<ProviderServices['execute']>(async (role, input) => {
+  const execute = vi.fn<ProviderServices['execute']>(async (role) => {
     expect(role).toBe('tts');
-    spoken.push(input.content);
 
     return {
       content: '',
@@ -78,6 +80,10 @@ function fixture(stream: ProviderServices['executeStream']) {
         send: (event) => {
           VoicePayload.parse(event);
           events.push(event);
+
+          if (event.type === 'reply.text') {
+            spoken.push(event.text);
+          }
         },
         audio,
       },
@@ -133,6 +139,7 @@ it('fala um preset uma única vez e conclui a resposta reserva no mesmo turno', 
     responseId: f.responseId,
   });
   expect(f.audio).toHaveBeenCalledTimes(2);
+  expect(f.execute).toHaveBeenCalledTimes(1);
   expect(f.updates).toContainEqual({ status: 'completed' });
 });
 

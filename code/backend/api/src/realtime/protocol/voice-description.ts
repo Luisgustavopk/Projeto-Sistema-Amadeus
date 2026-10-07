@@ -31,7 +31,9 @@ export const VOICE_PIPELINE_PROTOCOL = {
     channels: 1,
     sampleRates: [16000, 24000],
     frameDurationMs: 20,
-    rateSource: 'audio.segment.sampleRate',
+    rateSource: 'audio.segment.sampleRate or audio.start.sampleRate',
+    progressiveAudio:
+      'audio.start precedes PCM; audio.end supplies final sampleCount/frameCount before the padded tail; audio.abort discards an unfinished stream',
   },
   binaryAudio: {
     frameBytes: 648, // Input; output is 8 + sampleRate / 50 * 2.
@@ -42,7 +44,7 @@ export const VOICE_PIPELINE_PROTOCOL = {
     pcmBytes: 640,
     padding: 'Final output frame zero padded; sampleCount excludes padding',
     segmentAssociation:
-      'audio.segment immediately precedes its contiguous binary frames',
+      'audio.segment or audio.start immediately precedes its contiguous binary frames',
   },
   inputLimits: {
     minimumSpeechMs: 100,

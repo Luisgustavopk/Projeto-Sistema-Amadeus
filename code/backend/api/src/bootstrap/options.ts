@@ -3,6 +3,7 @@ import type { Config } from '../config/index.ts';
 import type { openDatabase } from '../adapters/database/index.ts';
 import type { MemoryEmbeddings } from '../ports/memory-embeddings.ts';
 import type { MemoryReranker } from '../ports/memory-reranker.ts';
+import type { PersonaDecisionClient } from '../ports/persona-decision.ts';
 
 export type AppOptions = {
   token: string;
@@ -14,4 +15,5 @@ export type AppOptions = {
   logStream?: { write: (message: string) => void };
   memoryEmbeddings?: MemoryEmbeddings;
   memoryReranker?: MemoryReranker;
+  personaDecisionClient?: PersonaDecisionClient;
 };

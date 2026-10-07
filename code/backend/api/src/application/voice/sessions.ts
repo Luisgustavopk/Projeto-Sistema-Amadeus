@@ -12,12 +12,19 @@ import { VoiceInputError } from '../../domain/errors/voice.ts';
 import type { VoiceMetrics } from './metrics.ts';
 
 export function createVoiceSessions(dependencies: {
-  providers: Pick<ProviderServices, 'execute' | 'executeStream'>;
+  providers: Pick<ProviderServices, 'execute' | 'executeStream'> &
+    Partial<
+      Pick<
+        ProviderServices,
+        'executeAudioStream' | 'closeSpeech' | 'speechVoiceId'
+      >
+    >;
   profiles: Pick<VoiceProfiles, 'active'>;
   history: CallHistoryRepository;
   gate: ExecutionGate;
   metrics: VoiceMetrics;
   ownerId: string;
+  analysis?: Pick<import('../persona/analysis.ts').PersonaAnalysis, 'analyze'>;
   memory?: Pick<
     import('../memory/service.ts').MemoryService,
     'retrieve' | 'interruptBackground'
@@ -115,6 +122,7 @@ export function createVoiceSessions(dependencies: {
             dependencies.metrics,
             dependencies.persona,
             dependencies.memory,
+            dependencies.analysis,
           ),
           gate: dependencies.gate,
           metrics: dependencies.metrics,
