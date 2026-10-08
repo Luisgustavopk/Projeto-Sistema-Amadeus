@@ -46,6 +46,10 @@ export type CallRecord = {
   reservedUsd: number;
   status: 'pending' | 'completed' | 'failed';
   provider?: string;
+  generationId?: string;
+  httpStatus?: number;
+  retryAfterMs?: number;
+  cancellationReason?: 'consumer-closed' | 'signal-aborted';
   returnedModel?: string;
   usage?: Usage;
   firstTokenMs?: number;
@@ -64,6 +68,7 @@ export function createEvaluationRouter(options: {
   fetcher?: typeof fetch;
 }) {
   const fetcher = options.fetcher ?? fetch;
+  const cooldowns = new Map<string, number>();
 
   async function* stream(
     model: Model,
@@ -74,6 +79,11 @@ export function createEvaluationRouter(options: {
     sampling: Record<string, number> = { temperature: 0.6 },
     json = false,
   ) {
+    // No reservation or paid retry while this fixed route is cooling down.
+    if ((cooldowns.get(model.id) ?? 0) > Date.now()) {
+      throw new Error('EVALUATION_ROUTE_COOLDOWN');
+    }
+
     const request = {
       model: model.id,
       messages,
@@ -129,8 +139,26 @@ export function createEvaluationRouter(options: {
       );
 
       record.responseHeadersMs = performance.now() - started;
+      record.httpStatus = response.status;
 
       if (!response.ok || !response.body) {
+        if (response.status === 429) {
+          const header = response.headers.get('retry-after');
+          const seconds = header?.trim() && Number(header);
+          const date = header ? Date.parse(header) : Number.NaN;
+          const delay =
+            seconds !== null &&
+            seconds !== undefined &&
+            seconds !== '' &&
+            Number.isFinite(Number(seconds))
+              ? Number(seconds) * 1000
+              : Number.isFinite(date)
+                ? date - Date.now()
+                : 60000;
+          record.retryAfterMs = Math.min(86400000, Math.max(1000, delay));
+          cooldowns.set(model.id, Date.now() + record.retryAfterMs);
+        }
+
         throw new Error(`EVALUATION_HTTP_${response.status}`);
       }
 
@@ -169,6 +197,7 @@ export function createEvaluationRouter(options: {
           }
 
           const chunk = JSON.parse(data) as {
+            id?: string;
             error?: unknown;
             provider?: string;
             model?: string;
@@ -178,6 +207,16 @@ export function createEvaluationRouter(options: {
               finish_reason?: string | null;
             }[];
           };
+
+          if (
+            !record.generationId &&
+            typeof chunk.id === 'string' &&
+            /^gen-[A-Za-z0-9_-]{1,180}$/u.test(chunk.id)
+          ) {
+            record.generationId = chunk.id;
+            // Persist before yielding: a downstream parser may cancel immediately.
+            await options.persist();
+          }
 
           if (chunk.error) {
             throw new Error('EVALUATION_STREAM_ERROR');
@@ -258,10 +297,17 @@ export function createEvaluationRouter(options: {
       if (record.status === 'pending') {
         record.status = 'failed';
         record.error = 'EVALUATION_STREAM_CLOSED';
+        record.cancellationReason = signal.aborted
+          ? 'signal-aborted'
+          : 'consumer-closed';
+      }
+
+      if (signal.aborted) {
+        record.cancellationReason = 'signal-aborted';
       }
 
       if (!settled) {
-        options.budget.settle(id, null);
+        options.budget.settle(id, record.usage?.cost);
       } // Never refund an uncertain charge.
 
       record.elapsedMs = performance.now() - started;

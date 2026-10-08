@@ -139,7 +139,10 @@ describe('evaluation streaming', () => {
       fetcher: async () => {
         requests++;
 
-        return new Response('untrusted error', { status: 429 });
+        return new Response('untrusted error', {
+          status: 429,
+          headers: { 'retry-after': '120' },
+        });
       },
     });
     await expect(async () => {
@@ -155,7 +158,23 @@ describe('evaluation streaming', () => {
     }).rejects.toThrow('EVALUATION_HTTP_429');
     expect(requests).toBe(1);
     expect(calls[0]?.error).toBe('EVALUATION_HTTP_429');
+    expect(calls[0]?.httpStatus).toBe(429);
+    expect(calls[0]?.retryAfterMs).toBe(120000);
     expect(budget.snapshot().unreportedCalls).toBe(1);
+    const before = budget.snapshot();
+    await expect(async () => {
+      for await (const chunk of router.stream(
+        evaluationModels.llama,
+        [],
+        50,
+        'conversation',
+        new AbortController().signal,
+      )) {
+        void chunk;
+      }
+    }).rejects.toThrow('EVALUATION_ROUTE_COOLDOWN');
+    expect(requests).toBe(1);
+    expect(budget.snapshot()).toEqual(before);
   });
 
   it('records a consumer-closed stream as ended and retains the unknown charge', async () => {
@@ -183,8 +202,48 @@ describe('evaluation streaming', () => {
 
     expect(calls[0]?.status).toBe('failed');
     expect(calls[0]?.error).toBe('EVALUATION_STREAM_CLOSED');
+    expect(calls[0]?.cancellationReason).toBe('consumer-closed');
     expect(budget.snapshot().unresolvedCalls).toBe(0);
     expect(budget.snapshot().unreportedCalls).toBe(1);
+  });
+
+  it('persists the remote ID before yielding and settles captured usage after cancellation', async () => {
+    const budget = createEvaluationBudget(0.01);
+    const calls: CallRecord[] = [];
+    const persisted: string[] = [];
+    const router = createEvaluationRouter({
+      key: 'secret-key',
+      budget,
+      calls,
+      persist: async () => {
+        persisted.push(JSON.stringify(calls));
+      },
+      fetcher: async () =>
+        new Response(
+          'data: {"id":"gen-test_123","usage":{"cost":0.00002},"choices":[{"delta":{"content":"Claro."}}]}\n\n',
+        ),
+    });
+
+    for await (const chunk of router.stream(
+      evaluationModels.llama,
+      [],
+      50,
+      'conversation',
+      new AbortController().signal,
+    )) {
+      expect(chunk.content).toBe('Claro.');
+      expect(persisted.at(-1)).toContain('gen-test_123');
+      break;
+    }
+
+    expect(calls[0]).toMatchObject({
+      generationId: 'gen-test_123',
+      cancellationReason: 'consumer-closed',
+      status: 'failed',
+    });
+    expect(budget.snapshot().reportedUsd).toBe(0.00002);
+    expect(budget.snapshot().unreportedCalls).toBe(0);
+    expect(JSON.stringify(calls)).not.toContain('secret-key');
   });
 
   it('rejects a substituted model while accounting for its reported charge', async () => {

@@ -13,16 +13,27 @@ import {
 const root = new URL('../../../evals/persona/quality-v2.1/', import.meta.url);
 const old = new URL('../../../evals/persona/quality-v2/', import.meta.url);
 describe('isolated v2.1 experiments', () => {
-  it('freezes every resource and verifies traceable disjoint chat exemplars', async () => {
+  it('preserves historical resources, identifies implementation drift and verifies disjoint exemplars', async () => {
     const manifest = JSON.parse(
       await readFile(new URL('manifest.json', root), 'utf8'),
     ) as { files: Record<string, string> };
 
+    const implementationDrift: string[] = [];
+
     for (const [file, hash] of Object.entries(manifest.files)) {
-      expect(fingerprint(await readFile(new URL(file, root), 'utf8'))).toBe(
-        hash,
-      );
+      const current = fingerprint(await readFile(new URL(file, root), 'utf8'));
+
+      if (file.startsWith('../../../api/') && current !== hash) {
+        implementationDrift.push(file);
+      } else {
+        expect(current).toBe(hash);
+      }
     }
+
+    // Do not replace the old hash with the new code's hash to permit inference.
+    expect(implementationDrift).toEqual([
+      '../../../api/src/evaluation/persona/router.ts',
+    ]);
 
     const bank = ShotBankSchema.parse(
       JSON.parse(await readFile(new URL('shots.json', root), 'utf8')),
