@@ -34,7 +34,7 @@ export function buildPersonaReferenceContext(
         message.role === 'user' && index === 0
           ? `[DEMONSTRAÇÃO ${entry.id}; contexto fictício: ${entry.situation}]\n${message.content}`
           : message.role === 'assistant'
-            ? '<expression>{"memory":[],"intent":"conversar","emotion":"neutra","intensity":0.15}</expression>\n' +
+            ? '<expression>{"memory":{"use":"none","facts":[]},"intent":"conversar","emotion":"neutra","intensity":0.15}</expression>\n' +
               message.content
             : message.content,
     })),

@@ -8,6 +8,7 @@ export function createVoiceMetrics() {
     textFallbacks: 0,
     personaMetadataFallbacks: 0,
     personaRecoveries: 0,
+    personaRepeatedOpenings: 0,
     inputClarifications: 0,
     memoryReplyRecoveries: 0,
     memoryReviewUnavailable: 0,

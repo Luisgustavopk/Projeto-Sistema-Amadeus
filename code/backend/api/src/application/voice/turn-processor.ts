@@ -27,7 +27,7 @@ import {
   buildVoicePersonaCore,
   voiceOutputFormat,
 } from '../persona/voice-prompt.ts';
-import { createConversationStyleGuard } from '../persona/conversation-style.ts';
+import { createConversationStyleObserver } from '../persona/conversation-style.ts';
 import { createExpressionState } from '../../domain/persona/expression-policy.ts';
 import {
   memoryContent,
@@ -833,6 +833,7 @@ export function createTurnProcessor(
           }
         };
 
+        const observeStyle = createConversationStyleObserver(recent);
         const createSegments = () =>
           streamPersonaSpeech(
             source,
@@ -847,7 +848,14 @@ export function createTurnProcessor(
               }
             },
             () => metrics.count('personaRecoveries'),
-            createConversationStyleGuard(recent, text),
+            (speech, delivered) => {
+              if (
+                !delivered &&
+                observeStyle(speech, delivered).repeatedOpening
+              ) {
+                metrics.count('personaRepeatedOpenings');
+              }
+            },
             announceWait,
             (use) => {
               declaredUse = use;

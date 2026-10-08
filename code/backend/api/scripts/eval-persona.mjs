@@ -28,7 +28,7 @@ import { createProviderStreaming } from '../src/application/providers/streaming.
 import { ProviderSchema } from '../src/domain/providers/model.ts';
 import { providerAttempts } from '../src/application/providers/fallback.ts';
 import { ActivityGate } from '../src/application/runtime/activity-gate.ts';
-import { createConversationStyleGuard } from '../src/application/persona/conversation-style.ts';
+import { createConversationStyleObserver } from '../src/application/persona/conversation-style.ts';
 import { createExpressionState } from '../src/domain/persona/expression-policy.ts';
 
 async function main() {
@@ -298,7 +298,7 @@ async function main() {
           () => {
             recoveries++;
           },
-          createConversationStyleGuard(scenario.history, scenario.text),
+          createConversationStyleObserver(scenario.history),
         )) {
           const text = segment;
           if (text) {

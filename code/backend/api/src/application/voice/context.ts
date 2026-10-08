@@ -54,7 +54,7 @@ export function buildVoiceContext(
       : 'Contexto recente (texto enviado e áudio confirmado são distintos):\n' +
         JSON.stringify(context)) +
     '\npartiallyPlayed indica áudio ouvido parcialmente, sem alinhamento de palavras. Não infira o trecho ouvido nem uma resposta completa a partir desse sinal. responseStatus indica conclusão, interrupção ou falha. [trecho omitido] indica resumo por limite de tamanho, não o fim original da fala.\n' +
-    '\nFamiliaridade e controle de repetição (dados derivados da reprodução confirmada; variar aberturas e fechos):\n' +
+    '\nFamiliaridade e estilo (interações disponíveis, distinguindo texto enviado de áudio confirmado; não inferir leitura ou audição; variar aberturas e fechos):\n' +
     JSON.stringify(buildConversationStyle(history, retainedOwnerTurns)) +
     (audioObservations
       ? '\nMedições acústicas, sem inferência emocional:\n' +

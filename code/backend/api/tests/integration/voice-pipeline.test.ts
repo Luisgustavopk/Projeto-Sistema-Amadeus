@@ -1336,7 +1336,7 @@ it('recupera cabeçalho incompleto antes da fala, sem duplicar áudio ou reinici
     'esta é uma reparação única de formato',
   );
   expect(attempts[1]?.content).toContain(
-    '<expression>{"memory":[]}</expression>',
+    '<expression>{"memory":{"use":"none","facts":[]}}</expression>',
   );
   expect(attempts[1]?.content).toContain('reparação única de formato');
   expect(f.events.filter((e) => e.type === 'reply.start')).toHaveLength(1);

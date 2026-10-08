@@ -10,7 +10,7 @@ import {
 } from '../../src/application/persona/prompt.ts';
 import {
   buildConversationStyle,
-  createConversationStyleGuard,
+  createConversationStyleObserver,
 } from '../../src/application/persona/conversation-style.ts';
 import { buildVoiceContext } from '../../src/application/voice/context.ts';
 import { measureVoiceAudio } from '../../src/application/voice/audio-observations.ts';
@@ -89,7 +89,7 @@ it('deriva familiaridade e cinco aberturas/fechos apenas do histórico confirmad
   );
 });
 
-it('recupera uma abertura repetida antes de enviar áudio e permite repetição solicitada', async () => {
+it('observa repetição sem bloquear a fala nem pagar uma regeneração de estilo', async () => {
   const recover = vi.fn();
   const result: string[] = [];
 
@@ -102,24 +102,46 @@ it('recupera uma abertura repetida antes de enviar áudio e permite repetição 
     new AbortController().signal,
     vi.fn(),
     recover,
-    createConversationStyleGuard([turn], 'E agora?'),
+    createConversationStyleObserver([turn]),
   )) {
     result.push(text);
   }
 
-  expect(recover).toHaveBeenCalledOnce();
-  expect(result).toEqual([
-    'Uma medição ajuda a separar hipótese de resultado.',
-  ]);
+  expect(recover).not.toHaveBeenCalled();
+  expect(result).toEqual([turn.generatedText]);
+  expect(
+    createConversationStyleObserver([turn])(turn.generatedText, false),
+  ).toEqual({ repeatedOpening: true, alreadyDelivered: false });
   expect(() =>
-    createConversationStyleGuard([turn], 'Repete exatamente.')(
-      turn.generatedText,
-      false,
-    ),
+    createConversationStyleObserver([])('Claro! Como posso ajudar?', false),
   ).not.toThrow();
-  expect(() =>
-    createConversationStyleGuard([], 'Oi.')('Claro! Como posso ajudar?', false),
-  ).toThrow();
+});
+
+it('inclui texto enviado no estilo sem inventar áudio confirmado ou familiaridade após falha', () => {
+  const textTurn = {
+    ...turn,
+    generatedText: '',
+    sentText: 'I changed my mind.',
+    responseStatus: 'completed' as const,
+  };
+  const style = buildConversationStyle(Array(3).fill(textTurn));
+  expect(style.familiarity).toBe('F1');
+  expect(style.confirmedTurnsAvailable).toBe(0);
+  expect(style.completedTextTurnsAvailable).toBe(3);
+  expect(style.recentStyle[0]).toMatchObject({
+    opening: textTurn.sentText,
+    evidence: 'sent-text',
+  });
+  expect(
+    buildConversationStyle(
+      Array(10).fill({ ...textTurn, responseStatus: 'failed' }),
+    ).familiarity,
+  ).toBe('F0');
+  expect(
+    buildConversationStyle(
+      Array(10).fill({ ...textTurn, initiativeKind: 'greeting' }),
+    ).familiarity,
+  ).toBe('F0');
 });
 
 it('mede duração, energia, pausas e ritmo sem inventar emoção ou tom', () => {
