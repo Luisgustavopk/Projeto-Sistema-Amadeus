@@ -18,6 +18,8 @@ O executor recusa arquivos modificados depois do congelamento. Verifica coincid�
 
 ## Comparação inicial
 
+Atualização de 07/10/2026: o executor também prepara os braços `examples-0/2/4/6`, com Llama e núcleo atual iguais, variando apenas o teto de exemplos contextuais adicionais. O [protocolo do corpus](../architecture/Referencias_Contextuais_Persona.md#comparação-controlada-preparada) registra isolamento, quantidade efetiva, fontes e limitações. Esses braços foram preparados sem inferência paga na integração e executados depois, na [rodada 2](Resultados_Refinamento_Llama_Rodada_2.md); os resultados históricos abaixo não incluem o novo índice.
+
 O foco vigente do refinamento é o **Llama 3.3 70B**, principal pago. O executor usa `--models=llama` por padrão; a comparação inicial entre autores permanece como registro histórico. Os modelos de reserva não recebem refinamento de atuação nesta etapa. Gemini continua como juiz independente do Llama: avaliar respostas não o promove a modelo principal nem valida suas próprias respostas.
 
 Todas as variantes usam o processador de turnos real, sem STT, TTS ou análise remota Jev. Histórico, memória de exemplo e estado artístico são isolados do perfil real. O contexto administrativo vigente é lido, registrado localmente e mantido igual entre variantes.
@@ -40,6 +42,10 @@ O executor roda entre cinco e dez amostras por conversa, com histórico novo por
 ## Orçamento e dados
 
 A primeira rodada tem autorização de **até US$ 0,25 no total**. O executor e o juiz compartilham o mesmo orçamento, inclusive entre comandos sucessivos. `data/refinement/quality-v2-budget.json` conserva o consumo contabilizado; um bloqueio de arquivo impede duas execuções concorrentes de gastar o teto separadamente.
+
+Em 07/10/2026, o usuário autorizou uma segunda rodada com **novos US$ 0,25**, para [refinamento do Llama em etapas pequenas](Refinamento_Llama_Etapas_Pequenas.md). A primeira rodada, com US$ 0,2322949165 contabilizados, fica arquivada; não é apagada nem agregada ao consumo da rodada nova. O registro ativo identifica a rodada, e o teto continua compartilhado entre todos os comandos e o juiz. Abrir uma rodada nova não renova automaticamente orçamento em cada etapa, dia ou tentativa.
+
+Os [resultados da rodada 2](Resultados_Refinamento_Llama_Rodada_2.md) registram 268/270 turnos concluídos e US$ 0,20724567 contabilizados. A calibração humana permanece em 0/30; as notas do juiz não aprovam persona. Os novos diagnósticos de memória e iniciativa têm manifesto próprio, sem alterar o conjunto reservado original.
 
 Antes de cada pedido, reserva-se um limite conservador usando bytes UTF-8 da entrada, margem de formatação, saída máxima e preços máximos explícitos. Custos reportados reconciliam a reserva. Falhas ou custo ausente conservam a estimativa; não são devolvidos como se fossem gratuitos. Ao faltar margem, a cobertura fica incompleta e a rodada para. Não existem retentativas financeiras invisíveis; reparos feitos pelo processador são chamadas distintas e também reservam orçamento.
 

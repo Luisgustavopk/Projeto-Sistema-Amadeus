@@ -16,6 +16,8 @@ Na persona **0.4.16**, a [compilação de atuação em pt-BR](../../canon-conver
 
 ## Reproduzir a preparação
 
+Atualização de 07/10/2026: o [catálogo contextual](../../corpus-examples-v1.md) contém 33 adaptações de atuação e seis resumos de lore rastreáveis. O corpus preparado bruto continua como matéria-prima, com 40 trechos de história arquivados separadamente no SQLite e excluídos do prompt. A [integração contextual](../../../../../../docs/architecture/Referencias_Contextuais_Persona.md) implementa seleção BGE/Jina, orçamento configurável e mensagens de demonstração no fluxo vocal. A [avaliação textual da rodada 2](../../../../../../docs/analysis/Resultados_Refinamento_Llama_Rodada_2.md) não aprovou naturalidade e fidelidade. A proposta de recuperação mencionada acima registra o estado anterior à implementação.
+
 O preparador e sua integração com os assets de avatar estão preservados na branch `feat/interface`, onde a aquisição foi realizada. Nessa branch, na pasta `code/backend/api`:
 
 ```sh
