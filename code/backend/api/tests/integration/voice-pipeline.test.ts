@@ -653,7 +653,7 @@ it.each([16000, 24000] as const)(
       intensity: 0.35,
       metadataValid: true,
       deliveryApplied: false,
-      personaVersion: 'kurisu-amadeus-0.4.21',
+      personaVersion: 'kurisu-amadeus-0.4.22',
     });
     expect(f.requests.filter((request) => request.role === 'llm')).toHaveLength(
       1,

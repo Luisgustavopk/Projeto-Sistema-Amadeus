@@ -257,7 +257,7 @@ export function createTurnProcessor(
             '\nControles artísticos graduais. A persona canônica e o contexto atual prevalecem; energia baixa sugere concisão, não reclamação, indisponibilidade ou hostilidade. Não verbalize números ou nomes de variáveis.\n</artistic_state>'
           : '';
         const initiativeDirection = turn.initiativeKind
-          ? '\n' + buildPresenceDirection(turn.initiativeKind)
+          ? '\n' + buildPresenceDirection(turn.initiativeKind, recent)
           : '';
         // Start the short analysis while memory retrieval/planning runs. No late
         // result can mutate a prompt after its generation has started.

@@ -54,6 +54,7 @@ for (const path of [
   'code/backend/api/src/application/persona/expressive-reference.ts',
   'code/backend/api/src/application/persona/expressive-direction-v1.md',
   'code/backend/api/src/application/persona/presence-turn-v1.md',
+  'code/backend/api/src/application/persona/presence-turn-v2.md',
   'code/backend/api/src/application/persona/presence-direction.ts',
   'code/backend/api/src/application/persona/corpus-context.ts',
   'code/backend/api/src/application/memory/memory-use-v1.md',
