@@ -26,6 +26,10 @@ Antes de cada chamada, a reserva conservadora é persistida; custos desconhecido
 
 Comando da API: `npm run eval:llama-emotions -- --remaining-budget --run`. Sem `--run`, apenas preparar e informar estimativa. Reexecução de um relatório existente é bloqueada. A execução anterior não é reescrita.
 
+Após uma interrupção por HTTP 429, `--resume` permite continuar usando o mesmo ledger e manifesto original, respeitando `retry-after`. As conversas completas são preservadas; uma conversa interrompida é arquivada e recomeça em uma tentativa separada. Chamadas descartadas da comparação continuam contabilizadas, inclusive reservas sem custo remoto informado. A estimativa da retomada considera apenas os jobs restantes. Prompts, fontes, modelo, rota, amostragem e desenho são comparados com o manifesto antes de inferir; mudanças do executor ficam registradas por época de execução. Há uma pausa de dois segundos entre os pedidos da retomada, fora das medições de latência do turno.
+
+`audit-llama-emotional-v4.mjs` confere offline a ligação de todas as chamadas, incluindo as interrupções, e reconcilia o gasto desde o saldo original. O snapshot de orçamento do último processo não representa sozinho o número acumulado de chamadas sem custo informado. A auditoria financeira usa todos os registros, sem liberar reservas incertas.
+
 ## Relatórios
 
 Separar comparação dos pares completos, todas as tentativas e cobertura sem controle. Gerar 120 fichas A/B com braço e amostra ocultos, além de 56 falas de cobertura. Notas humanas permanecem vazias; diagnóstico do agente é identificado como tal.

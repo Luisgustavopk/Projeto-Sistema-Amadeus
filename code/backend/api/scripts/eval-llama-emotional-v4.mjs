@@ -22,12 +22,13 @@ import { summarizeLlamaEmotionalV4 } from './lib/llama-emotional-v4-report.mjs';
 const args = process.argv.slice(2);
 if (
   !args.includes('--remaining-budget') ||
-  args.some((arg) => !['--remaining-budget', '--run'].includes(arg))
+  args.some((arg) => !['--remaining-budget', '--run', '--resume'].includes(arg))
 )
   throw new Error(
     'Use --remaining-budget e, para executar, --run; sem renovar orçamento.',
   );
 const run = args.includes('--run');
+const resume = args.includes('--resume');
 const parentDirectory = new URL(
   '../data/refinement/emotional-025-2026-10-08/',
   import.meta.url,
@@ -178,7 +179,7 @@ const frozen = {
   scope:
     'Llama principal; dez conversas comparadas em dois braços e três amostras, demais catorze como cobertura do candidato. Desenvolvimento aprovado, não reservado. Só expressiveDirection varia; âncora corrigida comum. Sem áudio ou juiz pago.',
 };
-const plan = {
+let plan = {
   frozen,
   fingerprint: fingerprint(frozen),
   plannedTurns: design.plannedTurns,
@@ -200,23 +201,82 @@ console.log(
 if (!run) process.exit(0);
 if (!process.env.OPENROUTER_API_KEY)
   throw new Error('OPENROUTER_API_KEY ausente.');
-if (plan.estimateUsdNoCache > maxUsd)
-  throw new Error('Estimativa acima do saldo autorizado.');
 await mkdir(directory, { recursive: true });
 const planPath = new URL('plan.json', directory);
 const reportPath = new URL('llama-emotional-v4.json', directory);
+let previousReport;
 try {
-  await readFile(reportPath);
-  throw new Error('Rodada já executada; saldo não é renovado.');
+  previousReport = JSON.parse(await readFile(reportPath, 'utf8'));
+  if (!resume || previousReport.stopped !== 'EVALUATION_HTTP_429')
+    throw new Error('Rodada já executada; retomada só após HTTP 429.');
 } catch (error) {
   if (error.code !== 'ENOENT') throw error;
 }
+if (resume && !previousReport) throw new Error('Não há rodada para retomar.');
 try {
   const saved = JSON.parse(await readFile(planPath, 'utf8'));
-  if (saved.fingerprint !== plan.fingerprint)
+  if (resume) {
+    if (fingerprint(saved.frozen) !== saved.fingerprint)
+      throw new Error('Manifesto original inválido.');
+    const comparable = (value) => {
+      const copy = globalThis.structuredClone(value);
+      delete copy.maxUsd;
+      delete copy.parentBudget;
+      delete copy.implementation['scripts/eval-llama-emotional-v4.mjs'];
+      return copy;
+    };
+    if (
+      fingerprint(comparable(saved.frozen)) !==
+      fingerprint(comparable(plan.frozen))
+    )
+      throw new Error('Condições do ensaio mudaram; retomada rejeitada.');
+    plan = saved;
+  } else if (saved.fingerprint !== plan.fingerprint)
     throw new Error('Manifesto congelado divergente.');
 } catch (error) {
   if (error.code !== 'ENOENT') throw error;
+}
+const completeCase = (item) =>
+  item.turns.length === 4 &&
+  item.turns.every((turn) => turn.assistant && !turn.errors.length);
+const remainingJobs = jobs.filter(
+  (job) =>
+    !previousReport?.cases.some(
+      (item) =>
+        completeCase(item) &&
+        item.id === job.scenario.id &&
+        item.sample === job.sample &&
+        item.variant === job.variant &&
+        item.phase === job.phase,
+    ),
+);
+const remainingTurns = remainingJobs.reduce(
+  (sum, job) => sum + job.scenario.turns.length,
+  0,
+);
+const remainingEstimate =
+  (remainingTurns * (4700 * models[0].prompt + 140 * models[0].completion)) /
+  1e6;
+if (remainingEstimate > maxUsd)
+  throw new Error('Estimativa restante acima do saldo autorizado.');
+if (resume) {
+  const failedCall = previousReport.calls.findLast(
+    (call) => call.httpStatus === 429,
+  );
+  if (
+    Date.now() <
+    Date.parse(previousReport.completedAt) + (failedCall?.retryAfterMs ?? 60000)
+  )
+    throw new Error('EVALUATION_ROUTE_COOLDOWN');
+  console.log(
+    JSON.stringify({
+      resumed: true,
+      frozenManifestHash: plan.fingerprint,
+      remainingTurns,
+      remainingEstimateUsd: remainingEstimate,
+      remainingBudgetUsd: maxUsd,
+    }),
+  );
 }
 const shared = await openSharedEvaluationRound(
   parentDirectory,
@@ -262,7 +322,7 @@ try {
   await shared.close();
   throw error;
 }
-const report = {
+const report = previousReport ?? {
   suite: 'llama-emotional-v4-carried-budget',
   createdAt: new Date().toISOString(),
   plan,
@@ -276,6 +336,25 @@ const report = {
   stopped: null,
   budget: null,
 };
+if (previousReport) {
+  const archive = new URL('interruption-' + Date.now() + '.json', directory);
+  await writeFile(archive, JSON.stringify(previousReport, null, 2));
+  report.interruptedCases ??= [];
+  report.interruptedCases.push(
+    ...report.cases.filter((item) => !completeCase(item)),
+  );
+  report.cases = report.cases.filter(completeCase);
+  report.executionEpochs ??= [];
+  report.executionEpochs.push({
+    resumedAt: new Date().toISOString(),
+    priorCommittedUsd: parent.committedUsd,
+    executorHash: implementation['scripts/eval-llama-emotional-v4.mjs'],
+    minimumRequestGapMs: 2000,
+    interruptedSnapshot: archive.pathname,
+  });
+  report.stopped = null;
+  delete report.completedAt;
+}
 let pendingPersist = Promise.resolve();
 const persist = () => {
   pendingPersist = pendingPersist.then(() =>
@@ -292,6 +371,30 @@ const router = createEvaluationRouter({
     models,
     calls: report.calls,
     persist,
+    fetcher: async (url, init) => {
+      const response = await fetch(url, init);
+      if (!response.ok) {
+        const failed = report.calls.findLast(
+          (call) => call.status === 'pending',
+        );
+        const payload = await response
+          .clone()
+          .json()
+          .catch(() => ({}));
+        if (failed)
+          failed.remoteFailure = {
+            code: payload.error?.code ?? null,
+            message: String(payload.error?.message ?? '')
+              .replaceAll(process.env.OPENROUTER_API_KEY, '[redacted]')
+              .slice(0, 500),
+            providerName: payload.error?.metadata?.provider_name ?? null,
+            providerDetail: String(payload.error?.metadata?.raw ?? '')
+              .replaceAll(process.env.OPENROUTER_API_KEY, '[redacted]')
+              .slice(0, 1000),
+          };
+      }
+      return response;
+    },
   }),
 });
 const stopFor = (error) => {
@@ -318,6 +421,16 @@ try {
   for (const [jobIndex, job] of jobs.entries()) {
     if (report.stopped) break;
     const { scenario, model, sample, variant, phase } = job;
+    if (
+      report.cases.some(
+        (item) =>
+          item.id === scenario.id &&
+          item.sample === sample &&
+          item.variant === variant &&
+          item.phase === phase,
+      )
+    )
+      continue;
     const actualVariant = scenario.facts.length ? 'grounded' : 'acting';
     const examples = bank.shots
       .filter(
@@ -444,6 +557,8 @@ try {
     const conversationId = randomUUID();
     for (const [index, turn] of scenario.turns.entries()) {
       if (report.stopped) break;
+      if (resume)
+        await new Promise((resolve) => globalThis.setTimeout(resolve, 2000));
       active = {
         user: typeof turn === 'string' ? turn : '',
         initiativeKind:
