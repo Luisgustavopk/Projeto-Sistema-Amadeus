@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "purpose": "referência descritiva de estilo, não certificação de persona",
+  "definitions": {
+    "words": "whitespaceWords divide por espaços; lexicalWords usa a mesma tokenização da avaliação",
+    "sentences": "Intl.Segmenter; locale en; pontuação não garante unidade dramática",
+    "rates": "frações entre 0 e 1; hasQuestionRate não é quantidade de perguntas por turno",
+    "comparability": "Linhas do CSV, blocos do personagem e respostas do modelo são unidades diferentes; inglês e pt-BR também diferem.",
+    "limitations": "Sem cena, época ou situação no CSV; agregados não validam D1, autoria canônica ou naturalidade."
+  },
+  "sources": [
+    {
+      "repository": "https://github.com/Ibnelaiq/KurisuQA",
+      "revision": "ebd640fdabf5616b6fde9c2fc12f9b9400ae0ceb",
+      "file": "VNKurisuDialogues.csv",
+      "sha256": "c162815a10c6c8133971b03d91cebe3c2f8c607a7360ea8b5cb182745bfe4477",
+      "unit": "csv-row",
+      "profile": {
+        "samples": 2834,
+        "whitespaceWords": {
+          "samples": 2834,
+          "p50": 8,
+          "p90": 19,
+          "p95": 23
+        },
+        "lexicalWords": {
+          "samples": 2834,
+          "p50": 8,
+          "p90": 20,
+          "p95": 24
+        },
+        "sentences": {
+          "samples": 2834,
+          "p50": 1,
+          "p90": 2,
+          "p95": 3
+        },
+        "questionsPerUnit": {
+          "samples": 2834,
+          "p50": 0,
+          "p90": 1,
+          "p95": 1
+        },
+        "hasQuestionRate": 0.29604798870853916,
+        "endsQuestionRate": 0.23747353563867327,
+        "ellipsisRate": 0.20924488355681017,
+        "exclamationRate": 0.11044460127028935,
+        "stutterRate": 0.029992942836979536
+      }
+    },
+    {
+      "repository": "https://github.com/FrancescoCaracciolo/Amadeus",
+      "revision": "9d4726bd37dce9919af37904e442e49205f329b8",
+      "file": "prepared/dialogues.jsonl",
+      "sha256": "10cb80b6a2e8f7b6c07530fa6b49fede43e9a438f6f249520ce6a313ad46667b",
+      "unit": "prepared-speaker-block",
+      "profile": {
+        "samples": 758,
+        "whitespaceWords": {
+          "samples": 758,
+          "p50": 9.5,
+          "p90": 36,
+          "p95": 60
+        },
+        "lexicalWords": {
+          "samples": 758,
+          "p50": 10,
+          "p90": 38,
+          "p95": 64
+        },
+        "sentences": {
+          "samples": 758,
+          "p50": 2,
+          "p90": 5,
+          "p95": 9
+        },
+        "questionsPerUnit": {
+          "samples": 758,
+          "p50": 0,
+          "p90": 2,
+          "p95": 3
+        },
+        "hasQuestionRate": 0.470976253298153,
+        "endsQuestionRate": 0.2770448548812665,
+        "ellipsisRate": 0.28891820580474936,
+        "exclamationRate": 0.22955145118733508,
+        "stutterRate": 0.07651715039577836
+      }
+    }
+  ],
+  "rawTextIncluded": false,
+  "paidCalls": 0
+}
