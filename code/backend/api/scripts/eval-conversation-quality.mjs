@@ -30,6 +30,17 @@ import { createPersonaConfiguration } from '../src/application/persona/configura
 import { createRevisionRepository } from '../src/adapters/database/revision-repository.ts';
 import { createPersistentPersonaState } from '../src/application/persona/persistent-state.ts';
 import { PERSONA_VERSION } from '../src/domain/persona/expression.ts';
+import { openDatabase } from '../src/adapters/database/index.ts';
+import { createPersonaReferenceRepository } from '../src/adapters/database/persona-reference-repository.ts';
+import {
+  loadPersonaReferenceCatalog,
+  personaCatalogUrl,
+  personaExamplesUrl,
+} from '../src/application/persona/reference-catalog.ts';
+import { createPersonaReferenceRetrieval } from '../src/application/persona/reference-retrieval.ts';
+import { createLocalMemoryEmbeddings } from '../src/adapters/embeddings/local.ts';
+import { createLocalMemoryReranker } from '../src/adapters/embeddings/reranker.ts';
+import { fileURLToPath } from 'node:url';
 
 const root = new URL('../../evals/persona/quality-v2/', import.meta.url);
 const directory = new URL('../data/refinement/', import.meta.url);
@@ -37,7 +48,16 @@ const args = process.argv.slice(2);
 const option = (key, fallback) =>
   args.find((arg) => arg.startsWith(`--${key}=`))?.slice(key.length + 3) ??
   fallback;
-const allowed = ['only', 'models', 'variants', 'samples', 'split', 'budget'];
+const allowed = [
+  'only',
+  'models',
+  'variants',
+  'samples',
+  'split',
+  'budget',
+  'turn-length',
+  'presence-examples',
+];
 if (
   args.some(
     (arg) =>
@@ -45,21 +65,72 @@ if (
   )
 )
   throw new Error('Argumento desconhecido.');
-const split = option('split', 'heldout');
-if (!['development', 'heldout', 'regression'].includes(split))
+const referenceExperiment = option('variants', '').includes('examples-');
+const split = option('split', referenceExperiment ? 'development' : 'heldout');
+if (
+  !['development', 'heldout', 'regression', 'memory', 'initiative'].includes(
+    split,
+  )
+)
   throw new Error('Conjunto inválido.');
 const samples = Number(option('samples', '5'));
 if (!Number.isInteger(samples) || samples < 5 || samples > 10)
   throw new Error('Use 5–10 amostras por conversa.');
 const modelNames = option('models', 'llama').split(',');
 const variants = option('variants', 'current,compact').split(',');
+const turnLength = option('turn-length', 'baseline');
+if (!['baseline', 'brief'].includes(turnLength)) {
+  throw new Error('Use turn-length=baseline ou brief.');
+}
+const lengthDirective =
+  turnLength === 'brief' ? '\nNeste turno, fale em uma ou duas frases.' : '';
+const presenceExamples = option('presence-examples', 'baseline');
+if (
+  !['baseline', 'omit'].includes(presenceExamples) ||
+  (presenceExamples === 'omit' && split !== 'initiative')
+) {
+  throw new Error(
+    'presence-examples=omit é exclusivo do diagnóstico de iniciativa.',
+  );
+}
+const baselineInitiative = buildPresenceDirection('initiative');
+const exampleStart = baselineInitiative.indexOf('\nExemplo fictício:\n');
+const exampleEnd = baselineInitiative.indexOf(
+  '\nNão insista em assuntos recusados.',
+);
+if (
+  presenceExamples === 'omit' &&
+  (exampleStart < 0 || exampleEnd <= exampleStart)
+) {
+  throw new Error('Bloco de exemplos de iniciativa não encontrado.');
+}
+const initiativeWithoutExamples =
+  baselineInitiative.slice(0, exampleStart) +
+  baselineInitiative.slice(exampleEnd);
+if (
+  referenceExperiment &&
+  variants.some((name) => !name.startsWith('examples-'))
+)
+  throw new Error(
+    'Compare os braços examples separadamente dos braços current/compact.',
+  );
 if (
   modelNames.some((name) => !Object.hasOwn(evaluationModels, name)) ||
   new Set(modelNames).size !== modelNames.length
 )
   throw new Error('Modelos inválidos.');
 if (
-  variants.some((name) => !['current', 'compact'].includes(name)) ||
+  variants.some(
+    (name) =>
+      ![
+        'current',
+        'compact',
+        'examples-0',
+        'examples-2',
+        'examples-4',
+        'examples-6',
+      ].includes(name),
+  ) ||
   new Set(variants).size !== variants.length
 )
   throw new Error('Variantes inválidas.');
@@ -72,6 +143,17 @@ const manifest = JSON.parse(
 for (const [file, hash] of Object.entries(manifest.files)) {
   if (fingerprint(await readFile(new URL(file, root), 'utf8')) !== hash)
     throw new Error(`Conjunto ou recurso alterado após congelamento: ${file}`);
+}
+let diagnosticManifest;
+if (split === 'memory' || split === 'initiative') {
+  diagnosticManifest = JSON.parse(
+    await readFile(new URL('diagnostics-manifest.json', root), 'utf8'),
+  );
+  for (const [file, hash] of Object.entries(diagnosticManifest.files)) {
+    if (fingerprint(await readFile(new URL(file, root), 'utf8')) !== hash) {
+      throw new Error(`Diagnóstico alterado após congelamento: ${file}`);
+    }
+  }
 }
 const dataset = JSON.parse(
   await readFile(new URL(`${split}.json`, root), 'utf8'),
@@ -87,6 +169,12 @@ const directive = (
   await readFile(new URL('turn-direction.md', root), 'utf8')
 ).trim();
 const rubric = (await readFile(new URL('rubric.md', root), 'utf8')).trim();
+const exampleCatalog = referenceExperiment
+  ? await loadPersonaReferenceCatalog(false)
+  : [];
+const exampleMarkdown = referenceExperiment
+  ? await readFile(personaExamplesUrl, 'utf8')
+  : '';
 const dev = await readFile(new URL('development.json', root), 'utf8');
 const baseCore = buildVoicePersonaCore(true, false);
 const baselineSources = [
@@ -100,6 +188,7 @@ const overlap = contamination(dataset.cases, [
   core,
   directive,
   dev,
+  exampleMarkdown,
 ]);
 if (split === 'heldout' && overlap.length)
   throw new Error(
@@ -117,12 +206,27 @@ console.log(
     samples,
     models: modelNames,
     variants,
+    turnLength,
+    presenceExamples,
     plannedTurns,
     maxUsd,
-    coreCharacters: core.length,
+    coreCharacters: referenceExperiment ? baseCore.length : core.length,
     overlap,
     noAudio: true,
     run: args.includes('--run'),
+    ...(referenceExperiment
+      ? {
+          referenceExperiment: {
+            core: 'current',
+            maxExamples: variants.map((name) => Number(name.split('-')[1])),
+            maxLore: 0,
+            characters: 6000,
+            bankEntries: exampleCatalog.filter(
+              (entry) => entry.kind === 'style',
+            ).length,
+          },
+        }
+      : {}),
   }),
 );
 if (!args.includes('--run')) process.exit(0);
@@ -132,6 +236,10 @@ await mkdir(directory, { recursive: true });
 const lockPath = new URL('quality-v2.lock', directory);
 const lock = await open(lockPath, 'wx'); // Concurrent runs must not each spend the cap.
 let database;
+let referenceDatabase;
+let referenceEmbeddings;
+let referenceReranker;
+let referenceRetrieval;
 
 try {
   const ledgerPath = new URL('quality-v2-budget.json', directory);
@@ -142,25 +250,41 @@ try {
     if (error.code !== 'ENOENT') throw error;
   }
   const prior = previous?.committedUsd ?? 0;
+  const round = previous?.round ?? 'quality-v2-first-round';
   if (
     !Number.isFinite(prior) ||
     prior < 0 ||
-    (previous && previous.round !== 'quality-v2-first-round')
+    ![
+      'quality-v2-first-round',
+      'quality-v2-llama-small-steps-round-2',
+    ].includes(round)
   )
     throw new Error('Registro de orçamento inválido.');
   if (prior >= maxUsd) throw new Error('EVALUATION_BUDGET_EXHAUSTED');
   const budget = createEvaluationBudget(maxUsd - prior);
   const reportPath = new URL(`${Date.now()}-quality-v2.json`, directory);
   const report = {
+    round,
     createdAt: new Date().toISOString(),
     personaVersion: PERSONA_VERSION,
     split,
     datasetHash: fingerprint(dataset),
     manifest,
+    ...(diagnosticManifest ? { diagnosticManifest } : {}),
     samples,
     plannedTurns,
     models: modelNames,
     variants,
+    turnLength,
+    lengthDirective,
+    lengthDirectiveHash: fingerprint(lengthDirective),
+    presenceExamples,
+    ...(presenceExamples === 'omit'
+      ? {
+          initiativeDirection: initiativeWithoutExamples,
+          initiativeDirectionHash: fingerprint(initiativeWithoutExamples),
+        }
+      : {}),
     synthetic: true,
     noAudio: true,
     limitations: [
@@ -171,6 +295,11 @@ try {
       'Limites de preço são exclusivos da avaliação; configuração de produção não é alterada.',
       'Intervalos por turno são descritivos; turnos da mesma conversa são correlacionados.',
       'Modelos usam provedores distintos do OpenRouter; comparação mede modelo e rota.',
+      ...(referenceExperiment
+        ? [
+            'Examples-0/2/4/6 mantêm o núcleo atual e variam só o teto de exemplos; lore está desativado. Quantidade efetiva depende da relevância e é registrada. Busca local entra na latência; nota humana continua pendente.',
+          ]
+        : []),
     ],
     calls: [],
     cases: [],
@@ -190,7 +319,10 @@ try {
       temp,
       JSON.stringify(
         {
-          round: 'quality-v2-first-round',
+          round,
+          ...(previous?.previousRound
+            ? { previousRound: previous.previousRound }
+            : {}),
           maxUsd,
           committedUsd: report.budget.roundCommittedUsd,
           report: reportPath.pathname,
@@ -253,6 +385,34 @@ try {
   )
     throw new Error('Diretriz administrativa sobrepõe teste reservado.');
   report.administrativeDirection = personaConfiguration;
+  if (referenceExperiment) {
+    report.referenceResources = {
+      catalog: fingerprint(await readFile(personaCatalogUrl, 'utf8')),
+      markdown: fingerprint(exampleMarkdown),
+      entries: exampleCatalog,
+      maxLore: 0,
+      characters: 6000,
+    };
+    referenceDatabase = await openDatabase('file::memory:');
+    const repository = createPersonaReferenceRepository(
+      referenceDatabase.client,
+    );
+    await repository.synchronize(exampleCatalog);
+    const cacheDirectory =
+      process.env.MEMORY_MODEL_CACHE_DIRECTORY ??
+      fileURLToPath(new URL('../data/models/', import.meta.url));
+    referenceEmbeddings = createLocalMemoryEmbeddings(cacheDirectory);
+    referenceReranker = createLocalMemoryReranker(cacheDirectory);
+    referenceRetrieval = createPersonaReferenceRetrieval(
+      repository,
+      referenceEmbeddings,
+      undefined,
+      referenceReranker,
+    );
+    await referenceRetrieval.start();
+    await referenceRetrieval.index();
+    await referenceRetrieval.warm();
+  }
   report.promptSourceHash = fingerprint([
     ...baselineSources,
     personaConfiguration.direction,
@@ -303,6 +463,15 @@ try {
         );
         const metrics = createVoiceMetrics();
         let activeTurn;
+        const recordingMetrics = {
+          ...metrics,
+          time(stage, milliseconds) {
+            metrics.time(stage, milliseconds);
+            if (activeTurn) {
+              (activeTurn.stageDurations[stage] ??= []).push(milliseconds);
+            }
+          },
+        };
         const history = {
           startSession: async () => {},
           endSession: async () => {},
@@ -337,12 +506,28 @@ try {
                 '\n' +
                 directive;
             }
+            systemPrompt += lengthDirective;
+            if (
+              presenceExamples === 'omit' &&
+              activeTurn.initiativeKind === 'initiative'
+            ) {
+              if (!systemPrompt.includes(baselineInitiative))
+                throw new Error(
+                  'Direção de iniciativa não encontrada no prompt.',
+                );
+              systemPrompt = systemPrompt.replace(
+                baselineInitiative,
+                initiativeWithoutExamples,
+              );
+            }
             const messages = [
               { role: 'system', content: systemPrompt },
               ...(input.history ?? []),
               { role: 'user', content: input.content },
             ];
             activeTurn.inputs.push({ original: input, messages, facts });
+            activeTurn.firstProviderCallStartMs ??=
+              performance.now() - activeTurn.started;
             for await (const chunk of router.stream(
               evaluationModels[cell.model],
               messages,
@@ -365,7 +550,7 @@ try {
         const processor = createTurnProcessor(
           providers,
           history,
-          metrics,
+          recordingMetrics,
           { get: async () => personaConfiguration },
           {
             retrieve: async () =>
@@ -377,6 +562,35 @@ try {
           },
           undefined,
           persistentState,
+          cell.variant.startsWith('examples-')
+            ? {
+                retrieve: async (query, signal, options) => {
+                  const started = performance.now();
+                  const selected = await referenceRetrieval.retrieve(
+                    query,
+                    signal,
+                    {
+                      ...options,
+                      maxExamples: Number(cell.variant.split('-')[1]),
+                      maxLore: 0,
+                      characters: 6000,
+                      waitMs: 30000,
+                    },
+                  );
+                  activeTurn.references = {
+                    state: selected.state,
+                    ids: selected.examples.map((entry) => entry.id),
+                    provenance: selected.examples.map((entry) => ({
+                      id: entry.id,
+                      sources: entry.provenance,
+                    })),
+                    characters: selected.characters,
+                    milliseconds: performance.now() - started,
+                  };
+                  return selected;
+                },
+              }
+            : undefined,
         );
         const conversationId = randomUUID();
         try {
@@ -393,6 +607,7 @@ try {
               history: JSON.parse(JSON.stringify(recent)),
               started: performance.now(),
               errors: [],
+              stageDurations: {},
               verdict: null,
             };
             item.turns.push(activeTurn);
@@ -563,6 +778,10 @@ try {
     }),
   );
 } finally {
+  await referenceRetrieval?.close();
+  await referenceEmbeddings?.close();
+  await referenceReranker?.close();
+  referenceDatabase?.client.close();
   database?.close();
   await lock.close();
   await unlink(lockPath);

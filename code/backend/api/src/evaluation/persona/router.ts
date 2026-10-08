@@ -49,6 +49,8 @@ export type CallRecord = {
   returnedModel?: string;
   usage?: Usage;
   firstTokenMs?: number;
+  reservationPersistMs?: number;
+  responseHeadersMs?: number;
   elapsedMs?: number;
   finishReason?: string;
   error?: string;
@@ -105,7 +107,9 @@ export function createEvaluationRouter(options: {
       status: 'pending',
     };
     options.calls.push(record);
+    const reservationStarted = performance.now();
     await options.persist(); // Durable reservation precedes every paid request.
+    record.reservationPersistMs = performance.now() - reservationStarted;
     const started = performance.now();
     let settled = false;
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
@@ -123,6 +127,8 @@ export function createEvaluationRouter(options: {
           signal,
         },
       );
+
+      record.responseHeadersMs = performance.now() - started;
 
       if (!response.ok || !response.body) {
         throw new Error(`EVALUATION_HTTP_${response.status}`);

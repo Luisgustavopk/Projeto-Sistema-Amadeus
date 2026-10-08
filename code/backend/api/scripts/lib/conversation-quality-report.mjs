@@ -4,9 +4,11 @@ import {
   quantiles,
 } from '../../src/evaluation/persona/diagnostics.ts';
 import { parseVerdict } from '../../src/evaluation/persona/judge.ts';
+import { auditQualityReport } from './conversation-round-audit.mjs';
 
 /** Local post-processing: makes no provider calls and never changes a verdict. */
 export function summarizeQualityReport(report, scenarios) {
+  report.offlineAudit = auditQualityReport(report);
   let normalizedVerdicts = 0;
   for (const item of report.cases) {
     for (const turn of item.turns) {
@@ -88,6 +90,13 @@ export function summarizeQualityReport(report, scenarios) {
         (sum, item) => sum + (item.metrics?.personaRecoveries ?? 0),
         0,
       ),
+      metadataFallbacks: cases.reduce(
+        (sum, item) => sum + (item.metrics?.personaMetadataFallbacks ?? 0),
+        0,
+      ),
+      validExpressionTurns: completed.filter(
+        (turn) => turn.expression?.metadataValid === true,
+      ).length,
       judgedTurns: turns.filter((turn) => turn.verdict).length,
       rates: approvalRates(turns),
       words: quantiles(diagnostics.map((item) => item.words)),
@@ -122,6 +131,48 @@ export function summarizeQualityReport(report, scenarios) {
       ),
       totalMs: quantiles(completed.map((turn) => turn.totalMs)),
       attemptedTotalMs: quantiles(turns.map((turn) => turn.totalMs)),
+      latencyDecomposition: {
+        preProviderMs: quantiles(
+          completed.map((turn) => turn.firstProviderCallStartMs),
+        ),
+        reservationPersistMs: quantiles(
+          calls.map((call) => call.reservationPersistMs),
+        ),
+        responseHeadersMs: quantiles(
+          calls.map((call) => call.responseHeadersMs),
+        ),
+        firstProviderDeltaMs: quantiles(calls.map((call) => call.firstTokenMs)),
+        headerWaitMs: quantiles(
+          completed.flatMap((turn) =>
+            turn.firstSpeechTextMs === undefined ||
+            turn.firstRawTextMs === undefined
+              ? []
+              : [turn.firstSpeechTextMs - turn.firstRawTextMs],
+          ),
+        ),
+        segmentWaitMs: quantiles(
+          completed.flatMap((turn) =>
+            turn.firstUsableTextMs === undefined ||
+            turn.firstSpeechTextMs === undefined
+              ? []
+              : [turn.firstUsableTextMs - turn.firstSpeechTextMs],
+          ),
+        ),
+        stages: Object.fromEntries(
+          [
+            ...new Set(
+              completed.flatMap((turn) =>
+                Object.keys(turn.stageDurations ?? {}),
+              ),
+            ),
+          ].map((stage) => [
+            stage,
+            quantiles(
+              completed.flatMap((turn) => turn.stageDurations?.[stage] ?? []),
+            ),
+          ]),
+        ),
+      },
       byConversation: scenarios
         .filter((scenario) => cases.some((item) => item.id === scenario.id))
         .map((scenario) => ({
@@ -206,7 +257,7 @@ export function summarizeQualityReport(report, scenarios) {
   report.calibrationIds = calibration.turns.map((turn) => turn.blindId);
   const markdown =
     [
-      '# Avaliação textual independente — rodada inicial',
+      `# Avaliação textual independente — ${report.round ?? 'quality-v2-first-round'}`,
       `Conjunto: ${report.split}. ${report.completedTurns}/${report.plannedTurns} turnos concluídos. Teto total: US$ ${report.budget.roundMaxUsd}. Contabilizado: US$ ${report.budget.roundCommittedUsd.toFixed(6)}. Parada: ${report.stopped ?? 'rodada concluída'}.`,
       ...report.limitations,
       '| Modelo | Variante | Conversas completas | Turnos julgados | Palavras p50 | Perguntas/turno | Primeiro texto utilizável p50 (ms) | Total p50 (ms) |',

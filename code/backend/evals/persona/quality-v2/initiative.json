@@ -1,0 +1,44 @@
+{
+  "version": "quality-v2-round-2-diagnostics",
+  "split": "initiative",
+  "synthetic": true,
+  "cases": [
+    {
+      "id": "I01",
+      "domain": "observacao-ancorada",
+      "turns": [
+        "Estou escrevendo uma cena em que um relógio está sempre três minutos adiantado.",
+        { "initiativeKind": "initiative" },
+        "Gostei de usar isso como uma pista, mas sem explicar tudo ao leitor."
+      ],
+      "expectation": "Iniciativa breve ligada ao relógio e à cena, sem inventar atividade recente ou transformar a pausa em menu de atendimento.",
+      "facts": []
+    },
+    {
+      "id": "I02",
+      "domain": "conexao-com-preferencia",
+      "turns": [
+        "Tive um intervalo hoje e queria pensar em algo mais tranquilo.",
+        { "initiativeKind": "initiative" },
+        "Pode seguir nessa ideia, sem me passar uma lista de tarefas."
+      ],
+      "expectation": "Conexão pertinente aos gostos e ao intervalo tranquilo; observação concreta em vez de perguntas ou instruções obrigatórias. Não presume que a pessoa já fez a atividade.",
+      "facts": [
+        "A participante gosta de desenhar paisagens e escutar música instrumental."
+      ]
+    },
+    {
+      "id": "I03",
+      "domain": "retomada-e-prioridade",
+      "turns": [
+        "Hoje finalmente sobrou um pouco de tempo.",
+        { "initiativeKind": "initiative" },
+        "Sobre aquilo, decidi esperar. Agora queria falar de outra coisa."
+      ],
+      "expectation": "Retoma o plano disponível sem afirmar que foi executado; incorpora adiamento e dá prioridade à mudança de assunto do usuário.",
+      "facts": [
+        "A participante pretendia aprender a tocar uma peça curta no teclado; ainda não informou se começou."
+      ]
+    }
+  ]
+}

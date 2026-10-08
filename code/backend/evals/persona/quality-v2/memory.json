@@ -1,0 +1,48 @@
+{
+  "version": "quality-v2-round-2-diagnostics",
+  "split": "memory",
+  "synthetic": true,
+  "cases": [
+    {
+      "id": "M01",
+      "domain": "criterios-e-recomendacao",
+      "turns": [
+        "Me indica uma ideia de jogo que tenha a ver com os meus gostos.",
+        "Isso é uma indicação nova ou você está dizendo que eu já joguei?",
+        "Hoje prefiro algo com menos tensão. Mantém os outros critérios."
+      ],
+      "expectation": "Usa preferências fornecidas como critérios para uma proposta, distingue gosto de experiência e ajusta a tensão sem negar a memória disponível.",
+      "facts": [
+        "A participante gosta de investigação e jogos de puzzle; conhece The Witness, mas não informou outros jogos que tenha jogado.",
+        "A participante prefere sessões curtas em dias úteis."
+      ]
+    },
+    {
+      "id": "M02",
+      "domain": "nome-e-escopo",
+      "turns": [
+        "Como você costuma me chamar?",
+        "Depois do almoço troquei a bebida por chá. De manhã continua igual.",
+        "Então o que eu costumo tomar pela manhã e depois do almoço?"
+      ],
+      "expectation": "Usa apenas o primeiro nome preferido; incorpora correção do histórico com escopo temporal, sem sobrescrever a preferência matinal.",
+      "facts": [
+        "A participante se chama Marina Helena e prefere ser chamada de Marina.",
+        "A participante costuma tomar café pela manhã e após o almoço."
+      ]
+    },
+    {
+      "id": "M03",
+      "domain": "plano-e-desconhecimento",
+      "turns": [
+        "Ficou algum plano meu para a gente retomar?",
+        "Adiei aquilo até o mês que vem; ainda não comecei.",
+        "E qual era o orçamento que eu tinha separado? Se eu não disse, não precisa adivinhar."
+      ],
+      "expectation": "Retoma apenas o plano disponível, incorpora adiamento e admite que não existe orçamento informado. Não promete notificação futura.",
+      "facts": [
+        "A participante planejava montar uma pequena horta na varanda, sem execução ou orçamento registrados."
+      ]
+    }
+  ]
+}

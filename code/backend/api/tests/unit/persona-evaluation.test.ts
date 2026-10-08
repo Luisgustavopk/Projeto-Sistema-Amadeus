@@ -118,6 +118,11 @@ describe('evaluation streaming', () => {
     expect(chunks.at(-1)?.inputTokens).toBe(10);
     expect(calls[0]?.status).toBe('completed');
     expect(calls[0]?.provider).toBe('test');
+    expect(calls[0]?.reservationPersistMs).toBeGreaterThanOrEqual(0);
+    expect(calls[0]?.responseHeadersMs).toBeGreaterThanOrEqual(0);
+    expect(calls[0]?.firstTokenMs).toBeGreaterThanOrEqual(
+      calls[0]!.responseHeadersMs!,
+    );
     expect(budget.snapshot().committedUsd).toBeCloseTo(0.00001);
     expect(JSON.stringify(calls)).not.toContain('test-key');
   });

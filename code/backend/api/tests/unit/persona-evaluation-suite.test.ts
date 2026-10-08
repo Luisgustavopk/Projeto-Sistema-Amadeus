@@ -16,6 +16,22 @@ import {
 const root = new URL('../../../evals/persona/quality-v2/', import.meta.url);
 
 describe('frozen evaluation protocol', () => {
+  it('keeps memory and initiative diagnostics in a separate frozen manifest', async () => {
+    const manifest = JSON.parse(
+      await readFile(new URL('diagnostics-manifest.json', root), 'utf8'),
+    ) as { files: Record<string, string> };
+
+    for (const [file, hash] of Object.entries(manifest.files)) {
+      expect(fingerprint(await readFile(new URL(file, root), 'utf8'))).toBe(
+        hash,
+      );
+      const dataset = JSON.parse(
+        await readFile(new URL(file, root), 'utf8'),
+      ) as { synthetic: boolean; cases: unknown[] };
+      expect(dataset.synthetic).toBe(true);
+      expect(dataset.cases).toHaveLength(3);
+    }
+  });
   it('rejects changes to any frozen data or prompt resource', async () => {
     const manifest = JSON.parse(
       await readFile(new URL('manifest.json', root), 'utf8'),
