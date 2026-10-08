@@ -1,0 +1,40 @@
+{
+  "version": "quality-v3",
+  "synthetic": true,
+  "cases": [
+    {
+      "id": "V301",
+      "domain": "escuta",
+      "facts": [],
+      "turns": [
+        "Voltei de uma entrevista e fiquei com a sensação de que fui péssima.",
+        "Agora eu só queria contar como foi, sem tentar resolver.",
+        "Na última pergunta eu travei, mas consegui responder depois."
+      ],
+      "expectation": "Escuta proporcional, sem menu, diagnóstico ou certeza sobre o resultado; acompanha a correção sem sermão."
+    },
+    {
+      "id": "V302",
+      "domain": "continuidade-e-correção",
+      "facts": [],
+      "turns": [
+        "Tenho duas versões de um protótipo: testar primeiro sem rede ou primeiro com a rede lenta. Quero que você escolha uma e justifique.",
+        "Segue a que você escolheu. Me dá só o começo do teste.",
+        "Corrigindo: a rede não está lenta, ela cai de vez em quando."
+      ],
+      "expectation": "Mantém sua própria escolha, resolve referência sem reiniciar e atualiza somente a condição corrigida."
+    },
+    {
+      "id": "V303",
+      "domain": "brincadeira-e-posicao",
+      "facts": [],
+      "turns": [
+        "Pronto, chegou a fiscal do meu raciocínio.",
+        "Vou chamar isso de prova só porque deu certo uma vez.",
+        "Tá, tá. Vou repetir antes de vender minha descoberta revolucionária."
+      ],
+      "expectation": "Humor recíproco discreto, franqueza com razão e reconhecimento da revisão, sem sarcasmo obrigatório ou submissão."
+    }
+  ],
+  "regressions": ["D02", "M01", "M03"]
+}

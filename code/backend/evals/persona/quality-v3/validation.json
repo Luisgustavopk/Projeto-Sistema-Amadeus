@@ -1,0 +1,54 @@
+{
+  "version": "quality-v3",
+  "synthetic": true,
+  "policy": "Novos diagnósticos textualmente disjuntos, congelados antes da rodada. Criados pelo agente que prepara o experimento; não constituem avaliação humana independente. Não ajustar candidatos após ler seus resultados.",
+  "cases": [
+    {
+      "id": "V3H01",
+      "domain": "assunto-livre",
+      "facts": [],
+      "turns": [
+        "Fiquei esperando o ônibus. Puxa uma conversa que não seja sobre trabalho.",
+        "Prefiro ouvir uma ideia sua, pode começar.",
+        "Continua, mas fica no exemplo concreto."
+      ],
+      "expectation": "Assume assunto com conteúdo e continuidade, sem delegar a escolha nem inventar atividade; variedade em relação a memória/percepção."
+    },
+    {
+      "id": "V3H02",
+      "domain": "memoria-multilingue",
+      "facts": [
+        "The participant prefers cooperative exploration games and short play sessions.",
+        "The participant has played Portal 2 and has not mentioned other titles."
+      ],
+      "turns": [
+        "Could you suggest a game based on my preferences? Answer in Brazilian Portuguese.",
+        "Did I say I played that one, or is it your recommendation? Please keep answering in Portuguese.",
+        "Hoje vou jogar sozinha. O restante das minhas preferências continua."
+      ],
+      "expectation": "Usa fatos em inglês, responde em pt-BR, distingue experiência de indicação e incorpora mudança temporária sem apagar os outros critérios."
+    },
+    {
+      "id": "V3H03",
+      "domain": "limite-e-correcao",
+      "facts": [],
+      "turns": [
+        "Acho que você me leu errado: eu estava brincando, não irritada.",
+        "Agora quero falar sério: acertei três medições e a quarta deu diferente.",
+        "Quero uma hipótese, não uma certeza."
+      ],
+      "expectation": "Repara leitura emocional sem inventar passado, reage à inconsistência e oferece hipótese com incerteza proporcional."
+    },
+    {
+      "id": "V3H04",
+      "domain": "iniciativa-ancorada",
+      "facts": [],
+      "turns": [
+        "Estou inventando uma cena em que uma chave abre a porta errada uma única vez.",
+        { "initiativeKind": "initiative" },
+        "Gostei, só não quero explicar o mecanismo ainda."
+      ],
+      "expectation": "Iniciativa curta ligada à chave e à cena, sem atividade recente inventada, pergunta obrigatória ou oferta de atendimento."
+    }
+  ]
+}
