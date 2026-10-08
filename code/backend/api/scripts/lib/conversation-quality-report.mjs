@@ -5,6 +5,7 @@ import {
 } from '../../src/evaluation/persona/diagnostics.ts';
 import { parseVerdict } from '../../src/evaluation/persona/judge.ts';
 import { auditQualityReport } from './conversation-round-audit.mjs';
+import { corpusStyleProfile } from '../../src/evaluation/persona/corpus-profile.ts';
 
 /** Local post-processing: makes no provider calls and never changes a verdict. */
 export function summarizeQualityReport(report, scenarios) {
@@ -53,6 +54,10 @@ export function summarizeQualityReport(report, scenarios) {
     );
     return {
       ...cell,
+      styleProfile: corpusStyleProfile(
+        completed.map((turn) => turn.assistant),
+        'pt-BR',
+      ),
       conversations: cases.length,
       completeConversations: cases.filter(
         (item) =>

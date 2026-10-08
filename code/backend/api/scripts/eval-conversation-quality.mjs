@@ -41,6 +41,12 @@ import { createPersonaReferenceRetrieval } from '../src/application/persona/refe
 import { createLocalMemoryEmbeddings } from '../src/adapters/embeddings/local.ts';
 import { createLocalMemoryReranker } from '../src/adapters/embeddings/reranker.ts';
 import { fileURLToPath } from 'node:url';
+import {
+  buildExperimentalMessages,
+  parseScenarioDataset,
+  ShotBankSchema,
+} from '../src/evaluation/persona/experimental-suite.ts';
+import { openSharedEvaluationRound } from '../src/evaluation/persona/shared-round.ts';
 
 const root = new URL('../../evals/persona/quality-v2/', import.meta.url);
 const directory = new URL('../data/refinement/', import.meta.url);
@@ -49,6 +55,9 @@ const option = (key, fallback) =>
   args.find((arg) => arg.startsWith(`--${key}=`))?.slice(key.length + 3) ??
   fallback;
 const allowed = [
+  'suite',
+  'shots',
+  'judge',
   'only',
   'models',
   'variants',
@@ -65,19 +74,52 @@ if (
   )
 )
   throw new Error('Argumento desconhecido.');
+const suite = option('suite', 'quality-v2');
+if (!['quality-v2', 'quality-v2.1'].includes(suite))
+  throw new Error('Suite desconhecida.');
+const experimental = suite === 'quality-v2.1';
+const suiteRoot = experimental
+  ? new URL('../../evals/persona/quality-v2.1/', import.meta.url)
+  : root;
+const shotLevel = option('shots', '1');
+const selectedJudge = option('judge', 'gemini');
+if (
+  !['1', '2'].includes(shotLevel) ||
+  !['gemini', 'qwen', 'kimi'].includes(selectedJudge)
+)
+  throw new Error('Exemplos ou juiz inválidos.');
+if (
+  !experimental &&
+  args.some((a) => a.startsWith('--shots=') || a.startsWith('--judge='))
+)
+  throw new Error('shots/judge pertencem à v2.1.');
 const referenceExperiment = option('variants', '').includes('examples-');
-const split = option('split', referenceExperiment ? 'development' : 'heldout');
+const split = option(
+  'split',
+  referenceExperiment || experimental ? 'development' : 'heldout',
+);
 if (
   !['development', 'heldout', 'regression', 'memory', 'initiative'].includes(
     split,
   )
 )
   throw new Error('Conjunto inválido.');
-const samples = Number(option('samples', '5'));
+const samples = Number(option('samples', experimental ? '10' : '5'));
 if (!Number.isInteger(samples) || samples < 5 || samples > 10)
   throw new Error('Use 5–10 amostras por conversa.');
+if (experimental && samples < 10)
+  throw new Error('A v2.1 exige dez amostras por conversa.');
 const modelNames = option('models', 'llama').split(',');
-const variants = option('variants', 'current,compact').split(',');
+const variants = option(
+  'variants',
+  experimental ? 'current,card' : 'current,compact',
+).split(',');
+if (
+  experimental &&
+  (modelNames.join(',') !== 'llama' ||
+    variants.some((v) => !['current', 'card', 'card-shots'].includes(v)))
+)
+  throw new Error('v2.1: autor Llama; braços current/card/card-shots.');
 const turnLength = option('turn-length', 'baseline');
 if (!['baseline', 'brief'].includes(turnLength)) {
   throw new Error('Use turn-length=baseline ou brief.');
@@ -122,21 +164,56 @@ if (
 if (
   variants.some(
     (name) =>
-      ![
-        'current',
-        'compact',
-        'examples-0',
-        'examples-2',
-        'examples-4',
-        'examples-6',
-      ].includes(name),
+      !(
+        experimental
+          ? ['current', 'card', 'card-shots']
+          : [
+              'current',
+              'compact',
+              'examples-0',
+              'examples-2',
+              'examples-4',
+              'examples-6',
+            ]
+      ).includes(name),
   ) ||
   new Set(variants).size !== variants.length
 )
   throw new Error('Variantes inválidas.');
-const maxUsd = Number(option('budget', '0.25'));
-if (!Number.isFinite(maxUsd) || maxUsd <= 0 || maxUsd > 0.25)
-  throw new Error('Esta rodada autoriza até US$ 0,25 no total.');
+const maxUsd = Number(option('budget', experimental ? undefined : '0.25'));
+if (
+  !Number.isFinite(maxUsd) ||
+  maxUsd <= 0 ||
+  maxUsd > (experimental ? 5 : 0.25)
+)
+  throw new Error(
+    experimental
+      ? 'A v2.1 exige --budget explícito (máximo US$ 5); preparar não autoriza execução paga.'
+      : 'Esta rodada autoriza até US$ 0,25 no total.',
+  );
+if (
+  experimental &&
+  (turnLength !== 'baseline' || presenceExamples !== 'baseline')
+)
+  throw new Error(
+    'Isole ficha e exemplos; controles de tamanho/presença ficam iguais na v2.1.',
+  );
+const suiteManifest = experimental
+  ? JSON.parse(await readFile(new URL('manifest.json', suiteRoot), 'utf8'))
+  : undefined;
+if (suiteManifest)
+  for (const [file, hash] of Object.entries(suiteManifest.files)) {
+    if (fingerprint(await readFile(new URL(file, suiteRoot), 'utf8')) !== hash)
+      throw new Error('Recurso v2.1 alterado após congelamento: ' + file);
+  }
+const shotBank = experimental
+  ? ShotBankSchema.parse(
+      JSON.parse(await readFile(new URL('shots.json', suiteRoot), 'utf8')),
+    )
+  : undefined;
+const card = experimental
+  ? (await readFile(new URL('core-card.md', suiteRoot), 'utf8')).trim()
+  : '';
 const manifest = JSON.parse(
   await readFile(new URL('manifest.json', root), 'utf8'),
 );
@@ -155,7 +232,7 @@ if (split === 'memory' || split === 'initiative') {
     }
   }
 }
-const dataset = JSON.parse(
+const dataset = parseScenarioDataset(
   await readFile(new URL(`${split}.json`, root), 'utf8'),
 );
 const only = option('only', '').split(',').filter(Boolean);
@@ -166,9 +243,9 @@ const scenarios = dataset.cases.filter(
 );
 const core = (await readFile(new URL('core-positive.md', root), 'utf8')).trim();
 const directive = (
-  await readFile(new URL('turn-direction.md', root), 'utf8')
+  await readFile(new URL('turn-direction.md', suiteRoot), 'utf8')
 ).trim();
-const rubric = (await readFile(new URL('rubric.md', root), 'utf8')).trim();
+const rubric = (await readFile(new URL('rubric.md', suiteRoot), 'utf8')).trim();
 const exampleCatalog = referenceExperiment
   ? await loadPersonaReferenceCatalog(false)
   : [];
@@ -189,6 +266,10 @@ const overlap = contamination(dataset.cases, [
   directive,
   dev,
   exampleMarkdown,
+  card,
+  ...(shotBank
+    ? shotBank.shots.flatMap((s) => s.messages.map((m) => m.content))
+    : []),
 ]);
 if (split === 'heldout' && overlap.length)
   throw new Error(
@@ -201,6 +282,7 @@ const plannedTurns =
   variants.length;
 console.log(
   JSON.stringify({
+    suite,
     split,
     cases: scenarios.length,
     samples,
@@ -210,7 +292,31 @@ console.log(
     presenceExamples,
     plannedTurns,
     maxUsd,
-    coreCharacters: referenceExperiment ? baseCore.length : core.length,
+    ...(experimental
+      ? {
+          judge: selectedJudge,
+          shotLevel,
+          actualDemonstrations: variants.includes('card-shots')
+            ? shotBank.levels[shotLevel].length
+            : 0,
+          sharedBudgetForAuthorAndJudges: true,
+          productionChanged: false,
+        }
+      : {}),
+    coreCharacters: experimental
+      ? undefined
+      : referenceExperiment
+        ? baseCore.length
+        : core.length,
+    ...(experimental
+      ? {
+          actingCoreCharacters: {
+            current: baseCore.length,
+            card: card.length,
+            'card-shots': card.length,
+          },
+        }
+      : {}),
     overlap,
     noAudio: true,
     run: args.includes('--run'),
@@ -234,7 +340,14 @@ if (!process.env.OPENROUTER_API_KEY)
   throw new Error('Configure OPENROUTER_API_KEY.');
 await mkdir(directory, { recursive: true });
 const lockPath = new URL('quality-v2.lock', directory);
-const lock = await open(lockPath, 'wx'); // Concurrent runs must not each spend the cap.
+const sharedRound = experimental
+  ? await openSharedEvaluationRound(
+      directory,
+      maxUsd,
+      fingerprint(suiteManifest),
+    )
+  : undefined;
+const lock = experimental ? undefined : await open(lockPath, 'wx'); // Concurrent runs must not each spend the cap.
 let database;
 let referenceDatabase;
 let referenceEmbeddings;
@@ -249,21 +362,41 @@ try {
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
   }
-  const prior = previous?.committedUsd ?? 0;
-  const round = previous?.round ?? 'quality-v2-first-round';
+  const prior =
+    sharedRound?.snapshot().priorCommittedUsd ?? previous?.committedUsd ?? 0;
+  const round = experimental
+    ? 'quality-v2.1'
+    : (previous?.round ?? 'quality-v2-first-round');
   if (
     !Number.isFinite(prior) ||
     prior < 0 ||
     ![
       'quality-v2-first-round',
       'quality-v2-llama-small-steps-round-2',
+      'quality-v2.1',
     ].includes(round)
   )
     throw new Error('Registro de orçamento inválido.');
   if (prior >= maxUsd) throw new Error('EVALUATION_BUDGET_EXHAUSTED');
-  const budget = createEvaluationBudget(maxUsd - prior);
-  const reportPath = new URL(`${Date.now()}-quality-v2.json`, directory);
+  const budget = sharedRound?.budget ?? createEvaluationBudget(maxUsd - prior);
+  const reportPath = new URL(`${Date.now()}-${suite}.json`, directory);
   const report = {
+    suite,
+    ...(experimental
+      ? {
+          suiteManifest,
+          shotLevel,
+          selectedJudge,
+          demonstrations: shotBank,
+          corpusReferenceProfile: JSON.parse(
+            await readFile(
+              new URL('corpus-reference-profile.json', suiteRoot),
+              'utf8',
+            ),
+          ),
+          cardHash: fingerprint(card),
+        }
+      : {}),
     round,
     createdAt: new Date().toISOString(),
     personaVersion: PERSONA_VERSION,
@@ -307,6 +440,10 @@ try {
     stopped: null,
   };
   const persist = async () => {
+    if (sharedRound) {
+      await sharedRound.persist(reportPath, report);
+      return;
+    }
     report.budget = {
       ...budget.snapshot(),
       roundMaxUsd: maxUsd,
@@ -342,7 +479,7 @@ try {
   const catalog = (await catalogResponse.json()).data;
   const usedModels = new Set([
     ...modelNames,
-    'gemini',
+    experimental ? selectedJudge : 'gemini',
     ...(modelNames.includes('gemini') ? ['qwen'] : []),
   ]);
   report.catalog = [];
@@ -359,7 +496,11 @@ try {
     for (const parameter of [
       'temperature',
       'max_tokens',
-      ...(name === 'gemini' || name === 'qwen' ? ['response_format'] : []),
+      ...(name === 'gemini' ||
+      name === 'qwen' ||
+      (experimental && name === selectedJudge)
+        ? ['response_format']
+        : []),
     ]) {
       if (!item.supported_parameters.includes(parameter))
         throw new Error(`Parâmetro indisponível: ${name}/${parameter}`);
@@ -525,6 +666,22 @@ try {
               ...(input.history ?? []),
               { role: 'user', content: input.content },
             ];
+            if (experimental)
+              messages.splice(
+                0,
+                messages.length,
+                ...buildExperimentalMessages({
+                  variant: cell.variant,
+                  originalCore: baseCore,
+                  card,
+                  direction: directive,
+                  system: systemPrompt,
+                  history: input.history ?? [],
+                  content: input.content,
+                  bank: shotBank,
+                  level: shotLevel,
+                }),
+              );
             activeTurn.inputs.push({ original: input, messages, facts });
             activeTurn.firstProviderCallStartMs ??=
               performance.now() - activeTurn.started;
@@ -678,7 +835,11 @@ try {
               recent.map((entry) => entry.sentText),
             );
             if (activeTurn.assistant && !activeTurn.errors.length) {
-              const judgeName = cell.model === 'gemini' ? 'qwen' : 'gemini';
+              const judgeName = experimental
+                ? selectedJudge
+                : cell.model === 'gemini'
+                  ? 'qwen'
+                  : 'gemini';
               activeTurn.judgeModel = evaluationModels[judgeName].id;
               let verdictText = '';
               try {
@@ -783,6 +944,9 @@ try {
   await referenceReranker?.close();
   referenceDatabase?.client.close();
   database?.close();
-  await lock.close();
-  await unlink(lockPath);
+  if (sharedRound) await sharedRound.close();
+  else {
+    await lock.close();
+    await unlink(lockPath);
+  }
 }

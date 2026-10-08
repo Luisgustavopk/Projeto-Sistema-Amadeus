@@ -4,16 +4,17 @@ import {
   renderCalibration,
 } from './lib/conversation-quality-report.mjs';
 import { fingerprint } from '../src/evaluation/persona/diagnostics.ts';
+import { parseScenarioDataset } from '../src/evaluation/persona/experimental-suite.ts';
 
 const filename = process.argv[2];
 if (
-  !/^[0-9]+-quality-v2\.json$/u.test(filename ?? '') ||
+  !/^[0-9]+-quality-v2(?:\.1)?\.json$/u.test(filename ?? '') ||
   process.argv.length !== 3
 )
   throw new Error('Informe somente o nome do relatório local quality-v2.');
 const reportPath = new URL(`../data/refinement/${filename}`, import.meta.url);
 const report = JSON.parse(await readFile(reportPath, 'utf8'));
-const scenarios = JSON.parse(
+const scenarios = parseScenarioDataset(
   await readFile(
     new URL(
       `../../evals/persona/quality-v2/${report.split}.json`,

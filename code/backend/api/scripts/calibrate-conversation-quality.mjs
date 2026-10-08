@@ -5,10 +5,11 @@ import {
 } from '../src/evaluation/persona/judge.ts';
 import { summarizeQualityReport } from './lib/conversation-quality-report.mjs';
 import { fingerprint } from '../src/evaluation/persona/diagnostics.ts';
+import { parseScenarioDataset } from '../src/evaluation/persona/experimental-suite.ts';
 
 const filename = process.argv[2];
 if (
-  !/^[0-9]+-quality-v2\.json$/u.test(filename ?? '') ||
+  !/^[0-9]+-quality-v2(?:\.1)?\.json$/u.test(filename ?? '') ||
   process.argv.length !== 3
 )
   throw new Error('Informe o nome do relatório local quality-v2.');
@@ -16,7 +17,7 @@ const path = new URL(`../data/refinement/${filename}`, import.meta.url);
 const report = JSON.parse(await readFile(path, 'utf8'));
 if (report.calls.some((call) => call.status === 'pending'))
   throw new Error('Rodada em andamento.');
-const scenarios = JSON.parse(
+const scenarios = parseScenarioDataset(
   await readFile(
     new URL(
       `../../evals/persona/quality-v2/${report.split}.json`,
@@ -73,11 +74,32 @@ for (const label of labels.turns) {
   });
 }
 const reviewed = pairs.filter((pair) => pair.human).length;
+const agreement = calibrationAgreement(pairs);
 const result = {
   reviewed,
   total: expected.turns.length,
   calibrationComplete: reviewed === 30,
-  agreement: calibrationAgreement(pairs),
+  agreement,
+  judgeEligibility: {
+    criteria: Object.fromEntries(
+      Object.entries(agreement).map(([key, value]) => [
+        key,
+        {
+          agreementAtLeast80:
+            value.agreement === null ? null : value.agreement >= 0.8,
+          falseApprovalAtMost10:
+            value.falseApprovalRate === null
+              ? null
+              : value.falseApprovalRate <= 0.1,
+          compared: value.compared,
+          humanFailures: value.humanFailures,
+        },
+      ]),
+    ),
+    approved: false,
+    limitation:
+      'Sem reprovações humanas, a taxa de falsas aprovações é desconhecida. Trinta fichas não garantem cobertura de todos os critérios; aprovação exige revisão da cobertura e não é automática.',
+  },
 };
 await writeFile(
   new URL(path.href.replace('.json', '-agreement.json')),

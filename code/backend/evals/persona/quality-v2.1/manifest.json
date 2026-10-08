@@ -1,0 +1,28 @@
+{
+  "version": "quality-v2.1",
+  "files": {
+    "core-card.md": "a87db82f990200d9fcd08d97f0f87ce8e7178d4067dbd516b985dae142fa3b3a",
+    "turn-direction.md": "7186575ac2d948881f2f40e72e7842c0bb7c66d9a27baf3e20732d1987418065",
+    "rubric.md": "cb716d438ea6948989ec41e2a96eccf16f163f366978a6aa2a259f4eb242b54f",
+    "pairwise-rubric.md": "84c17fe36dfa3e4e8bd8d2ccc8a605ff001c218acfe347d2f358f0c5111731d7",
+    "shots.json": "71d9354289ff0fb24282224c5c6e372b4a61507451be40e643acc49130004299",
+    "curation-audit.json": "e156a0a3438bc3ed163c0b6706e2a7ef1a82a98743f4e242daef4dba73edb252",
+    "corpus-reference-profile.json": "0a5f2801a7638190d0a5241f0643be56c3a5fe8f5f2244fb403b737a5e29a82a",
+    "patch-candidates.json": "d3eb32f9efb6cb157044576ff96a8de5acc6becd3463342b3346260bbf46a1ad",
+    "../../../api/scripts/calibrate-persona-v2-1.mjs": "57cf44f2380f3ae5d3bd2f4e1d96d699d1d8faf3ebca9fb58b876b2c433e0570",
+    "../../../api/scripts/eval-conversation-quality.mjs": "1c008e10a5f874e0a5c52b3bc4ef2fa2bb8433c794ad21d0cf0a28e85bf9262a",
+    "../../../api/scripts/judge-pairwise.mjs": "d565f8bb6db0ad0610c9d4a9619516028f8e563570f71993f418b1cf01d08c87",
+    "../../../api/scripts/prepare-persona-v2-1.mjs": "7d943770fdf15b336c7054c7dbaac4159765c7e8b79d0ff9fbeeedf67cd90f4b",
+    "../../../api/scripts/profile-persona-corpus.mjs": "d7c2ded742e6c3389a78f37a6dfec87b9015173326aaaa02d100f685b08fa662",
+    "../../../api/scripts/lib/conversation-quality-report.mjs": "2291d5e57bc13f59e889b9713f4f793376610833fcf58a5b308127f6a103f0a9",
+    "../../../api/src/evaluation/persona/experimental-suite.ts": "ba50cd9e7063ed8027dc2690c62c84196debc8033e97fac8a52929e0da26dc31",
+    "../../../api/src/evaluation/persona/pairwise.ts": "24b3be2b4b4f4f6fb6ab03fa15ac48836ad3a9772b74818594c7f6dcf811931c",
+    "../../../api/src/evaluation/persona/shared-round.ts": "4022543d73a1cef178e290c3fd2fb1116cc6f9d1c356dee5be20ae1ab8c85bee",
+    "../../../api/src/evaluation/persona/judge.ts": "c682db0514bfb5e48af01145fbb959906b894123b6b79eb46b0151e6c6780195",
+    "../../../api/src/evaluation/persona/router.ts": "47128387aec7f69f959f015b7cc0bc72a48d2c275f6cead9eb1739e1fac7f035",
+    "../../../api/src/evaluation/persona/corpus-profile.ts": "f09e80f4a8054b71c1e00ca87fc3183bc7f101e5263d3a10c9f31008cb775703"
+  },
+  "datasetManifest": "../quality-v2/manifest.json",
+  "diagnosticsManifest": "../quality-v2/diagnostics-manifest.json",
+  "humanAccepted": false
+}

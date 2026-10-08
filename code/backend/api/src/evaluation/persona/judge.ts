@@ -77,7 +77,8 @@ export function calibrationAgreement(
         disagreements = 0,
         unavailable = 0,
         falseApproval = 0,
-        falseRejection = 0;
+        falseRejection = 0,
+        humanFailures = 0;
 
       for (const pair of pairs) {
         const human = pair.human?.checks[criterion];
@@ -92,6 +93,10 @@ export function calibrationAgreement(
         ) {
           unavailable++;
           continue;
+        }
+
+        if (human.pass === false) {
+          humanFailures++;
         }
 
         if (human.pass === automatic.pass) {
@@ -117,6 +122,10 @@ export function calibrationAgreement(
           unavailable,
           falseApproval,
           falseRejection,
+          humanFailures,
+          falseApprovalRate: humanFailures
+            ? falseApproval / humanFailures
+            : null,
           compared,
           agreement: compared ? agreements / compared : null,
         },
