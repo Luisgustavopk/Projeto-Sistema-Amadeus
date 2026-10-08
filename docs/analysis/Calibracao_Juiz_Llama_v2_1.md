@@ -1,10 +1,12 @@
-# Calibração humana e rodada Llama v2.1
+# Calibração com rótulos recebidos e rodada Llama v2.1
 
-Em 08/10/2026, o proprietário avaliou as 30 fichas cegas da segunda rodada, sem receber a identidade do autor, variante ou nota automática. A autorização vigente para a nova rodada é **US$ 0,25 no total**, incluindo rejulgamento, geração pelo Llama e comparação em pares. O registro v2 anterior permanece preservado.
+**Ressalva de proveniência (08/10/2026):** os rótulos abaixo foram recebidos pela conversa e registrados com `origin: user-chat-2026-10-08`. Isso não comprova autoria humana nem revisão pessoal independente. A afirmação original de que o proprietário avaliou pessoalmente foi categórica demais. Os números permanecem como concordância com os rótulos recebidos, sem certificar calibração humana. A nova avaliação A/B/C enviada posteriormente declara expressamente autoria de outro modelo e será registrada separadamente, sem converter suas notas em referência humana.
 
-## Referência humana
+Em 08/10/2026, foram recebidas notas para as 30 fichas da segunda rodada, originalmente apresentadas sem identidade do autor, variante ou nota automática. A autoria humana e a revisão pessoal dessas notas não estão confirmadas. A autorização daquela rodada foi **US$ 0,25 no total**, incluindo rejulgamento, geração pelo Llama e comparação em pares. O registro v2 anterior permanece preservado.
 
-As notas foram registradas no arquivo local `1791418467896-quality-v2-calibration.json`; a importação conserva os identificadores, contexto e respostas originais. O arquivo local `1791418467896-human-review.json` conserva os motivos fornecidos pelo proprietário. Esses arquivos ficam em `data/refinement`, fora do versionamento.
+## Referência recebida — autoria humana não confirmada
+
+As notas foram registradas no arquivo local `1791418467896-quality-v2-calibration.json`; a importação conserva os identificadores, contexto e respostas originais. O arquivo local `1791418467896-human-review.json` conserva os motivos recebidos na conversa; seu nome histórico não comprova autoria humana. Esses arquivos ficam em `data/refinement`, fora do versionamento.
 
 | Critério            | Aprova | Reprova | Incerto | Não aplicável |
 | ------------------- | -----: | ------: | ------: | ------------: |
@@ -17,11 +19,11 @@ As notas foram registradas no arquivo local `1791418467896-quality-v2-calibratio
 | Recomendações       |      0 |       0 |       0 |            30 |
 | Cânone              |      0 |       0 |       0 |            30 |
 
-Os quatro casos incertos de persona e dois de sustentação factual não viraram aprovações nem reprovações. A amostra cobre dois cenários de desenvolvimento; não valida todos os critérios nem generalização para conversas reservadas. Em especial, não há reprovação humana factual para estimar falsas aprovações nesse critério, e há apenas uma reprovação de continuidade.
+Os quatro casos incertos de persona e dois de sustentação factual não viraram aprovações nem reprovações. A amostra cobre dois cenários de desenvolvimento; não valida todos os critérios nem generalização para conversas reservadas. Em especial, não há reprovação factual nos rótulos recebidos para estimar falsas aprovações nesse critério, e há apenas uma reprovação de continuidade.
 
 ## Juiz anterior
 
-Comparar com os vereditos originais não exige novas chamadas. O juiz anterior concordou em 14/30 casos de interlocução, 19/30 de proporcionalidade, 2/26 de persona e 7/22 comparações disponíveis de perguntas. Aprovou todos os casos reprovados pelo proprietário nesses critérios. Portanto, suas taxas elevadas de aprovação não servem como evidência de naturalidade ou fidelidade.
+Comparar com os vereditos originais não exige novas chamadas. O juiz anterior concordou em 14/30 casos de interlocução, 19/30 de proporcionalidade, 2/26 de persona e 7/22 comparações disponíveis de perguntas. Aprovou todos os casos reprovados nos rótulos recebidos nesses critérios. Portanto, suas taxas elevadas de aprovação não servem como evidência de naturalidade ou fidelidade.
 
 ## Rejulgamento controlado
 
@@ -50,9 +52,9 @@ Foram executados 30 rejulgamentos com Qwen e outros 30 com Kimi, consumindo **US
 | Persona           |          2/26 |                     11/22 |                     11/17 |
 | Perguntas         |          7/22 |                      4/23 |                     16/23 |
 
-Os denominadores são comparações com decisão humana e automática definida; não representam cobertura igual. No Kimi, a falsa aprovação foi 5/16 em interlocução, 10/11 em proporcionalidade, 6/15 em persona e 2/15 em perguntas. A abstinência ou não aplicabilidade do juiz não conta como acerto. **Nenhum juiz atende aos portões de calibração.**
+Os denominadores são comparações com rótulo recebido e decisão automática definida; não representam cobertura igual nem uma referência humana confirmada. No Kimi, a aprovação contrária ao rótulo recebido foi 5/16 em interlocução, 10/11 em proporcionalidade, 6/15 em persona e 2/15 em perguntas. A abstinência ou não aplicabilidade do juiz não conta como acerto. **Nenhum juiz atende aos portões de calibração.**
 
-Uma divergência recorrente é o juiz considerar agradecimentos genéricos como evidência de persona, enquanto o proprietário exige atuação distinguível. Também há justificativas que avaliam a resposta anterior ou a falta de histórico em vez do alvo atual. Antes de uma avaliação confirmatória, a rubrica precisa explicitar o alvo e os limites entre adequação educada e fidelidade, com exemplos de calibração e validação em fichas distintas. Escolher Kimi nesta rodada é uma escolha diagnóstica, não aprovação do juiz.
+Uma divergência recorrente é o juiz considerar agradecimentos genéricos como evidência de persona, enquanto os rótulos recebidos exigem atuação distinguível. Também há justificativas que avaliam a resposta anterior ou a falta de histórico em vez do alvo atual. Antes de uma avaliação confirmatória, a rubrica precisa explicitar o alvo e os limites entre adequação educada e fidelidade, com exemplos de calibração e validação em fichas distintas. Escolher Kimi nesta rodada é uma escolha diagnóstica, não aprovação do juiz.
 
 ## Ensaio exploratório do autor
 
@@ -75,7 +77,7 @@ A ficha sozinha não melhorou a concisão nessa situação. Acrescentar exemplos
 
 O tempo do cabeçalho, quando presente, foi relevante: p50 de aproximadamente 1,24 s no braço com exemplos entre primeiro conteúdo bruto e primeira fala após `</expression>`. Esse subconjunto tem cobertura diferente dos braços com metadados inválidos. O agrupamento também acrescentou espera. Isso sustenta medir separadamente um futuro braço de fala sem cabeçalho, não instalar essa mudança agora nem prometer uma latência final.
 
-Concisão não certifica atuação. Por exemplo, o braço com exemplos gerou “Obrigada. É gentileza sua.” e “Obrigada. Fico feliz que tenha feito sentido para você.”, ainda próximas das fórmulas que a referência humana reprovou. Na discordância também apareceram falas brandas pedindo implicitamente a razão, em vez de uma posição marcante. O relatório conserva os exemplos completos para revisão cega.
+Concisão não certifica atuação. Por exemplo, o braço com exemplos gerou “Obrigada. É gentileza sua.” e “Obrigada. Fico feliz que tenha feito sentido para você.”, ainda próximas das fórmulas que a referência recebida reprovou. Na discordância também apareceram falas brandas pedindo implicitamente a razão, em vez de uma posição marcante. O relatório conserva os exemplos completos para revisão cega.
 
 Uma auditoria offline contra os exemplos realmente inseridos encontrou zero respostas integralmente iguais e zero cópias de trechos com oito palavras nos três braços. Isso não exclui imitação de ritmo, fórmulas curtas nem convergência semântica. Os exemplos e o núcleo experimental permanecem fora da produção.
 
@@ -87,7 +89,7 @@ Uma limitação adicional do comparador é conservar os vereditos válidos e err
 
 ## Encerramento e próximos passos
 
-O gasto agregado foi **US$ 0,2300526025 de US$ 0,25**, com **US$ 0,0199473975 restantes**, nenhum custo sem informação e nenhuma reserva pendente. Não houve aumento nem reinício do teto entre calibração, autor e comparação em pares. As 30 fichas humanas anteriores continuam registradas, e o ensaio novo gerou outras 30 fichas cegas ainda sem avaliação humana.
+O gasto agregado foi **US$ 0,2300526025 de US$ 0,25**, com **US$ 0,0199473975 restantes**, nenhum custo sem informação e nenhuma reserva pendente. Não houve aumento nem reinício do teto entre calibração, autor e comparação em pares. As 30 fichas anteriores com rótulos recebidos continuam registradas, e o ensaio novo gerou outras 30 fichas cegas ainda sem avaliação humana.
 
 O ganho demonstrado nesta situação é concisão e conformidade do formato com exemplos. A ficha sozinha não demonstrou benefício, o juiz não está calibrado, a fidelidade não está aprovada e a latência não atingiu a meta. Os candidatos do patch ficam disponíveis para revisão, sem misturar suas direções com o tratamento testado. Produção, memória pessoal e voz permanecem preservadas.
 
