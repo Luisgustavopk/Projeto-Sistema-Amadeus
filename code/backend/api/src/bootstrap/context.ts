@@ -33,6 +33,9 @@ import { createLocalMemoryEmbeddings } from '../adapters/embeddings/local.ts';
 import { createLocalMemoryReranker } from '../adapters/embeddings/reranker.ts';
 import { createPersonaAnalysis } from '../application/persona/analysis.ts';
 import { createJevClient } from '../adapters/providers/jev.ts';
+import { createPersonaReferenceRepository } from '../adapters/database/persona-reference-repository.ts';
+import { loadPersonaReferenceCatalog } from '../application/persona/reference-catalog.ts';
+import { createPersonaReferenceRetrieval } from '../application/persona/reference-retrieval.ts';
 
 export async function createContext(
   options: AppOptions,
@@ -126,18 +129,40 @@ export async function createContext(
       beginExecution: () => activity.beginExecution(),
     },
   });
+  const embeddings = config.MEMORY_SEMANTIC_ENABLED
+    ? (options.memoryEmbeddings ??
+      createLocalMemoryEmbeddings(config.MEMORY_MODEL_CACHE_DIRECTORY))
+    : undefined;
+  const referenceRepository = createPersonaReferenceRepository(database.client);
+  const reranker =
+    config.MEMORY_SEMANTIC_ENABLED && config.MEMORY_RERANK_ENABLED
+      ? (options.memoryReranker ??
+        createLocalMemoryReranker(config.MEMORY_MODEL_CACHE_DIRECTORY))
+      : undefined;
+  const personaReferences = createPersonaReferenceRetrieval(
+    referenceRepository,
+    config.PERSONA_REFERENCES_ENABLED ? embeddings : undefined,
+    {
+      maxExamples: config.PERSONA_REFERENCE_MAX_EXAMPLES,
+      maxLore: config.PERSONA_REFERENCE_MAX_LORE,
+      characters: config.PERSONA_REFERENCE_CHARACTERS,
+      waitMs: config.PERSONA_REFERENCE_TIMEOUT_MS,
+    },
+    reranker,
+  );
+
+  if (config.PERSONA_REFERENCES_ENABLED) {
+    await referenceRepository.synchronize(await loadPersonaReferenceCatalog());
+  }
+
+  await personaReferences.start();
+  await personaReferences.warm();
   const memory = createMemoryService(
     createMemoryRepository(database.client, config.OWNER_ID),
     memoryProvider,
     () => activity.activeExecutions > 0,
-    config.MEMORY_SEMANTIC_ENABLED
-      ? (options.memoryEmbeddings ??
-          createLocalMemoryEmbeddings(config.MEMORY_MODEL_CACHE_DIRECTORY))
-      : undefined,
-    config.MEMORY_SEMANTIC_ENABLED && config.MEMORY_RERANK_ENABLED
-      ? (options.memoryReranker ??
-          createLocalMemoryReranker(config.MEMORY_MODEL_CACHE_DIRECTORY))
-      : undefined,
+    embeddings,
+    reranker,
     personaAnalysis,
   );
   await memory.start();
@@ -152,6 +177,7 @@ export async function createContext(
     memory,
     analysis: personaAnalysis,
     persistentState,
+    references: personaReferences,
   });
 
   return {
@@ -162,6 +188,7 @@ export async function createContext(
       persona,
       persistentState,
       personaAnalysis,
+      personaReferences,
       memory,
       memoryProvider,
       voiceVersions,

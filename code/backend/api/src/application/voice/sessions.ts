@@ -25,6 +25,7 @@ export function createVoiceSessions(dependencies: {
   metrics: VoiceMetrics;
   ownerId: string;
   persistentState?: import('../persona/persistent-state.ts').PersistentPersonaState;
+  references?: import('../../ports/persona-references.ts').PersonaReferenceRetriever;
   analysis?: Pick<import('../persona/analysis.ts').PersonaAnalysis, 'analyze'>;
   memory?: Pick<
     import('../memory/service.ts').MemoryService,
@@ -125,6 +126,7 @@ export function createVoiceSessions(dependencies: {
             dependencies.memory,
             dependencies.analysis,
             dependencies.persistentState,
+            dependencies.references,
           ),
           gate: dependencies.gate,
           metrics: dependencies.metrics,

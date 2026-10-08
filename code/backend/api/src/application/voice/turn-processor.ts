@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { buildPresenceDirection } from '../persona/presence-direction.ts';
 import { PERSONA_PRESENCE_REFERENCE } from '../persona/presence-reference.ts';
+import type { PersonaReferenceRetriever } from '../../ports/persona-references.ts';
+import { buildPersonaReferenceContext } from '../persona/corpus-context.ts';
 import type { PersistentPersonaState } from '../persona/persistent-state.ts';
 import type { ProviderServices } from '../providers/index.ts';
 import type { CallHistoryRepository } from '../../ports/call-history-repository.ts';
@@ -76,6 +78,7 @@ export function createTurnProcessor(
     >,
   analysis?: Pick<import('../persona/analysis.ts').PersonaAnalysis, 'analyze'>,
   persistentState?: Pick<PersistentPersonaState, 'snapshot' | 'observe'>,
+  references?: PersonaReferenceRetriever,
 ) {
   const expressionState = createExpressionState();
 
@@ -302,6 +305,53 @@ export function createTurnProcessor(
         metrics.time('memoryRetrieve', performance.now() - analysisStarted);
         signal.throwIfAborted();
 
+        // Personal memory has priority on the shared CPU models. Reference
+        // lookup follows it with a bounded wait instead of blocking its queue.
+        const referenceStarted = performance.now();
+        const referenceQuery = turn.initiativeKind
+          ? `[${turn.initiativeKind}] ${recent.filter((item) => item.userText.trim()).at(-1)?.userText ?? ''}`
+          : `Pessoa agora: ${text.slice(0, 1200)}\nContexto anterior: ${recent
+              .slice(-1)
+              .map(
+                (item) => `Pessoa: ${item.userText}\nAmadeus: ${item.sentText}`,
+              )
+              .join('\n')
+              .slice(0, 500)}`;
+        const selectedReferences = await references
+          ?.retrieve(referenceQuery, signal, {
+            focus: turn.initiativeKind
+              ? (recent.filter((item) => item.userText.trim()).at(-1)
+                  ?.userText ?? referenceQuery)
+              : text,
+          })
+          .catch(() => undefined);
+        signal.throwIfAborted();
+        const referenceContext = buildPersonaReferenceContext(
+          selectedReferences ?? { examples: [], lore: [] },
+        );
+
+        if (references) {
+          metrics.time(
+            'personaReferences',
+            performance.now() - referenceStarted,
+          );
+
+          if (
+            selectedReferences?.state === 'timeout' ||
+            selectedReferences?.state === 'degraded' ||
+            selectedReferences?.state === 'unindexed'
+          ) {
+            metrics.failure(
+              'PERSONA_REFERENCES_' + selectedReferences.state.toUpperCase(),
+            );
+          }
+        }
+
+        context.history = [
+          ...referenceContext.history,
+          ...(context.history ?? []),
+        ];
+
         const conversationContent = context.content;
         const memoryDirection = memory
           ? describeMemory(memories ?? '', false, true)
@@ -349,6 +399,7 @@ export function createTurnProcessor(
             buildVoicePersonaCore(true, false),
             personaConfiguration,
           ) +
+          referenceContext.system +
           memoryDirection +
           contextualDirection +
           context.conversationDirection +
@@ -732,6 +783,7 @@ export function createTurnProcessor(
                         buildVoicePersonaCore(true, false),
                         personaConfiguration,
                       ) +
+                      referenceContext.system +
                       direction +
                       contextualDirection +
                       context.conversationDirection +

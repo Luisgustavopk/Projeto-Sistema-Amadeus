@@ -87,6 +87,8 @@ if (process.exitCode === 0) {
     'reaction-catalog-v0.2.md',
     'reaction-repertoire-v0.2.md',
     'canon-conversation-v1.md',
+    'corpus-examples-v1.md',
+    'corpus-examples-v1.json',
   ]) {
     await copyFile(
       new URL('../../assets/persona/' + file, import.meta.url),
