@@ -27,6 +27,15 @@ if (result.error) {
 process.exitCode = result.status ?? 1;
 
 if (process.exitCode === 0) {
+  for (const file of [
+    'conversation-presence-v2.md',
+    'expressive-direction-v1.md',
+  ]) {
+    await copyFile(
+      new URL('../src/application/persona/' + file, import.meta.url),
+      resolve(output, 'application/persona', file),
+    );
+  }
   await copyFile(
     new URL('../src/application/persona/presence-turn-v1.md', import.meta.url),
     resolve(output, 'application/persona/presence-turn-v1.md'),

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 
 const document = readFileSync(
-  new URL('./conversation-presence-v1.md', import.meta.url),
+  new URL('./conversation-presence-v2.md', import.meta.url),
   'utf8',
 ).trim();
 

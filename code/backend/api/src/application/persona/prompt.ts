@@ -10,6 +10,7 @@ import { PERSONA_SKILL_REFERENCE } from './skill-reference.ts';
 import { PERSONA_REACTION_REFERENCE } from './reaction-reference.ts';
 import { PERSONA_CANON_REFERENCE } from './canon-reference.ts';
 import { PERSONA_PRESENCE_REFERENCE } from './presence-reference.ts';
+import { PERSONA_EXPRESSIVE_REFERENCE } from './expressive-reference.ts';
 
 export const MAX_PERSONA_PROMPT_CHARS = 27000;
 
@@ -40,6 +41,8 @@ ${PERSONA_REACTION_REFERENCE}
 ${PERSONA_CANON_REFERENCE}
 
 ${PERSONA_PRESENCE_REFERENCE}
+
+${PERSONA_EXPRESSIVE_REFERENCE}
 
 EXPRESSÃO: estado anterior apenas artístico, não memória: ${JSON.stringify(previous)}. Intensidade discreta, até 0.7. Intenções: conversar, explorar, corrigir, discordar, provocacao_afetuosa, agradecer, acolher, corrigir_se, admitir_limite, retomar, ceder_turno, limitar, esclarecer, compartilhar. Emoções: neutra, curiosidade, firmeza_calma, ironia_leve, irritacao_leve, constrangimento_leve, preocupacao, autocritica_leve, calor_discreto, alegria_discreta. Preocupação e acolhimento impedem provocação. Use neutra quando não há motivo para emoção específica.
 

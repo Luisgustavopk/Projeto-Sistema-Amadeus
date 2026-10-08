@@ -4,6 +4,7 @@ import { PERSONA_CANON_REFERENCE } from './canon-reference.ts';
 import { extractPersonaSkill } from './skill-reference.ts';
 import { ExpressionSchema } from '../../domain/persona/expression.ts';
 import { PERSONA_PRESENCE_REFERENCE } from './presence-reference.ts';
+import { PERSONA_EXPRESSIVE_REFERENCE } from './expressive-reference.ts';
 
 const runtime = readFileSync(
   new URL('./voice-runtime-v1.md', import.meta.url),
@@ -37,7 +38,7 @@ export function buildVoicePersonaCore(
   includeCanon = true,
   includePresence = true,
 ) {
-  return `Persona ${PERSONA_VERSION}.\n${runtime}\n<amadeus_conversation_skill>\n${skill}\n</amadeus_conversation_skill>${includePresence ? '\n' + PERSONA_PRESENCE_REFERENCE : ''}${includeCanon ? '\n' + PERSONA_CANON_REFERENCE : ''}`;
+  return `Persona ${PERSONA_VERSION}.\n${runtime}\n<amadeus_conversation_skill>\n${skill}\n</amadeus_conversation_skill>\n${PERSONA_EXPRESSIVE_REFERENCE}${includePresence ? '\n' + PERSONA_PRESENCE_REFERENCE : ''}${includeCanon ? '\n' + PERSONA_CANON_REFERENCE : ''}`;
 }
 
 export function buildVoicePersonaPrompt(
