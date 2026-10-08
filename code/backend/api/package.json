@@ -16,6 +16,7 @@
     "eval:persona-v3": "node --env-file-if-exists=.env scripts/eval-persona-v3.mjs",
     "prepare:persona-emotions": "node scripts/prepare-emotional-suite.mjs",
     "eval:persona-emotions": "node --env-file-if-exists=.env scripts/eval-emotional-suite.mjs",
+    "eval:llama-emotions": "node --env-file-if-exists=.env scripts/eval-llama-emotional-v4.mjs",
     "profile:persona-corpus": "node scripts/profile-persona-corpus.mjs",
     "prepare:persona-v2-1": "node scripts/prepare-persona-v2-1.mjs",
     "freeze:persona-v2-1": "node scripts/freeze-quality-v2-1.mjs",
