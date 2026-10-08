@@ -1,6 +1,8 @@
 # Avaliação textual v3
 
-Roteiro adicional em pt-BR: [personalidade e transições emocionais](personality-pt-BR.md), com 12 conversas de quatro turnos. Está preparado, ainda sem respostas dos modelos ou execução paga. Ele complementa a revisão de memória; não altera os prompts ou o conjunto já executado.
+Roteiro histórico em pt-BR: [personalidade e transições emocionais](personality-pt-BR.md), com 12 conversas de quatro turnos. Foi executado em 08/10/2026; a [análise da rodada](../../../../../docs/analysis/Resultados_Rodada_Emocional_025.md) registra respostas, limites e custo. Os arquivos do roteiro preservam a versão usada na execução.
+
+A próxima preparação usa o [roteiro emocional ampliado v4](../quality-v4/emotional-pt-BR.md), com 24 conversas e 96 turnos por modelo. `npm run prepare:persona-emotions` prepara a v4 sem inferência; acrescente `-- --suite=historical` para preparar a v3. O executor pago anterior permanece associado à rodada concluída, sem renovar orçamento.
 
 Preparação revisada: `npm run prepare:persona-emotions`, na API, valida o roteiro e grava um plano local com hashes. Esse comando não aceita `--run` nem renova orçamento. Os [ajustes anteriores à inferência](../../../../../docs/analysis/Preparacao_Rodada_Emocional.md) corrigem histórico de estilo, veto lexical, contrato factual e rastreamento das chamadas. Código atualizado exige outro manifesto de execução; preservar os hashes da rodada antiga.
 
