@@ -50,9 +50,10 @@ describe('evaluation dry run before any remote access', () => {
     );
     expect(JSON.parse(output)).toMatchObject({
       prepared: true,
-      cases: 12,
-      turnsPerModel: 48,
-      plannedTurnsThreeModels: 144,
+      suiteVersion: 'quality-v4-emotional-pt-BR-draft-1',
+      cases: 24,
+      turnsPerModel: 96,
+      plannedTurnsThreeModels: 288,
       inferenceCalls: 0,
     });
     expect(() =>

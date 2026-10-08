@@ -102,6 +102,28 @@ describe('persona refinement v3 factors', () => {
     expect(messages.at(-2)).toEqual(history[0]);
     expect(JSON.stringify(bank)).toBe(original);
   });
+  it('retains the expressive direction after a card replacement only when explicitly selected', () => {
+    const expressiveDirection = 'An explicit emotional acting factor.';
+    const base = buildRefinementMessages({ ...input, variant: 'acting' });
+    const changed = buildRefinementMessages({
+      ...input,
+      variant: 'acting',
+      expressiveDirection,
+    });
+    expect(base[0]?.content).not.toContain(expressiveDirection);
+    expect(changed[0]?.content).toContain(expressiveDirection);
+    expect(changed.slice(1)).toEqual(base.slice(1));
+    expect(changed[0]?.content).toContain(voiceOutputFormat(0));
+    const alreadyPresent = buildRefinementMessages({
+      ...input,
+      variant: 'acting',
+      card: input.card + expressiveDirection,
+      expressiveDirection,
+    });
+    expect(alreadyPresent[0]?.content.split(expressiveDirection)).toHaveLength(
+      2,
+    );
+  });
   it.each([
     'A person prefers astronomy.',
     'La personne préfère la randonnée.',

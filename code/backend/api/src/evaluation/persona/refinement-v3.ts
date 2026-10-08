@@ -29,6 +29,7 @@ export function buildRefinementMessages(input: {
   memoryBlock: string;
   plain?: boolean;
   canonicalMemory?: boolean;
+  expressiveDirection?: string;
 }) {
   let bank = input.bank;
 
@@ -101,6 +102,18 @@ export function buildRefinementMessages(input: {
     variant: 'card-shots',
     level: '1',
   });
+
+  // Explicit factor: the short card replaces the production core and would
+  // otherwise drop its expressive supplement. Historical arms stay unchanged.
+  if (
+    input.expressiveDirection &&
+    !messages[0]!.content.includes(input.expressiveDirection)
+  ) {
+    messages[0]!.content +=
+      '\n<persona_expressive_direction>\n' +
+      input.expressiveDirection +
+      '\n</persona_expressive_direction>';
+  }
 
   // Opt-in factor for new rounds. Preserve the original bank and historical arms.
   if (input.canonicalMemory && !input.plain) {

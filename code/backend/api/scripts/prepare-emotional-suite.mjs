@@ -3,11 +3,17 @@ import { prepareEmotionalSuite } from '../src/evaluation/persona/emotional-suite
 import { fingerprint } from '../src/evaluation/persona/diagnostics.ts';
 
 // Deliberately preparation-only: no env file, API key, inference or budget reset.
-if (process.argv.length > 2)
+const args = process.argv.slice(2);
+if (
+  args.length > 1 ||
+  args.some((arg) => !['--suite=expanded', '--suite=historical'].includes(arg))
+)
   throw new Error('Este comando apenas prepara; não aceita --run.');
+const expanded = !args.includes('--suite=historical');
 const repository = new URL('../../../../', import.meta.url);
-const suitePath =
-  'code/backend/evals/persona/quality-v3/personality-pt-BR.json';
+const suitePath = expanded
+  ? 'code/backend/evals/persona/quality-v4/emotional-pt-BR.json'
+  : 'code/backend/evals/persona/quality-v3/personality-pt-BR.json';
 const resources = {};
 async function resource(path) {
   const text = await readFile(new URL(path, repository), 'utf8');
@@ -24,6 +30,9 @@ const documents = await Promise.all(
     'code/backend/evals/persona/quality-v2.1/core-card.md',
     'code/backend/evals/persona/quality-v2.1/turn-direction.md',
     'code/backend/evals/persona/quality-v3/presence-positive.md',
+    ...(expanded
+      ? ['code/backend/api/src/application/persona/expressive-direction-v1.md']
+      : []),
   ].map(resource),
 );
 documents.push(
@@ -33,12 +42,19 @@ documents.push(
 );
 for (const path of [
   'code/backend/api/scripts/prepare-emotional-suite.mjs',
+  'code/backend/api/scripts/build.mjs',
   'code/backend/api/scripts/lib/three-model-v3-report.mjs',
   'code/backend/api/src/evaluation/persona/emotional-suite.ts',
   'code/backend/api/src/evaluation/persona/refinement-v3.ts',
   'code/backend/api/src/evaluation/persona/router.ts',
   'code/backend/api/src/application/persona/conversation-style.ts',
   'code/backend/api/src/application/persona/voice-prompt.ts',
+  'code/backend/api/src/application/persona/presence-reference.ts',
+  'code/backend/api/src/application/persona/conversation-presence-v2.md',
+  'code/backend/api/src/application/persona/expressive-reference.ts',
+  'code/backend/api/src/application/persona/expressive-direction-v1.md',
+  'code/backend/api/src/application/persona/presence-turn-v1.md',
+  'code/backend/api/src/application/persona/presence-direction.ts',
   'code/backend/api/src/application/persona/corpus-context.ts',
   'code/backend/api/src/application/memory/memory-use-v1.md',
   'code/backend/api/src/application/voice/context.ts',
@@ -46,12 +62,23 @@ for (const path of [
 ])
   await resource(path);
 const prepared = prepareEmotionalSuite(suite, documents);
+const order = suite.executionGroups.flatMap((group) => group.cases);
+if (
+  order.length !== prepared.authorCases.length ||
+  new Set(order).size !== order.length ||
+  order.some(
+    (id) => !prepared.authorCases.some((scenario) => scenario.id === id),
+  )
+)
+  throw new Error('Grupos de execução inválidos.');
 let previousBudgetRemainingUsd = null;
 try {
   const ledger = JSON.parse(
     await readFile(
       new URL(
-        '../data/refinement/quality-v3-025/quality-v2-1-budget.json',
+        expanded
+          ? '../data/refinement/emotional-025-2026-10-08/quality-v2-1-budget.json'
+          : '../data/refinement/quality-v3-025/quality-v2-1-budget.json',
         import.meta.url,
       ),
       'utf8',
@@ -70,7 +97,8 @@ try {
   // A fresh checkout has no private ledger; absence is not a new authorization.
 }
 const frozen = {
-  version: 'emotional-preparation-1',
+  version: 'emotional-preparation-2',
+  suiteVersion: suite.version,
   resources,
   prepared,
   factors: {
@@ -79,6 +107,16 @@ const frozen = {
     headlessMemory: false,
     realSemanticJudge: false,
     fixedExamples: true,
+    expressiveDirection: expanded,
+  },
+  actingResources: {
+    card: 'code/backend/evals/persona/quality-v2.1/core-card.md',
+    ...(expanded
+      ? {
+          expressiveDirection:
+            'code/backend/api/src/application/persona/expressive-direction-v1.md',
+        }
+      : {}),
   },
   executionAuthorized: false,
   nextStep:
@@ -92,7 +130,7 @@ const plan = {
   inferenceCalls: 0,
 };
 const directory = new URL(
-  '../data/refinement/emotional-preparation/',
+  `../data/refinement/emotional-preparation/${suite.version}/`,
   import.meta.url,
 );
 await mkdir(directory, { recursive: true });
@@ -100,6 +138,7 @@ await writeFile(new URL('plan.json', directory), JSON.stringify(plan, null, 2));
 console.log(
   JSON.stringify({
     prepared: true,
+    suiteVersion: suite.version,
     cases: prepared.authorCases.length,
     turnsPerModel: prepared.plannedTurnsPerModel,
     plannedTurnsThreeModels: plan.plannedTurnsThreeModels,

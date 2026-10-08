@@ -42,6 +42,7 @@ const caseSchema = z
     evaluation: z.object({
       references: z.array(z.string()).min(1),
       focus: z.string().min(1),
+      emotionTargets: z.array(z.string().min(1)).min(1).optional(),
       turnChecks: z.array(z.string().min(1)).length(4),
     }),
   })
