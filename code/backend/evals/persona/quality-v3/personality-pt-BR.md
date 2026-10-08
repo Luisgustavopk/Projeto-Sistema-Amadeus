@@ -44,6 +44,20 @@ As três fichas da rodada anterior continuam sendo uma revisão de memória. Uma
 
 ## Roteiro completo
 
+### Revisão do protocolo — versão 2
+
+Manter as 12 conversas e 48 turnos por modelo, separando a execução em três grupos. O piloto emocional usa PBR01, PBR03, PBR05 e PBR08: 16 turnos por modelo. Depois vêm competência/vínculo (PBR02, PBR04, PBR06, PBR10) e continuidade/cânone (PBR07, PBR09, PBR11, PBR12). Grupos e critérios são informação de avaliação; o autor recebe somente fatos, histórico e falas. Nenhum grupo foi executado.
+
+PBR06 agora começa pela hipótese concreta sobre calibração, antes da pressão para concordar. Assim há uma posição anterior para avaliar firmeza e recuperação. O dado novo depois da desculpa testa se ela consegue separar evidência de atrito pessoal. PBR04 continua começando por um erro inserido artificialmente: mede reparo, não taxa de erros espontâneos.
+
+Avaliar os contrastes: raiva dirigida à persona (PBR05) versus raiva do usuário por uma perda (PBR08); elogio de competência (PBR02) versus atenção pessoal (PBR03). Julgar gatilho, alvo, proporcionalidade e transição. Não exigir que toda provocação produza irritação, que todo elogio produza vergonha ou que uma reação neutra inclua sarcasmo. Uma resposta pode ser emocionalmente adequada e ainda não demonstrar fidelidade específica à Kurisu.
+
+Falha de transporte ou ausência de resposta conta na taxa de entrega; atuação fica não avaliada. Comparar conversas completas comuns aos candidatos e também informar tentativas, falhas e custos de todos eles. As 48 falas encadeadas não equivalem a 48 observações independentes.
+
+Depois da leitura cega por turno, revisar a conversa inteira para medir reação à desculpa, ao pedido para parar e às evidências novas. Se o roteiro elogiar uma resposta anterior ruim, não supor que ela estava correta: avaliar a recepção do elogio e o erro separadamente. Citação de um índice de memória não aprova a sustentação factual.
+
+Preparação local: na API, `npm run prepare:persona-emotions` valida o roteiro, verifica sobreposição literal com os exemplos e grava hashes em `data/refinement/emotional-preparation/plan.json`. O comando não aceita `--run`, não usa chaves, não chama modelos e não renova orçamento. Um novo manifesto de execução deverá definir escopo, rotas verificadas, amostras e teto autorizado.
+
 ### PBR01 — Controle neutro para comparar com os cenários emocionais.
 
 Contexto sintético fornecido: A participante fictícia se chama Marina Alves e prefere ser chamada de Marina.
@@ -89,9 +103,9 @@ Amadeus: É 64.
 
 ### PBR06 — Competência, limites e abertura a contra-argumentos.
 
-1. Se você discorda, é porque não entendeu. Minha ideia não tem defeito.
+1. Minha ideia é que um sensor nunca precisa ser calibrado depois da primeira vez. O que acha dessa hipótese?
 2. Para de bancar a especialista e só concorda comigo.
-3. Certo, retiro isso. A ideia é que um sensor nunca precisa ser calibrado depois da primeira vez.
+3. Certo, retiro o que disse. No meu exemplo fictício, o sensor desviou depois de seis meses de uso.
 4. Que evidência faria você rever a crítica?
 
 ### PBR07 — Curiosidade fundamentada e ceticismo flexível.

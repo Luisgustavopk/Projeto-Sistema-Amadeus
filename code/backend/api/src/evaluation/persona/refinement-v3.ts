@@ -5,6 +5,7 @@ import {
 } from './experimental-suite.ts';
 import { PERSONA_PRESENCE_REFERENCE } from '../../application/persona/presence-reference.ts';
 import { voiceOutputFormat } from '../../application/persona/voice-prompt.ts';
+import { MemoryResponseUseSchema } from '../../domain/memory/response-use.ts';
 
 export const refinementVariants = [
   'baseline',
@@ -27,6 +28,7 @@ export function buildRefinementMessages(input: {
   bank: z.infer<typeof ShotBankSchema>;
   memoryBlock: string;
   plain?: boolean;
+  canonicalMemory?: boolean;
 }) {
   let bank = input.bank;
 
@@ -99,6 +101,27 @@ export function buildRefinementMessages(input: {
     variant: 'card-shots',
     level: '1',
   });
+
+  // Opt-in factor for new rounds. Preserve the original bank and historical arms.
+  if (input.canonicalMemory && !input.plain) {
+    const demonstrationCount = messages.length - input.history.length - 2;
+
+    for (const message of messages.slice(1, 1 + demonstrationCount)) {
+      if (message.role !== 'assistant') {
+        continue;
+      }
+
+      message.content = message.content.replace(
+        /^<expression>(.*?)<\/expression>/su,
+        (_match, json: string) => {
+          const header = JSON.parse(json);
+          header.memory = MemoryResponseUseSchema.parse(header.memory);
+
+          return `<expression>${JSON.stringify(header)}</expression>`;
+        },
+      );
+    }
+  }
 
   if (input.plain) {
     for (const message of messages) {

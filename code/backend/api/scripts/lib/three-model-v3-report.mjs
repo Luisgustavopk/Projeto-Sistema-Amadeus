@@ -5,7 +5,6 @@ import {
 } from '../../src/evaluation/persona/diagnostics.ts';
 
 const good = (turn) => Boolean(turn.assistant && !turn.errors.length);
-const complete = (item) => item.turns.length === 3 && item.turns.every(good);
 function metrics(turns) {
   return {
     turns: turns.length,
@@ -31,6 +30,14 @@ export async function summarizeThreeModelV3(path, report) {
   if (report.calls.some((call) => call.status === 'pending'))
     throw new Error('Rodada em andamento.');
   const names = report.plan.frozen.models.map((model) => model.name);
+  const expectedTurns = new Map(
+    report.plan.frozen.jobs.map((job) => [
+      job.scenario.id,
+      job.scenario.turns.length,
+    ]),
+  );
+  const complete = (item) =>
+    item.turns.length === expectedTurns.get(item.id) && item.turns.every(good);
   const ids = [
     ...new Set(report.plan.frozen.jobs.map((job) => job.scenario.id)),
   ];
@@ -133,6 +140,8 @@ export async function summarizeThreeModelV3(path, report) {
     '',
     'Critérios: interlocução, proporcionalidade, sustentação factual, continuidade, persona, perguntas, recomendações e cânone. Marque aprova/reprova/incerto/não aplicável e o motivo.',
     '',
+    'No roteiro emocional, avalie também adequação ao gatilho e ao alvo, intensidade proporcional e transição após reparo. Julgue a fala antes de consultar metadados; neutralidade pode ser adequada sem comprovar fidelidade.',
+    '',
   ];
   const mappings = [];
   let count = 0;
@@ -140,7 +149,7 @@ export async function summarizeThreeModelV3(path, report) {
     const items = names.map((model) =>
       report.cases.find((item) => item.id === id && item.model === model),
     );
-    for (let index = 0; index < 3; index++) {
+    for (let index = 0; index < expectedTurns.get(id); index++) {
       count++;
       const sorted = [...items].sort((a, b) =>
         fingerprint([

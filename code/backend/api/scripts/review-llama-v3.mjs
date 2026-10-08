@@ -3,24 +3,29 @@ import { pathToFileURL } from 'node:url';
 import { fingerprint } from '../src/evaluation/persona/diagnostics.ts';
 
 const path = process.argv[2];
-if (!path || !path.endsWith('-quality-v3.json'))
-  throw new Error('Informe o relatório quality-v3.json concluído.');
+if (!path || !path.endsWith('.json'))
+  throw new Error('Informe o relatório textual concluído.');
 const url = pathToFileURL(path);
 const report = JSON.parse(await readFile(url, 'utf8'));
 if (!report.completedAt || report.calls.some((c) => c.status === 'pending'))
   throw new Error('Aguarde a conclusão da rodada.');
+const jobs = report.plan?.frozen?.jobs;
+if (!Array.isArray(jobs)) throw new Error('Relatório sem cenários planejados.');
+const expectedTurns = new Map(
+  jobs.map((job) => [job.scenario.id, job.scenario.turns.length]),
+);
 const candidates = report.cases.filter(
   (c) =>
     c.model === 'llama' &&
     c.phase !== 'latency' &&
-    c.turns.length === 3 &&
+    c.turns.length === expectedTurns.get(c.id) &&
     c.turns.every((t) => t.assistant && !t.errors.length),
 );
 const scenarioIds = [...new Set(candidates.map((c) => c.id))].sort();
 const items = [];
 const privateKeys = [];
 for (const scenario of scenarioIds) {
-  for (let index = 0; index < 3; index++) {
+  for (let index = 0; index < expectedTurns.get(scenario); index++) {
     const options = candidates
       .filter((c) => c.id === scenario)
       .toSorted((a, b) =>
@@ -47,7 +52,11 @@ for (const scenario of scenarioIds) {
     });
     items.push({
       id,
-      expectation: chosen.expectation,
+      expectation:
+        chosen.expectation ??
+        report.plan.frozen.prepared?.evaluationOnly.find(
+          (entry) => entry.id === scenario,
+        )?.expectation,
       user: turn.user,
       initiativeKind: turn.initiativeKind,
       history: turn.history,
@@ -81,7 +90,7 @@ await writeFile(
 );
 await writeFile(
   new URL(prefix + '.md'),
-  '# Revisão pessoal do Llama — variantes ocultas\n\nTodas as respostas são do Llama. Ajuste, amostra e notas automáticas estão ocultos. Avalie somente a resposta atual, usando histórico e fatos como contexto. Use aprova/reprova/incerto/não aplicável e um motivo para interlocução, proporcionalidade, sustentação factual, continuidade, persona, perguntas, recomendações e cânone. Educação ou concisão não bastam para aprovar persona. Estas fichas ainda não têm notas humanas; avaliações de outra IA devem manter essa origem. Não abra o mapa privado antes de revisar.\n\n' +
+  '# Revisão pessoal do Llama — variantes ocultas\n\nTodas as respostas são do Llama. Ajuste, amostra e notas automáticas estão ocultos. Avalie somente a resposta atual, usando histórico e fatos como contexto. Use aprova/reprova/incerto/não aplicável e um motivo para interlocução, proporcionalidade, sustentação factual, continuidade, persona, perguntas, recomendações e cânone. No roteiro emocional, julgue também gatilho/alvo, intensidade proporcional e transição após reparo. Avalie a fala antes de consultar metadados. Educação ou concisão não bastam para aprovar persona. Estas fichas ainda não têm notas humanas; avaliações de outra IA devem manter essa origem. Não abra o mapa privado antes de revisar.\n\n' +
     items
       .map(
         (t, index) =>

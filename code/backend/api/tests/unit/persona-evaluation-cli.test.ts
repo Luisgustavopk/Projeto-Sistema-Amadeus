@@ -18,32 +18,81 @@ const run = (args: string[]) =>
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 describe('evaluation dry run before any remote access', () => {
-  it('requires an explicit budget and plans both acting arms without network', () => {
+  it('requires an explicit budget and refuses historical execution with changed code before network', () => {
     expect(() => run(['--suite=quality-v2.1'])).toThrow();
-    const plan = JSON.parse(
-      run([
-        '--suite=quality-v2.1',
-        '--budget=0.25',
-        '--only=D01,D02',
-        '--variants=card,card-shots',
-        '--shots=2',
-      ]),
+    const options = [
+      '--suite=quality-v2.1',
+      '--budget=0.25',
+      '--only=D01,D02',
+      '--variants=card,card-shots',
+      '--shots=2',
+    ];
+    expect(() => run(options)).toThrow(
+      'Recurso v2.1 alterado após congelamento: ../../../api/src/evaluation/persona/router.ts',
     );
-    expect(plan).toMatchObject({
-      plannedTurns: 120,
-      samples: 10,
-      actualDemonstrations: 19,
-      run: false,
-      productionChanged: false,
-      models: ['llama'],
+    expect(() => run([...options, '--run'])).toThrow(
+      'Recurso v2.1 alterado após congelamento: ../../../api/src/evaluation/persona/router.ts',
+    );
+  }, 30000);
+  it('prepares the emotional round without remote access, keys or renewed budget', () => {
+    const emotionalScript = fileURLToPath(
+      new URL('../../scripts/prepare-emotional-suite.mjs', import.meta.url),
+    );
+    const output = execFileSync(
+      process.execPath,
+      ['--import', denyNetwork, emotionalScript],
+      {
+        encoding: 'utf8',
+        timeout: 20000,
+        env: { ...process.env, OPENROUTER_API_KEY: '' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+    expect(JSON.parse(output)).toMatchObject({
+      prepared: true,
+      cases: 12,
+      turnsPerModel: 48,
+      plannedTurnsThreeModels: 144,
+      inferenceCalls: 0,
     });
-    expect(plan.actingCoreCharacters.card).toBeLessThan(
-      plan.actingCoreCharacters.current,
-    );
+    expect(() =>
+      execFileSync(process.execPath, [emotionalScript, '--run'], {
+        stdio: 'pipe',
+      }),
+    ).toThrow('não aceita --run');
   });
   it('plans legacy BOM/envelope regression without mutating the frozen dataset', () => {
     const plan = JSON.parse(run(['--split=regression', '--variants=current']));
     expect(plan.cases).toBe(18);
     expect(plan.run).toBe(false);
   });
+  it('requires the new emotional budget and prepares 144 turns before any network access', () => {
+    const emotionalScript = fileURLToPath(
+      new URL('../../scripts/eval-emotional-suite.mjs', import.meta.url),
+    );
+    const invoke = (args: string[]) =>
+      execFileSync(
+        process.execPath,
+        ['--import', denyNetwork, emotionalScript, ...args],
+        {
+          encoding: 'utf8',
+          timeout: 20000,
+          env: { ...process.env, OPENROUTER_API_KEY: '' },
+          stdio: ['ignore', 'pipe', 'pipe'],
+        },
+      );
+    expect(() => invoke([])).toThrow('teto explícito');
+    expect(() => invoke(['--budget=0.5'])).toThrow('teto explícito');
+    const plan = JSON.parse(invoke(['--budget=0.25']));
+    expect(plan).toMatchObject({
+      prepared: true,
+      run: false,
+      maxUsd: 0.25,
+      plannedTurns: 144,
+    });
+    expect(plan.estimateUsdNoCache).toBeLessThan(0.25);
+    expect(() => invoke(['--budget=0.25', '--run'])).toThrow(
+      'OPENROUTER_API_KEY ausente',
+    );
+  }, 30000);
 });

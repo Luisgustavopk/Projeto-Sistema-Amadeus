@@ -76,6 +76,32 @@ describe('persona refinement v3 factors', () => {
     expect(acting[0]?.content).toContain(input.presence);
     expect(acting[0]?.content).toContain(voiceOutputFormat(0));
   });
+  it('normalizes demonstration headers only as an explicit new-round factor', () => {
+    const original = JSON.stringify(bank);
+    const history = [
+      {
+        role: 'assistant',
+        content: '<expression>{"memory":[]}</expression>Old reply.',
+      },
+    ];
+    const messages = buildRefinementMessages({
+      ...input,
+      history,
+      variant: 'acting',
+      canonicalMemory: true,
+    });
+    const demos = messages
+      .slice(1, -2)
+      .filter((message) => message.role === 'assistant');
+    expect(demos.length).toBeGreaterThan(0);
+
+    for (const demo of demos) {
+      expect(demo.content).toContain('"memory":{"use":"none","facts":[]}');
+    }
+
+    expect(messages.at(-2)).toEqual(history[0]);
+    expect(JSON.stringify(bank)).toBe(original);
+  });
   it.each([
     'A person prefers astronomy.',
     'La personne préfère la randonnée.',

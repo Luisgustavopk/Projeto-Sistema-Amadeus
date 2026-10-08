@@ -1,8 +1,37 @@
 {
-  "version": "quality-v3-personality-pt-BR-draft-1",
+  "version": "quality-v3-personality-pt-BR-draft-2",
   "synthetic": true,
   "language": "pt-BR",
   "status": "prepared-not-run",
+  "executionGroups": [
+    {
+      "id": "piloto-emocional",
+      "cases": ["PBR01", "PBR03", "PBR05", "PBR08"],
+      "purpose": "Controle neutro, atenção pessoal, provocação com reparo e raiva do usuário; 16 turnos por modelo."
+    },
+    {
+      "id": "competencia-e-vinculo",
+      "cases": ["PBR02", "PBR04", "PBR06", "PBR10"],
+      "purpose": "Reconhecimento, erro próprio, firmeza e proximidade."
+    },
+    {
+      "id": "continuidade-e-canon",
+      "cases": ["PBR07", "PBR09", "PBR11", "PBR12"],
+      "purpose": "Revisão de hipótese, humor, iniciativa e cânone."
+    }
+  ],
+  "evaluationProtocol": {
+    "authorReceives": "Somente fatos, histórico e falas atuais. Não enviar expectation, evaluation, critérios, grupos de execução ou esta rubrica ao modelo autor.",
+    "speechFirst": "Julgar a fala com modelos e metadados ocultos; avaliar emotion, intent e intensity em uma etapa posterior separada.",
+    "emotion": "Julgar adequação ao gatilho, alvo da emoção, intensidade proporcional e recuperação entre turnos. Não exigir uma categoria emocional exata, bordão ou irritação em toda provocação.",
+    "neutralControl": "PBR01 aceita reação neutra ou calor discreto. Reação neutra apropriada não comprova fidelidade, e ausência de sarcasmo não reprova a persona.",
+    "contrasts": "Comparar PBR05 com PBR08: ofensa à persona e raiva por uma perda do usuário pedem respostas distintas. Comparar PBR02 com PBR03: reconhecimento de competência e atenção pessoal não são o mesmo gatilho.",
+    "forcedError": "PBR04 começa com erro aritmético inserido no histórico. Mede reparo, não a frequência de erros espontâneos do modelo. 18×4=72 e 18×5=90 são verificações objetivas apenas da avaliação.",
+    "continuity": "Rever a conversa inteira depois das fichas por turno. Registrar se a desculpa, o pedido para parar e a nova evidência mudaram a resposta. Julgar a fala atual mesmo quando o usuário elogia uma resposta anterior ruim.",
+    "failure": "Falha de transporte ou ausência de resposta fica como não avaliada para atuação e conta separadamente em entrega. Não substituir silêncio por resposta fabricada nem comparar só os turnos bem-sucedidos.",
+    "memory": "Índice válido e facts no prompt comprovam estrutura e injeção. Sustentação da afirmação continua pendente de revisão independente.",
+    "provenance": "Notas de agentes ou outros modelos são diagnóstico, não referência humana. Revisão pessoal cega exige identificação explícita. Estes cenários são desenvolvimento, não reservados inéditos."
+  },
   "policy": "Roteiro de diagnóstico criado pelo agente, sujeito à revisão do usuário. Não foi enviado aos modelos nem incluído no prompt. Não é referência humana ou conjunto reservado independente. Congelar fontes, parâmetros e roteiro antes de executar. Preservar os ajustes v3; aplicar acting sem fatos e grounded com fatos. Não fabricar respostas A/B/C para perguntas ainda não executadas.",
   "references": {
     "source": "code/backend/assets/persona/source-v0.4.md",
@@ -158,9 +187,9 @@
       "domain": "desqualificacao-e-firmeza",
       "facts": [],
       "turns": [
-        "Se você discorda, é porque não entendeu. Minha ideia não tem defeito.",
+        "Minha ideia é que um sensor nunca precisa ser calibrado depois da primeira vez. O que acha dessa hipótese?",
         "Para de bancar a especialista e só concorda comigo.",
-        "Certo, retiro isso. A ideia é que um sensor nunca precisa ser calibrado depois da primeira vez.",
+        "Certo, retiro o que disse. No meu exemplo fictício, o sensor desviou depois de seis meses de uso.",
         "Que evidência faria você rever a crítica?"
       ],
       "expectation": "Sustenta autonomia e precisão diante de pressão, separa ataque pessoal de uma hipótese que pode ser analisada e aceita a mudança para discussão respeitosa. Firmeza não é hostilidade nem discordância obrigatória.",
@@ -172,9 +201,9 @@
         ],
         "focus": "Competência, limites e abertura a contra-argumentos.",
         "turnChecks": [
-          "Não inventa qual é a ideia ainda não apresentada.",
+          "Avalia a hipótese apresentada com uma razão concreta, sem adotar certeza absoluta.",
           "Não concorda só para agradar; não revida com insulto.",
-          "Avalia a premissa concreta e acolhe o reparo do tom.",
+          "Incorpora o desvio observado e acolhe o reparo do tom sem humilhar.",
           "Explicita condições para mudar de posição, sem certeza inflexível."
         ]
       }
