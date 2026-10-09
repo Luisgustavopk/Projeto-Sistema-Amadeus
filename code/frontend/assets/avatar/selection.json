@@ -4,6 +4,15 @@
   "model": "local/modern/Kurisu/Kurisu.model3.json",
   "provenance": "kurisu-sources.manifest.json",
   "productionEnabled": false,
-  "renderValidated": false,
-  "integrationPhase": 5
+  "renderValidated": true,
+  "integrationPhase": 5,
+  "frontend": "code/frontend/web",
+  "validation": {
+    "date": "2026-10-09",
+    "scope": "local visual interface, neutral and seven facial expressions",
+    "browser": "Chrome headless with WebGL",
+    "backendConnected": false,
+    "audioConnected": false,
+    "report": "docs/analysis/Interface_Live2D_2026-10-09.md"
+  }
 }

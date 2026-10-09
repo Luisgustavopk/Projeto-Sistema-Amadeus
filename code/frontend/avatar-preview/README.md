@@ -26,6 +26,6 @@ Os pacotes e runtimes estão preservados em `../assets/avatar/local/`, ignorado 
 
 ## Estado de validação
 
-Sintaxe e entrega HTTP foram verificadas. A inspeção visual automatizada foi interrompida porque a ferramenta de controle do navegador não conseguiu identificar a URL atual com segurança. Renderização, efeitos das expressões e movimentos ainda precisam de aceite visual; o manifesto mantém `renderValidated: false`.
+Sintaxe e entrega HTTP deste comparador foram verificadas. A inspeção dos dois candidatos neste comparador ficou pendente. Em 09/10/2026, o modelo novo foi renderizado e conferido na [interface web](../web/README.md), incluindo sete reações faciais e retorno à neutra; a validação posterior consta em [selection.json](../assets/avatar/selection.json). O manifesto de aquisição preserva o estado inicial da inspeção. O modelo antigo e todo o catálogo de movimentos continuam sem validação visual completa.
 
 Este renderer é uma prévia independente. A integração dos eventos de expressão e do áudio real da conversa pertence à fase 5.
