@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { PERSONA_VERSION } from '../../domain/persona/expression.ts';
 import { PERSONA_CANON_REFERENCE } from './canon-reference.ts';
 import { extractPersonaSkill } from './skill-reference.ts';
-import { ExpressionSchema } from '../../domain/persona/expression.ts';
+import { describeExpressionContract } from '../../domain/persona/expression.ts';
 import { PERSONA_PRESENCE_REFERENCE } from './presence-reference.ts';
 import { PERSONA_EXPRESSIVE_REFERENCE } from './expressive-reference.ts';
 
@@ -10,6 +10,7 @@ const runtime = readFileSync(
   new URL('./voice-runtime-v1.md', import.meta.url),
   'utf8',
 ).trim();
+export const MAX_VOICE_PERSONA_PROMPT_CHARS = 14000;
 const skill = extractPersonaSkill(
   readFileSync(new URL('./skill-amadeus-kurisu.md', import.meta.url), 'utf8'),
 );
@@ -25,7 +26,7 @@ export function voiceOutputFormat(factCount = 0, repair = false) {
     : 'ZERO fatos persistentes selecionados: memory:{"use":"none","facts":[]}; não há índice 0. Uma lembrança ausente agora não implica que o aplicativo não tenha memória.';
   const expression = repair
     ? 'Não acrescente outros metadados; esta é uma reparação única de formato.'
-    : `Inclua intent, emotion e intensity no cabeçalho. Intent: ${ExpressionSchema.shape.intent.options.join(', ')}. Emotion: ${ExpressionSchema.shape.emotion.options.join(', ')}. Intensidade até 0.7; sem rodapé.`;
+    : `Inclua intent, emotion e intensity no cabeçalho. ${describeExpressionContract()} Sem rodapé.`;
 
   const header = repair
     ? '{"memory":{"use":"none","facts":[]}}'
@@ -52,8 +53,8 @@ export function buildVoicePersonaPrompt(
     : voiceOutputFormat(factCount);
   const prompt = base + format;
 
-  if (prompt.length > 12500) {
-    throw new Error('Prompt vocal excede 12500 caracteres.');
+  if (prompt.length > MAX_VOICE_PERSONA_PROMPT_CHARS) {
+    throw new Error('Prompt vocal excede 14000 caracteres.');
   }
 
   return prompt;

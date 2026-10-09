@@ -3,6 +3,7 @@ import type { RevisionRepository } from '../../ports/revision-repository.ts';
 import type { DataClass } from '../../domain/providers/model.ts';
 import {
   ExpressionSchema,
+  EMOTION_PRESENTATIONS,
   type Expression,
 } from '../../domain/persona/expression.ts';
 import { ProviderBusyError } from '../../domain/errors/providers.ts';
@@ -22,18 +23,6 @@ export type PersonaState = z.infer<typeof PersonaStateSchema>;
 const round = (value: number) => Math.round(value * 1000) / 1000;
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
-const targets: Record<Expression['emotion'], [number, number, number]> = {
-  neutra: [0, 0, 0],
-  curiosidade: [0.15, 0.35, 0.15],
-  firmeza_calma: [0, 0.1, 0.35],
-  ironia_leve: [0.1, 0.2, 0.2],
-  irritacao_leve: [-0.25, 0.25, 0.2],
-  constrangimento_leve: [-0.1, 0.2, -0.15],
-  preocupacao: [-0.2, 0.15, -0.1],
-  autocritica_leve: [-0.1, 0, -0.1],
-  calor_discreto: [0.25, 0, 0.1],
-  alegria_discreta: [0.3, 0.2, 0.1],
-};
 
 // Artistic controls, not emotions/diagnoses about the person. No model call.
 export function createPersistentPersonaState(
@@ -132,7 +121,7 @@ export function createPersistentPersonaState(
           return state;
         }
 
-        const target = targets[parsed.emotion];
+        const target = EMOTION_PRESENTATIONS[parsed.emotion].pad;
         const weight = Math.min(0.25, parsed.intensity * 0.35);
         const move = (current: number, desired: number) =>
           round(

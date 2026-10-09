@@ -650,10 +650,10 @@ it.each([16000, 24000] as const)(
     expect(directions.length).toBeGreaterThan(0);
     expect(directions[0]).toMatchObject({
       emotion: 'curiosidade',
-      intensity: 0.35,
+      intensity: 0.4,
       metadataValid: true,
       deliveryApplied: false,
-      personaVersion: 'kurisu-amadeus-0.4.22',
+      personaVersion: 'kurisu-amadeus-0.4.23',
     });
     expect(f.requests.filter((request) => request.role === 'llm')).toHaveLength(
       1,
@@ -712,7 +712,7 @@ it('aplica uma edição de persona no próximo turno da mesma conexão', async (
   expect(after).toContain('FORMATO OBRIGAT');
 });
 
-it('reconectar reinicia a expressão mesmo quando a chamada anterior já acumulou intensidade', async () => {
+it('reconectar preserva a intensidade proposta sem o antigo teto por sessão', async () => {
   const f = await fixture({
     llmResponse:
       '<expression>{"intent":"explorar","emotion":"curiosidade","intensity":0.7}</expression>Vamos testar.',
@@ -737,7 +737,7 @@ it('reconectar reinicia a expressão mesmo quando a chamada anterior já acumulo
     f.events.find(
       (event) => event.type === 'reply.expression' && event.turnId === 2,
     )?.intensity,
-  ).toBe(0.55);
+  ).toBe(0.7);
   const { ticket } = (
     await f.app.inject({
       method: 'POST',
@@ -792,7 +792,7 @@ it('reconectar reinicia a expressão mesmo quando a chamada anterior já acumulo
   );
   expect(
     events.find((event) => event.type === 'reply.expression')?.intensity,
-  ).toBe(0.35);
+  ).toBe(0.7);
 });
 
 it('uma palavra reconhecida cancela a resposta antes do fim da nova captura', async () => {

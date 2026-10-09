@@ -144,15 +144,15 @@ it('remove rubricas completas e rejeita rubricas cortadas e JSON residual', () =
   ).toThrow();
 });
 
-it('limita intensidade, prioriza acolhimento e evita ironia consecutiva', () => {
+it('preserva a intensidade e a emoção propostas, inclusive ironia consecutiva', () => {
   const state = createExpressionState();
   expect(
     state.accept({ intent: 'explorar', emotion: 'curiosidade', intensity: 1 })
       .intensity,
-  ).toBe(0.35);
+  ).toBe(1);
   expect(
     state.accept({ intent: 'acolher', emotion: 'ironia_leve', intensity: 0.9 }),
-  ).toEqual({ intent: 'acolher', emotion: 'neutra', intensity: 0.15 });
+  ).toEqual({ intent: 'acolher', emotion: 'ironia_leve', intensity: 0.9 });
   state.accept({
     intent: 'provocacao_afetuosa',
     emotion: 'neutra',
@@ -164,7 +164,7 @@ it('limita intensidade, prioriza acolhimento e evita ironia consecutiva', () => 
       emotion: 'ironia_leve',
       intensity: 0.4,
     }).emotion,
-  ).toBe('neutra');
+  ).toBe('ironia_leve');
 });
 
 it('estado é isolado por sessão e retorna ao neutro sem guardar fatos do usuário', () => {
@@ -173,8 +173,7 @@ it('estado é isolado por sessão e retorna ao neutro sem guardar fatos do usuá
   first.accept({ intent: 'acolher', emotion: 'preocupacao', intensity: 0.6 });
   expect(second.snapshot()).toEqual(NEUTRAL_EXPRESSION);
 
-  expect(first.accept(NEUTRAL_EXPRESSION).intensity).toBe(0.4);
-  expect(first.accept(NEUTRAL_EXPRESSION).intensity).toBe(0.2);
+  expect(first.accept(NEUTRAL_EXPRESSION).intensity).toBe(0.15);
   first.accept(NEUTRAL_EXPRESSION);
 
   expect(first.snapshot()).toEqual(NEUTRAL_EXPRESSION);

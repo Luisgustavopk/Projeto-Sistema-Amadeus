@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import type { z } from 'zod';
 import {
   ExpressionSchema,
+  EMOTION_PRESENTATIONS,
   describeDelivery,
 } from '../../domain/persona/expression.ts';
 import type { ShotBankSchema } from './experimental-suite.ts';
@@ -100,24 +101,13 @@ export function expressionDeliveryReview(proposal: unknown) {
   }
 
   const expression = parsed.data;
-  const artistic = {
-    neutra: ['neutra', 'claro'],
-    curiosidade: ['atenta', 'interessado'],
-    firmeza_calma: ['seria', 'firme-contido'],
-    ironia_leve: ['sorriso-discreto', 'seco-suave'],
-    irritacao_leve: ['contrariada', 'firme-contido'],
-    constrangimento_leve: ['reserva-discreta', 'hesitacao-breve'],
-    preocupacao: ['atenta-seria', 'acolhedor-calmo'],
-    autocritica_leve: ['seria', 'direto-contido'],
-    calor_discreto: ['suave', 'calor-contido'],
-    alegria_discreta: ['sorriso-discreto', 'alegria-contida'],
-  }[expression.emotion];
+  const artistic = EMOTION_PRESENTATIONS[expression.emotion];
 
   return {
     valid: true as const,
     expression,
     currentDelivery: describeDelivery(expression),
-    artisticProposal: { visual: artistic[0], vocal: artistic[1] },
+    artisticProposal: { visual: artistic.visual, vocal: artistic.vocal },
     executable: false,
     semanticAlignment: 'pending-contextual-review' as const,
   };

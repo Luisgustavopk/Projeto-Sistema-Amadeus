@@ -14,7 +14,7 @@ it('usa a mesma curadoria com proveniência em produção, comparação e recupe
     expect(prompt).toContain('9d4726bd37dce9919af37904e442e49205f329b8');
   }
 
-  expect(buildVoicePersonaPrompt().length).toBeLessThanOrEqual(12500);
+  expect(buildVoicePersonaPrompt().length).toBeLessThanOrEqual(14000);
   const context = buildVoiceContext(
     [],
     'Olá.',

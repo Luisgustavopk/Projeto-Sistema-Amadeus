@@ -72,7 +72,7 @@ describe('emotional preparation without inference', () => {
     expect(buildVoicePersonaPrompt(true)).toContain(
       PERSONA_EXPRESSIVE_REFERENCE,
     );
-    expect(voicePrompt.length).toBeLessThanOrEqual(12500);
+    expect(voicePrompt.length).toBeLessThanOrEqual(14000);
   });
   it('prepares four-turn conversations without leaking grading instructions to the author', () => {
     const prepared = prepareEmotionalSuite(suite, []);
@@ -111,7 +111,7 @@ describe('emotional preparation without inference', () => {
     expect(() => prepareEmotionalSuite(changed, [])).toThrow();
   });
   it('keeps the output contract bounded, canonical and backward compatible', () => {
-    expect(buildVoicePersonaPrompt().length).toBeLessThanOrEqual(12500);
+    expect(buildVoicePersonaPrompt().length).toBeLessThanOrEqual(14000);
     const format = voiceOutputFormat(2);
     expect(format).toContain('"use":"recall","facts":[0]');
     expect(format).toContain('"use":"context","facts":[0]');
