@@ -4,7 +4,18 @@ import { segmentSpeech } from '../../domain/voice/segmentation.ts';
 export async function* streamSpeech(
   source: (signal: AbortSignal) => AsyncIterable<string>,
   signal: AbortSignal,
+  options: { firstFlushMs?: number } = {},
 ): AsyncIterable<string> {
+  const firstFlushMs = options.firstFlushMs ?? 700;
+
+  if (
+    !Number.isFinite(firstFlushMs) ||
+    firstFlushMs < 0 ||
+    firstFlushMs > 5000
+  ) {
+    throw new RangeError('Prazo inicial de segmentação inválido.');
+  }
+
   const abort = new AbortController();
   const cancel = () => abort.abort();
   signal.addEventListener('abort', cancel, { once: true });
@@ -72,8 +83,8 @@ export async function* streamSpeech(
         text += chunk;
 
         if (text && !firstDeadline) {
-          firstDeadline = Date.now() + 700;
-          firstTimer = setTimeout(flushFirst, 700);
+          firstDeadline = Date.now() + firstFlushMs;
+          firstTimer = setTimeout(flushFirst, firstFlushMs);
         }
 
         if (firstDeadline && Date.now() >= firstDeadline) {

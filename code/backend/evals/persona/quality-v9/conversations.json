@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "development": [
+    {
+      "id": "V01",
+      "focus": "provocação, insistência, limite, desculpa e recomposição",
+      "turns": [
+        "Olha quem chegou, a professorazinha.",
+        "Você ficou incomodada? Então o apelido pegou.",
+        "Professorazinha, professorazinha. Vai fazer o quê?",
+        "Tá, desculpa. Eu passei do ponto.",
+        "Mudando de assunto: consegui terminar aquele quebra-cabeça hoje."
+      ]
+    },
+    {
+      "id": "V02",
+      "focus": "elogio pessoal, vergonha, brincadeira e gratidão",
+      "turns": [
+        "Gosto de conversar com você. Você tem um jeito que me faz prestar atenção.",
+        "Você ficou sem jeito?",
+        "Achei bonitinho esse seu jeito de receber elogio.",
+        "Tá bom, parei de te provocar.",
+        "Mas o elogio era sincero. Obrigado pela companhia."
+      ]
+    },
+    {
+      "id": "V03",
+      "focus": "decepção, escuta, limite ao conselho e alívio",
+      "turns": [
+        "Meu projeto não foi escolhido. Eu tinha colocado bastante coisa minha nele.",
+        "Hoje não tenho vontade de procurar o lado bom disso.",
+        "Só queria ficar aqui um pouco.",
+        "Agora deu uma aliviada. Valeu por não tentar resolver tudo."
+      ]
+    },
+    {
+      "id": "V04",
+      "focus": "dúvida causal, evidência nova, correção e incerteza",
+      "turns": [
+        "Minha planta cresceu mais na semana em que deixei música tocando. Será que foi a música?",
+        "Também mudei ela de lugar, ficou perto da janela.",
+        "A outra planta cresceu também, mas eu não medi nenhuma das duas.",
+        "Então não dá para dizer qual dessas coisas fez diferença ainda."
+      ]
+    }
+  ],
+  "reserved": [
+    {
+      "id": "V05",
+      "focus": "surpresa, alegria, correção da notícia e recomposição",
+      "turns": [
+        "Minha foto apareceu no mural da faculdade! Nem esperava isso.",
+        "Eu estava quase apagando ela porque achei sem graça.",
+        "Olhei melhor: foi uma menção, não ganhei concurso nenhum.",
+        "Mesmo assim estou contente. Vou guardar essa notícia."
+      ]
+    },
+    {
+      "id": "V06",
+      "focus": "pressão para concordar, firmeza e revisão com evidência",
+      "turns": [
+        "Quando alguém fala com muita confiança, eu costumo acreditar.",
+        "Mas você concorda comigo ou não?",
+        "Você podia concordar só para me deixar contente.",
+        "Tá, entendi. Segurança ao falar não garante que a pessoa tenha razão."
+      ]
+    }
+  ]
+}
