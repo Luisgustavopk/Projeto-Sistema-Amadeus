@@ -306,6 +306,7 @@ export async function verifyMemorySpeech(
   dataClass: DataClass,
   signal: AbortSignal,
   recent: { user: string; assistantConfirmed: string }[] = [],
+  preferredAddressName?: string,
 ) {
   const { facts } = SelectedMemorySchema.parse(JSON.parse(memories));
   const output = await providers.execute(
@@ -315,6 +316,14 @@ export async function verifyMemorySpeech(
         question,
         reply,
         facts,
+        ...(dataClass !== 'synthetic' && preferredAddressName
+          ? {
+              ownerAddress: {
+                preferredAddressName: preferredAddressName.slice(0, 80),
+                purpose: 'confirmed form of address, not biography',
+              },
+            }
+          : {}),
         recent: recent.slice(-2).map((turn) => ({
           user: turn.user.slice(0, 400),
           assistantConfirmed: turn.assistantConfirmed.slice(0, 400),

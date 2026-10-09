@@ -429,7 +429,13 @@ export function createMemoryService(
       dataClass: DataClass,
       signal: AbortSignal,
       recent: { user: string; assistantConfirmed: string }[] = [],
+      preferredAddressName?: string,
     ) {
+      const ownerAddress =
+        dataClass !== 'synthetic'
+          ? preferredAddressName?.slice(0, 80)
+          : undefined;
+
       try {
         const policy = await repository.policy();
 
@@ -463,7 +469,18 @@ export function createMemoryService(
                     question,
                     reply,
                     dataClass,
-                    recentConversation: JSON.stringify(recent.slice(-2)),
+                    recentConversation: JSON.stringify(
+                      ownerAddress
+                        ? {
+                            turns: recent.slice(-2),
+                            ownerAddress: {
+                              preferredAddressName: ownerAddress,
+                              purpose:
+                                'confirmed form of address, not biography',
+                            },
+                          }
+                        : recent.slice(-2),
+                    ),
                   },
                   signal,
                 )
@@ -489,6 +506,7 @@ export function createMemoryService(
               dataClass,
               AbortSignal.any([signal, AbortSignal.timeout(8000)]),
               recent,
+              ownerAddress,
             );
           }
         } catch {

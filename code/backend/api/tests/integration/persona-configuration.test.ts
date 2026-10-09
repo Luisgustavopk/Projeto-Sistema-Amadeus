@@ -8,6 +8,36 @@ import { createPersonaConfiguration } from '../../src/application/persona/config
 const token = 'test-only-credential-of-more-than-32-characters';
 const headers = { authorization: `Bearer ${token}` };
 
+it('persiste o vocativo por proprietário, preserva em edição de estilo e permite removê-lo', async () => {
+  const db = await openDatabase('file::memory:');
+
+  try {
+    const repo = createRevisionRepository(db.client);
+    const config = createPersonaConfiguration(repo, 'address-owner');
+    await config.update({
+      expectedRevision: 0,
+      direction: 'Breve.',
+      preferredAddressName: 'Alex',
+    });
+    const restarted = createPersonaConfiguration(repo, 'address-owner');
+    expect((await restarted.get()).preferredAddressName).toBe('Alex');
+    expect(
+      (await createPersonaConfiguration(repo, 'other-owner').get())
+        .preferredAddressName,
+    ).toBeUndefined();
+    await restarted.update({ expectedRevision: 1, direction: 'Cotidiano.' });
+    expect((await restarted.get()).preferredAddressName).toBe('Alex');
+    await restarted.update({
+      expectedRevision: 2,
+      direction: 'Cotidiano.',
+      preferredAddressName: null,
+    });
+    expect((await restarted.get()).preferredAddressName).toBeNull();
+  } finally {
+    db.client.close();
+  }
+});
+
 it('protege configuração, valida tags e conflitos e persiste a persona por proprietário', async () => {
   const db = await openDatabase('file::memory:');
   const app = await buildApp({

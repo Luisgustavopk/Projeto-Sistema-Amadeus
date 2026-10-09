@@ -27,6 +27,16 @@ if (result.error) {
 process.exitCode = result.status ?? 1;
 
 if (process.exitCode === 0) {
+  for (const [directory, file] of [
+    ['quality-v2.1', 'core-card.md'],
+    ['quality-v2.1', 'turn-direction.md'],
+    ['quality-v3', 'presence-positive.md'],
+  ]) {
+    await copyFile(
+      new URL(`../../evals/persona/${directory}/${file}`, import.meta.url),
+      resolve(output, 'application/persona', file),
+    );
+  }
   for (const file of [
     'input-repair-v1.md',
     'conversation-presence-v2.md',
