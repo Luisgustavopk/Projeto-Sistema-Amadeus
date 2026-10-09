@@ -32,6 +32,7 @@ describe('isolated v2.1 experiments', () => {
 
     // Do not replace the old hash with the new code's hash to permit inference.
     expect(implementationDrift).toEqual([
+      '../../../api/src/evaluation/persona/shared-round.ts',
       '../../../api/src/evaluation/persona/router.ts',
     ]);
 

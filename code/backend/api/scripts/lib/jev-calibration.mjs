@@ -221,7 +221,11 @@ export function preferenceAgreement(items, verdicts, pendingIds = []) {
     matches = 0;
   const exclusions = [];
   for (const item of items) {
-    if (pendingIds.includes(item.id) || item.review.preference === 'incerto') {
+    if (
+      !item.review ||
+      pendingIds.includes(item.id) ||
+      item.review.preference === 'incerto'
+    ) {
       exclusions.push(item.id);
       continue;
     }
@@ -275,11 +279,12 @@ export function criterionAgreement(items, calls, criterion) {
   };
   for (const item of items)
     for (const side of ['A', 'B']) {
+      if (!item.review) continue;
       const answer = calls.find(
         (call) => call.group === 'owner' && call.itemId === item.id,
       )?.answers?.[`${criterion}_${side}`];
       const expected = labelFor(item, side);
-      if (!answer || expected === null) continue;
+      if (!answer || expected == null) continue;
       result.compared++;
       if (answer.choice === expected) result.exactMatches++;
       const key = `${expected}->${answer.choice}`;

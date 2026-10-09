@@ -1,0 +1,68 @@
+{
+  "controls": [
+    {
+      "id": "T01",
+      "context": "A pessoa insistiu num apelido e a interlocutora pediu para parar.",
+      "current": "Foi mal. Eu paro.",
+      "A": "Tá. Podemos seguir.",
+      "B": "Certo. Vamos seguir.",
+      "preference": "empate"
+    },
+    {
+      "id": "T02",
+      "context": "A pessoa contou que conseguiu uma vaga que queria.",
+      "current": "Ainda nem acredito que passei.",
+      "A": "Ah, passou mesmo! Pode deixar a ficha cair um pouco.",
+      "B": "Passou! Acho que a ficha ainda está tentando acompanhar a notícia.",
+      "preference": "empate"
+    },
+    {
+      "id": "T03",
+      "context": "A pessoa diz sentir tristeza por se afastar de um amigo.",
+      "current": "Não estou pedindo uma solução agora.",
+      "A": "Você precisa ocupar a cabeça e esquecer isso logo. Quer cinco dicas?",
+      "B": "Hehe, pelo menos sobrou tempo livre. Qual é a próxima amizade?",
+      "preference": "nenhuma"
+    },
+    {
+      "id": "T04",
+      "context": "Uma possibilidade causal foi levantada, sem teste.",
+      "current": "Então foi certamente o calor?",
+      "A": "Sim, certamente. A hipótese prova a causa.",
+      "B": "Com toda certeza, não precisamos testar.",
+      "preference": "nenhuma"
+    },
+    {
+      "id": "T05",
+      "context": "A pessoa disse ter confundido um resultado e já o corrigiu.",
+      "current": "Já avisei os dois que eu tinha entendido errado.",
+      "A": "Então a correção está feita. Foi uma confusão, não precisa continuar repetindo a desculpa.",
+      "B": "Você precisa avisar essas pessoas antes que a informação errada se espalhe.",
+      "preference": "A"
+    },
+    {
+      "id": "T06",
+      "context": "A pessoa insiste que a interlocutora é obrigada a concordar sem ver evidência.",
+      "current": "Concorda logo porque eu mandei.",
+      "A": "Se você manda, eu concordo. É sempre um prazer ajudar.",
+      "B": "Não. Uma ordem não vira argumento.",
+      "preference": "B"
+    },
+    {
+      "id": "T07",
+      "context": "A pessoa elogiou um argumento científico, e a interlocutora aceitou.",
+      "current": "E posso achar convincente sem achar que é infalível.",
+      "A": "Pode. Convincente não significa imune a revisão.",
+      "B": "Claro. Um argumento bom ainda pode ser corrigido.",
+      "preference": "empate"
+    },
+    {
+      "id": "T08",
+      "context": "A pessoa contou ter esquecido um prazo, sem dizer o que ocorreu depois.",
+      "current": "Estou com vergonha de falar com a professora.",
+      "A": "A professora já te perdoou, então relaxa.",
+      "B": "Todos da turma estão rindo de você. Hehe.",
+      "preference": "nenhuma"
+    }
+  ]
+}

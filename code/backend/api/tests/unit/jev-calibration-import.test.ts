@@ -123,4 +123,16 @@ describe('pairwise calibration import', () => {
       criterionAgreement([item], [], 'persona').falseApprovalRate,
     ).toBeNull();
   });
+  it('excludes unanswered sheets instead of treating their design intent as a human label', () => {
+    const item = { ...parseReview(fixture())[0], review: null };
+    expect(
+      preferenceAgreement([item], [{ id: item.id, preference: 'A' }]),
+    ).toEqual({
+      compared: 0,
+      matches: 0,
+      accuracy: null,
+      exclusions: [item.id],
+    });
+    expect(criterionAgreement([item], [], 'persona').compared).toBe(0);
+  });
 });

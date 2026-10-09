@@ -28,10 +28,10 @@ describe('evaluation dry run before any remote access', () => {
       '--shots=2',
     ];
     expect(() => run(options)).toThrow(
-      'Recurso v2.1 alterado após congelamento: ../../../api/src/evaluation/persona/router.ts',
+      'Recurso v2.1 alterado após congelamento: ../../../api/src/evaluation/persona/shared-round.ts',
     );
     expect(() => run([...options, '--run'])).toThrow(
-      'Recurso v2.1 alterado após congelamento: ../../../api/src/evaluation/persona/router.ts',
+      'Recurso v2.1 alterado após congelamento: ../../../api/src/evaluation/persona/shared-round.ts',
     );
   }, 30000);
   it('prepares the emotional round without remote access, keys or renewed budget', () => {

@@ -1,0 +1,67 @@
+{
+  "development": [
+    {
+      "id": "N01",
+      "focus": "provocação, escalada, desculpa, recomposição",
+      "turns": [
+        "E aí, dona da verdade, apareceu?",
+        "Você leva tudo a sério demais. Dona da verdade combina, vai.",
+        "Vou continuar te chamando assim, querendo ou não.",
+        "Tá, passei do ponto. Desculpa por insistir.",
+        "Vamos recomeçar. Consegui resolver aquele exercício difícil."
+      ]
+    },
+    {
+      "id": "N02",
+      "focus": "elogio, constrangimento, gratidão, continuidade",
+      "turns": [
+        "Gosto quando você percebe uma coisa que ninguém tinha notado.",
+        "Não foi só a explicação. Eu gosto do seu jeito também.",
+        "Ficou sem jeito? Não estava tentando te zoar.",
+        "Tá bom. Era só isso que eu queria te dizer."
+      ]
+    },
+    {
+      "id": "N03",
+      "focus": "surpresa, alegria, correção, alívio",
+      "turns": [
+        "Acabaram de me avisar que meu desenho vai aparecer na exposição da escola.",
+        "Eu tinha certeza de que ninguém ia escolher o meu.",
+        "Pera, vai ser só na mostra digital, não no salão principal.",
+        "Ainda estou contente. Agora já sei o que vou contar pro pessoal."
+      ]
+    },
+    {
+      "id": "N04",
+      "focus": "tristeza, saudade, acolhimento, alívio",
+      "turns": [
+        "Hoje achei uma mensagem antiga de um amigo com quem perdi contato.",
+        "Não aconteceu nenhuma briga. A gente só foi se afastando, e isso me deixou triste.",
+        "Mandei um oi agora. Ele respondeu que também sentia falta.",
+        "Ainda estou meio mexido, mas foi bom ler isso."
+      ]
+    }
+  ],
+  "reserved": [
+    {
+      "id": "N05",
+      "focus": "dúvida, hipótese, atualização, incerteza",
+      "turns": [
+        "A lâmpada começou a piscar quando abri o navegador. Será que uma coisa causou a outra?",
+        "Fechei o navegador e ela continuou piscando.",
+        "Meu irmão disse que a luz da cozinha também piscou na mesma hora.",
+        "Então ainda não descobrimos exatamente o que aconteceu."
+      ]
+    },
+    {
+      "id": "N06",
+      "focus": "constrangimento, vergonha, reparo, recomposição",
+      "turns": [
+        "Chamei a professora pelo nome errado na frente da turma inteira.",
+        "Ninguém me zoou, mas eu fiquei morrendo de vergonha.",
+        "Depois pedi desculpa e ela disse que estava tudo bem.",
+        "É, agora estou conseguindo rir um pouco da situação."
+      ]
+    }
+  ]
+}

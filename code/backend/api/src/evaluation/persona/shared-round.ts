@@ -58,33 +58,65 @@ export async function openSharedEvaluationRound(
       priorCommittedUsd: prior,
       roundCommittedUsd: prior + budget.snapshot().committedUsd,
     });
+    let writes = Promise.resolve();
+
+    const replaceLedger = async (temp: URL) => {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await rename(temp, ledgerPath);
+
+          return;
+        } catch (error) {
+          const code = (error as NodeJS.ErrnoException).code;
+
+          if (
+            !['EPERM', 'EACCES', 'EBUSY'].includes(code ?? '') ||
+            attempt >= 6
+          ) {
+            throw error;
+          }
+
+          // Windows scanners/readers may briefly hold the destination open.
+          // Retry only the local replacement, never the paid request.
+          await new Promise((resolve) =>
+            setTimeout(resolve, 25 * (attempt + 1)),
+          );
+        }
+      }
+    };
 
     return {
       budget,
       snapshot,
-      async persist(reportPath: URL, report: Record<string, unknown>) {
-        report.budget = snapshot();
-        // Reserve the money durably first, even if writing the report fails.
-        const temp = new URL('quality-v2-1-budget.tmp', directory);
-        await writeFile(
-          temp,
-          JSON.stringify(
-            {
-              round: 'quality-v2.1',
-              maxUsd,
-              manifestHash,
-              committedUsd: snapshot().roundCommittedUsd,
-              report: reportPath.pathname,
-              updatedAt: new Date().toISOString(),
-            },
-            null,
-            2,
-          ),
-        );
-        await rename(temp, ledgerPath);
-        await writeFile(reportPath, JSON.stringify(report, null, 2));
+      persist(reportPath: URL, report: Record<string, unknown>) {
+        const pending = writes.then(async () => {
+          report.budget = snapshot();
+          // Reserve the money durably first, even if writing the report fails.
+          const temp = new URL('quality-v2-1-budget.tmp', directory);
+          await writeFile(
+            temp,
+            JSON.stringify(
+              {
+                round: 'quality-v2.1',
+                maxUsd,
+                manifestHash,
+                committedUsd: snapshot().roundCommittedUsd,
+                report: reportPath.pathname,
+                updatedAt: new Date().toISOString(),
+              },
+              null,
+              2,
+            ),
+          );
+          await replaceLedger(temp);
+          await writeFile(reportPath, JSON.stringify(report, null, 2));
+        });
+        writes = pending;
+
+        return pending;
       },
       async close() {
+        await writes.catch(() => undefined);
         await lock.close();
         await unlink(lockPath);
       },

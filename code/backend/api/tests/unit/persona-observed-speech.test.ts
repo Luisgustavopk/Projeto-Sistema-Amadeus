@@ -102,3 +102,28 @@ it('does not weaken persistent-fact protection or accept an invalid classifier r
     error: 'INVALID_EXPRESSION',
   });
 });
+
+it('keeps speech available when the classifier fails', async () => {
+  const expressions: boolean[] = [];
+  const pipeline = observedSpeech({
+    speech: source(),
+    factCount: 0,
+    signal: new AbortController().signal,
+    classify: async () => {
+      throw new Error('Observer unavailable.');
+    },
+    expression: (_value, event) => expressions.push(event.initial),
+  });
+  const delivered: string[] = [];
+
+  for await (const text of pipeline.stream()) {
+    delivered.push(text);
+  }
+
+  expect(delivered).toEqual(['Hã... obrigada.', 'Esse detalhe importava.']);
+  expect(await pipeline.observationResult()).toEqual({
+    attempted: true,
+    error: 'CLASSIFIER_FAILED',
+  });
+  expect(expressions).toEqual([true]);
+});
