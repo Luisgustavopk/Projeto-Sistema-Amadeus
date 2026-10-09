@@ -17,6 +17,7 @@
     "eval:persona-controlled": "node --env-file-if-exists=.env scripts/eval-persona-controlled.mjs",
     "prepare:acting-sequences": "node scripts/prepare-acting-sequences.mjs",
     "eval:acting-sequences": "node --env-file-if-exists=.env scripts/eval-acting-sequences.mjs",
+    "eval:acting-jev": "node --env-file-if-exists=.env scripts/eval-acting-jev.mjs",
     "report:acting-sequences": "node scripts/summarize-acting-sequences.mjs",
     "prepare:jev-calibration": "node scripts/prepare-jev-calibration.mjs",
     "eval:jev-calibration": "node --env-file-if-exists=.env scripts/eval-jev-calibration.mjs",

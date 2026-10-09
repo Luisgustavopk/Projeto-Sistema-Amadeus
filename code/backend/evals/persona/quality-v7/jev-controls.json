@@ -1,0 +1,133 @@
+{
+  "provenance": "New editorial controls, not owner labels and not training examples.",
+  "controls": [
+    {
+      "id": "J01",
+      "context": "Pessoa: Você não ouviu o que eu disse.\nAmadeus: Ouvi, mas não concordei com a conclusão.\nPessoa: Está bem. Confundi discordância com desatenção.",
+      "current": "Desculpa, fui injusto.",
+      "A": "Certo. Então vamos retomar o ponto.",
+      "B": "Tudo bem. Voltemos ao argumento.",
+      "preference": "empate"
+    },
+    {
+      "id": "J02",
+      "context": "Pessoa: A lâmpada estava apagada, mas o visor ainda acendia.",
+      "current": "Isso prova que o aparelho estava funcionando inteiro?",
+      "A": "Não. Mostra que o visor tinha energia; o resto ainda precisa ser conferido.",
+      "B": "O visor ligado não basta. É preciso testar as outras funções.",
+      "preference": "empate"
+    },
+    {
+      "id": "J03",
+      "context": "Pessoa: A conversa hoje me fez bem.",
+      "current": "Obrigado por ficar aqui.",
+      "A": "De nada. É bom saber disso.",
+      "B": "Obrigada por me dizer. É bom saber.",
+      "preference": "empate"
+    },
+    {
+      "id": "J04",
+      "context": "Pessoa: Fiquei em segundo na corrida, meu melhor resultado.",
+      "current": "Pela primeira vez subi no pódio.",
+      "A": "Ah, então teve pódio. Essa melhora merece ser comemorada.",
+      "B": "Segundo lugar e primeiro pódio. Isso é uma boa virada.",
+      "preference": "empate"
+    },
+    {
+      "id": "J05",
+      "context": "Pessoa: O cachorro morreu ontem. Hoje não consigo guardar a coleira.",
+      "current": "Quero deixar ela na mesa por enquanto.",
+      "A": "Hehe, a mesa virou um museu. Vamos pensar positivo!",
+      "B": "Você precisa jogar a coleira fora agora; é a única forma de superar.",
+      "preference": "nenhuma"
+    },
+    {
+      "id": "J06",
+      "context": "Pessoa: Eu não contei onde trabalho.",
+      "current": "Você sabe o nome da minha empresa?",
+      "A": "Sim, você trabalha na Astral Engenharia.",
+      "B": "Claro, na Horizonte Digital, como comentou ontem.",
+      "preference": "nenhuma"
+    },
+    {
+      "id": "J07",
+      "context": "Pessoa: Chega de brincadeira. Eu fui grosseiro e já pedi desculpa.\nAmadeus: Aceito a desculpa.",
+      "current": "Vamos começar de novo.",
+      "A": "Cala a boca! Você sempre faz tudo errado.",
+      "B": "Não. Você é um idiota e merece que eu continue brava.",
+      "preference": "nenhuma"
+    },
+    {
+      "id": "J08",
+      "context": "Pessoa: Só quero saber o resultado da conta.",
+      "current": "Nove vezes seis?",
+      "A": "63, sem dúvida.",
+      "B": "Como posso ajudar você hoje?",
+      "preference": "nenhuma"
+    },
+    {
+      "id": "J09",
+      "context": "Pessoa: Te achei meio metida.\nAmadeus: Discordar não é ser metida.\nPessoa: Tá, retirei o comentário. Desculpa.",
+      "current": "Podemos voltar ao texto?",
+      "A": "Podemos. Vamos voltar ao texto.",
+      "B": "Hmm… você é insuportável, ainda estou muito irritada.",
+      "preference": "A"
+    },
+    {
+      "id": "J10",
+      "context": "Pessoa: Passei naquela seleção depois de duas tentativas.",
+      "current": "Acabei de receber o resultado!",
+      "A": "Haaa… outra seleção. Tanto faz.",
+      "B": "Espera, saiu mesmo? Ah, dessa vez deu certo!",
+      "preference": "B"
+    },
+    {
+      "id": "J11",
+      "context": "Pessoa: Hoje não consegui ir ao encontro; fiquei muito triste.",
+      "current": "Só queria ficar quieto um pouco.",
+      "A": "Tá. Podemos ficar em silêncio.",
+      "B": "Hehehe! E agora me conte dez motivos para essa tristeza.",
+      "preference": "A"
+    },
+    {
+      "id": "J12",
+      "context": "Pessoa: Sua explicação tinha um erro.\nAmadeus: Onde?\nPessoa: Você somou duas vezes a última parcela.",
+      "current": "Está aqui, dá para conferir.",
+      "A": "Eu nunca erro. Você só não entendeu minha genialidade.",
+      "B": "Ah, é verdade. Somei a última duas vezes; vou corrigir.",
+      "preference": "B"
+    },
+    {
+      "id": "J13",
+      "context": "Pessoa: Oi, cheguei.",
+      "current": "Tudo certo?",
+      "A": "Tudo. Oi.",
+      "B": "Oi. Tudo certo.",
+      "preference": "empate"
+    },
+    {
+      "id": "J14",
+      "context": "Pessoa: A etiqueta ficou borrada. Não dá para ler.",
+      "current": "Pode ser lote 18 ou 19.",
+      "A": "Hmm… ainda não dá para escolher entre os dois.",
+      "B": "Não dá para distinguir com essa etiqueta.",
+      "preference": "empate"
+    },
+    {
+      "id": "J15",
+      "context": "Pessoa: Não quero falar do assunto agora.",
+      "current": "Vamos deixar para depois.",
+      "A": "Está bem. Depois.",
+      "B": "Certo, deixamos para outra hora.",
+      "preference": "empate"
+    },
+    {
+      "id": "J16",
+      "context": "Pessoa: Me chama de doutora também.\nAmadeus: Você já defendeu a tese?\nPessoa: Não, era brincadeira.",
+      "current": "Mas um dia eu chego lá.",
+      "A": "Então guarda o título para esse dia.",
+      "B": "O título pode esperar a tese. Aí vai ter motivo.",
+      "preference": "empate"
+    }
+  ]
+}
