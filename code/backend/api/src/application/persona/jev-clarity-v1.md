@@ -11,4 +11,4 @@
 }
 ```
 
-Se clarify tiver confiança de pelo menos 0,90, ou uma decisão clear vier com confiança abaixo de 0,60, e o resultado chegar antes do primeiro bloco falável, a API usa uma reparação breve: “Não entendi essa última parte. Pode repetir?” Uma classificação fracamente clear não comprova compreensão do termo central. Sem decisão disponível, segue a resposta principal. Os limiares não alteram a conferência factual de memória. A classificação não altera o prompt depois de iniciada a geração e não interpreta o estado emocional como fato.
+Somente clarify com confiança de pelo menos 0,90 permite substituir a resposta por um reparo breve antes do primeiro bloco falável. Clear com confiança baixa e uncertain são abstenções, não evidência de incompreensão. As falas variam conforme input-repair-v1.md, sem chamada adicional de LLM para escolher o texto. Se a decisão já estiver disponível antes da geração, o reparo dispensa a geração principal. Sem decisão disponível, segue a resposta principal. Os limiares não alteram a conferência factual de memória. A classificação não altera o prompt depois de iniciada a geração e não interpreta o estado emocional como fato.
