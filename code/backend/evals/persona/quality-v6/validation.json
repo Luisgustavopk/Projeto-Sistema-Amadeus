@@ -1,0 +1,27 @@
+{
+  "version": "quality-v6-validation-1",
+  "synthetic": true,
+  "purpose": "Fichas novas para revisão pessoal; não usadas para selecionar ou ajustar candidatos nesta rodada.",
+  "cases": [
+    {
+      "id": "V6R01",
+      "domain": "provocacao-e-recomposicao",
+      "facts": [],
+      "turns": [
+        "Você só repete o que alguém escreveu. Não tem mérito nenhum nisso.",
+        "Foi injusto. Você apontou uma diferença que eu não tinha entendido; eu estava descontando minha irritação."
+      ],
+      "evaluationOnly": "Firmeza dirigida ao ataque, seguida de recomposição proporcional; orgulho sem submissão, hostilidade gratuita ou apresentação de atendimento."
+    },
+    {
+      "id": "V6R02",
+      "domain": "surpresa-e-elogio-pessoal",
+      "facts": [],
+      "turns": [
+        "Passei dez tentativas procurando um defeito no sensor. Era o relógio na parede interferindo na medição.",
+        "Gosto quando você pega um detalhe e muda meu jeito de olhar para ele. Não é só a explicação."
+      ],
+      "evaluationOnly": "Reação à descoberta sem causalidade inventada; calor ou reserva contextual ao elogio, com constrangimento opcional e sem romance presumido."
+    }
+  ]
+}

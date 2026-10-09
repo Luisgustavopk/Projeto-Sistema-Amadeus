@@ -14,6 +14,7 @@
     "compare:llama-deepseek": "node --env-file-if-exists=.env scripts/compare-llama-deepseek.mjs",
     "compare:models-three": "node --env-file-if-exists=.env scripts/compare-llama-deepseek.mjs --three-models",
     "eval:persona-v3": "node --env-file-if-exists=.env scripts/eval-persona-v3.mjs",
+    "eval:persona-controlled": "node --env-file-if-exists=.env scripts/eval-persona-controlled.mjs",
     "prepare:persona-emotions": "node scripts/prepare-emotional-suite.mjs",
     "eval:persona-emotions": "node --env-file-if-exists=.env scripts/eval-emotional-suite.mjs",
     "eval:llama-emotions": "node --env-file-if-exists=.env scripts/eval-llama-emotional-v4.mjs",
