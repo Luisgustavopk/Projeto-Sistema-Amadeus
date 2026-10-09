@@ -48,6 +48,7 @@ const event = z.discriminatedUnion('type', [
     personaVersion: z.string().max(64),
     voiceProfileId: z.uuid().nullable(),
     metadataValid: z.boolean(),
+    phase: z.enum(['initial', 'update']).optional(),
     deliveryApplied: z.literal(false),
     deliveryPresetId: DeliveryPresetSchema,
     avatarExpression: z.enum([

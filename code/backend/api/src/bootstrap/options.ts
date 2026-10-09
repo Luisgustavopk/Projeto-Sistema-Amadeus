@@ -16,4 +16,5 @@ export type AppOptions = {
   memoryEmbeddings?: MemoryEmbeddings;
   memoryReranker?: MemoryReranker;
   personaDecisionClient?: PersonaDecisionClient;
+  expressionClassifier?: import('../application/persona/expression-classifier.ts').ExpressionClassifier;
 };

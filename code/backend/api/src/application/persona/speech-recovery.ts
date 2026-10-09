@@ -27,10 +27,11 @@ export async function* streamPersonaSpeech(
   validateStyle?: (text: string, delivered: boolean) => void,
   onProviderRecovery?: () => Promise<void>,
   onMemoryUse?: (use: MemoryResponseUse | null) => void,
+  options: { speechOnly?: boolean; firstFlushMs?: number | undefined } = {},
 ): AsyncIterable<string> {
   let delivered = false;
   const spoken: string[] = [];
-  let speechOnly = false;
+  let speechOnly = options.speechOnly ?? false;
   let providerRecovered = false;
   let formatRecovered = false;
 
@@ -46,6 +47,9 @@ export async function* streamPersonaSpeech(
             onMemoryUse,
           ),
         signal,
+        options.firstFlushMs === undefined
+          ? {}
+          : { firstFlushMs: options.firstFlushMs },
       )) {
         const text = validateSpokenSegment(segment);
 

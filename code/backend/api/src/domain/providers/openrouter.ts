@@ -1,10 +1,11 @@
 import { z } from 'zod';
 
 export const LLAMA_REFINEMENT_MODEL = 'meta-llama/llama-3.3-70b-instruct';
-// USD per million tokens. Paid access is explicit and limited to this experiment.
+export const DEEPSEEK_REFINEMENT_MODEL = 'deepseek/deepseek-v4.1-flash';
+// USD per million tokens. Paid access is explicit and limited to approved authors.
 export const OpenRouterPaidSchema = z.strictObject({
   maxPromptPrice: z.number().positive().max(0.15),
-  maxCompletionPrice: z.number().positive().max(0.4),
+  maxCompletionPrice: z.number().positive().max(0.42),
 });
 
 export function validOpenRouterPayment(config: {
@@ -15,7 +16,11 @@ export function validOpenRouterPayment(config: {
   if (config.openRouterPaid) {
     return (
       config.adapter === 'openrouter' &&
-      config.model === LLAMA_REFINEMENT_MODEL &&
+      [LLAMA_REFINEMENT_MODEL, DEEPSEEK_REFINEMENT_MODEL].includes(
+        config.model ?? '',
+      ) &&
+      (config.model !== LLAMA_REFINEMENT_MODEL ||
+        config.openRouterPaid.maxCompletionPrice <= 0.4) &&
       OpenRouterPaidSchema.safeParse(config.openRouterPaid).success
     );
   }

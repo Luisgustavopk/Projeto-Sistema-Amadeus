@@ -36,6 +36,7 @@ export type VoiceEvent =
         personaVersion: string;
         voiceProfileId: string | null;
         metadataValid: boolean;
+        phase?: 'initial' | 'update';
         deliveryApplied: false;
       })
   | { type: 'state'; turnId: number; state: CallState }

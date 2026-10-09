@@ -14,6 +14,7 @@ import { ApplicationError } from '../../domain/errors/application-error.ts';
 import { VoiceInputError } from '../../domain/errors/voice.ts';
 import { ProviderInvalidError } from '../../domain/errors/providers.ts';
 import { streamPersonaSpeech } from '../persona/speech-recovery.ts';
+import { createInputRepair } from '../persona/input-repair.ts';
 import { buildVoiceContext } from './context.ts';
 import { buildHistoryContext } from './history-context.ts';
 import {
@@ -29,6 +30,9 @@ import {
 } from '../persona/voice-prompt.ts';
 import { createConversationStyleObserver } from '../persona/conversation-style.ts';
 import { createExpressionState } from '../../domain/persona/expression-policy.ts';
+import { createSegmentExpressionObserver } from '../persona/segment-expression.ts';
+import type { ExpressionClassifier } from '../persona/expression-classifier.ts';
+import type { VoiceRuntimeOptions } from './runtime-configuration.ts';
 import {
   memoryContent,
   memoryDirection as describeMemory,
@@ -79,8 +83,15 @@ export function createTurnProcessor(
   analysis?: Pick<import('../persona/analysis.ts').PersonaAnalysis, 'analyze'>,
   persistentState?: Pick<PersistentPersonaState, 'snapshot' | 'observe'>,
   references?: PersonaReferenceRetriever,
+  runtime?: {
+    get: () => Promise<{ options: VoiceRuntimeOptions }>;
+    classifier: ExpressionClassifier;
+  },
 ) {
   const expressionState = createExpressionState();
+  const inputRepair = createInputRepair();
+  let previousObserver:
+    ReturnType<typeof createSegmentExpressionObserver> | undefined;
 
   const executeProvider = async (
     role: Parameters<typeof providers.execute>[0],
@@ -172,6 +183,7 @@ export function createTurnProcessor(
       const { signal, turnId, responseId } = turn;
       let deliveryQueue = Promise.resolve();
       const toneAbort = new AbortController();
+      previousObserver?.dispose();
 
       try {
         memory?.interruptBackground();
@@ -239,6 +251,9 @@ export function createTurnProcessor(
         }
 
         const personaConfiguration = await persona?.get();
+        const runtimeOptions = (await runtime?.get())?.options;
+        const parallelExpression =
+          runtimeOptions?.expressionMode === 'parallel';
         const artisticState = await persistentState
           ?.snapshot(context.dataClass)
           .catch(() => {
@@ -407,7 +422,9 @@ export function createTurnProcessor(
           memoryContent('', memories ?? '') +
           PERSONA_PRESENCE_REFERENCE +
           initiativeDirection +
-          voiceOutputFormat(factCount);
+          (parallelExpression && !factCount
+            ? '\nFORMATO: somente a fala em prosa, sem cabeçalhos, JSON, tags, gestos ou rubricas.'
+            : voiceOutputFormat(factCount, parallelExpression));
         let proposal = expressionState.snapshot();
         let metadataValid = false;
         let expression = proposal;
@@ -419,6 +436,50 @@ export function createTurnProcessor(
         let modelSpeechCount = 0;
         let waitAnnounced = false;
         let deliveryFailure: unknown;
+        let latestExpressionPosition = -1;
+        const observer =
+          parallelExpression &&
+          runtime &&
+          context.dataClass !== 'local-only' &&
+          (context.dataClass !== 'personal' ||
+            runtimeOptions?.observerPersonalConsent)
+            ? createSegmentExpressionObserver({
+                classifier: runtime.classifier,
+                signal,
+                timeoutMs: runtimeOptions!.observerTimeoutMs,
+                context: {
+                  user: text,
+                  history: (context.history ?? []).slice(-6),
+                  dataClass: context.dataClass,
+                  personalConsent: runtimeOptions!.observerPersonalConsent,
+                },
+                onFailure: (reason) => metrics.failure(reason),
+                onDuration: (milliseconds) =>
+                  metrics.time('expressionObserver', milliseconds),
+                onResult: (target, value) => {
+                  if (target.position >= latestExpressionPosition) {
+                    latestExpressionPosition = target.position;
+                    expression = expressionState.accept(value);
+                  }
+
+                  emit({
+                    type: 'reply.expression',
+                    turnId,
+                    responseId,
+                    segmentId: target.segmentId,
+                    position: target.position,
+                    personaVersion: PERSONA_VERSION,
+                    ...value,
+                    ...describeDelivery(value),
+                    voiceProfileId: turn.profile?.id ?? null,
+                    metadataValid: true,
+                    deliveryApplied: false,
+                    phase: 'update',
+                  });
+                },
+              })
+            : undefined;
+        previousObserver = observer;
 
         const deliverSegmentNow = async (
           spokenText: string,
@@ -432,7 +493,15 @@ export function createTurnProcessor(
 
           if (!waiting && modelSpeechCount === 0) {
             expression = expressionState.accept(proposal);
-            metrics.time('llmFirstSpeechSegment', performance.now() - started);
+            metrics.time(
+              needsClarification ? 'inputRepair' : 'llmFirstSpeechSegment',
+              performance.now() - started,
+            );
+          }
+
+          if (!waiting && parallelExpression) {
+            expression = { ...NEUTRAL_EXPRESSION };
+            metadataValid = false;
           }
 
           if (!waiting) {
@@ -472,7 +541,12 @@ export function createTurnProcessor(
             voiceProfileId: turn.profile?.id ?? null,
             metadataValid: waiting ? false : metadataValid,
             deliveryApplied: false,
+            phase: 'initial',
           });
+
+          if (!waiting) {
+            observer?.observe(spokenText, { segmentId, position });
+          }
 
           if (!turn.profile) {
             metrics.count('textFallbacks');
@@ -494,6 +568,14 @@ export function createTurnProcessor(
           let pcm: Buffer;
           let sampleRate: 16000 | 24000;
           const synthesisStart = performance.now();
+          let measuredFirstTtsAudio = false;
+
+          const recordFirstTtsAudio = () => {
+            if (!waiting && !measuredFirstTtsAudio) {
+              measuredFirstTtsAudio = true;
+              metrics.time('ttsFirstAudio', performance.now() - synthesisStart);
+            }
+          };
 
           try {
             let bufferedOutput:
@@ -539,6 +621,7 @@ export function createTurnProcessor(
                 }
 
                 const rate = first.value.audio.sampleRate;
+                recordFirstTtsAudio();
 
                 if (!first.value.progressiveAudio) {
                   bufferedOutput = first.value;
@@ -659,6 +742,8 @@ export function createTurnProcessor(
               ) {
                 throw new VoiceInputError('Áudio sintetizado inválido.');
               }
+
+              recordFirstTtsAudio();
             }
           } catch (error) {
             if (signal.aborted) {
@@ -796,7 +881,12 @@ export function createTurnProcessor(
                       initiativeDirection +
                       (continuation
                         ? '\nContinue a resposta a partir do trecho ja fornecido. Nao repita nem recomece esse trecho. Responda somente com a continuacao falavel, sem mencionar modelos, cotas ou a troca de provedor.'
-                        : voiceOutputFormat(sourceFactCount, speechOnly))
+                        : parallelExpression && !sourceFactCount
+                          ? '\nFORMATO: somente a fala em prosa, sem cabeçalhos, JSON, tags, gestos ou rubricas.'
+                          : voiceOutputFormat(
+                              sourceFactCount,
+                              speechOnly || parallelExpression,
+                            ))
                     : context.systemPrompt,
                 maxTokens: 512,
               },
@@ -839,6 +929,10 @@ export function createTurnProcessor(
             source,
             signal,
             (value, valid) => {
+              if (parallelExpression) {
+                return;
+              }
+
               proposal = value;
               metadataValid = valid;
               metrics.time('personaHeader', performance.now() - started);
@@ -872,6 +966,11 @@ export function createTurnProcessor(
                 );
               }
             },
+            {
+              speechOnly:
+                parallelExpression && (!factCount || withoutPersistentMemory),
+              firstFlushMs: runtimeOptions?.firstFlushMs,
+            },
           );
         emit({ type: 'reply.start', turnId, responseId });
 
@@ -879,9 +978,30 @@ export function createTurnProcessor(
         let length = 0;
         let reviewRequired = false;
 
+        const deliverInputRepair = async () => {
+          toneAbort.abort();
+          metrics.count('inputClarifications');
+          proposal = {
+            intent: 'esclarecer',
+            emotion: 'duvida',
+            intensity: 0.2,
+          };
+          metadataValid = true;
+          await deliverSegment(inputRepair());
+        };
+
+        // A decision already available needs no discarded author generation.
+        // This does not wait for the optional classifier or bypass memory checks
+        // on generated replies; the repair makes no assertion about memory.
+        if (needsClarification) {
+          await deliverInputRepair();
+        }
+
         // With no retrieved facts there is no grounding request. When sources
         // are present, new recommendations/general knowledge remain permitted.
-        for await (const segment of createSegments()) {
+        for await (const segment of needsClarification
+          ? []
+          : createSegments()) {
           if (!modelSpeechCount) {
             // Do not wait for classification. A late answer cannot change a
             // started prompt; only a confident ambiguity found before speech
@@ -889,16 +1009,7 @@ export function createTurnProcessor(
             toneAbort.abort();
 
             if (needsClarification) {
-              metrics.count('inputClarifications');
-              proposal = {
-                intent: 'esclarecer',
-                emotion: 'neutra',
-                intensity: 0.15,
-              };
-              metadataValid = true;
-              await deliverSegment(
-                'Não entendi essa última parte. Pode repetir?',
-              );
+              await deliverInputRepair();
               break;
             }
           }

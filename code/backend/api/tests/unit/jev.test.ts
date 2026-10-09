@@ -125,7 +125,8 @@ it.each([
   { choice: 'clarify' as const, confidence: 0.98, expected: true },
   { choice: 'clarify' as const, confidence: 0.89, expected: false },
   { choice: 'clear' as const, confidence: 0.99, expected: false },
-  { choice: 'clear' as const, confidence: 0.45, expected: true },
+  { choice: 'clear' as const, confidence: 0.45, expected: false },
+  { choice: 'uncertain' as const, confidence: 0.99, expected: false },
 ])(
   'só sinaliza esclarecimento com decisão específica e confiança alta: $choice/$confidence',
   async ({ choice, confidence, expected }) => {

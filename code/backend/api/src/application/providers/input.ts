@@ -11,7 +11,7 @@ const InputSchema = z.strictObject({
   content: z.string().max(65536),
   systemPrompt: z.string().min(1).max(32768).optional(),
   dataClass: DataClassSchema,
-  purpose: z.enum(['conversation', 'memory']).optional(),
+  purpose: z.enum(['conversation', 'memory', 'expression']).optional(),
   memoryTask: z
     .enum(['extract', 'review', 'reconcile', 'answer', 'verify-answer'])
     .optional(),

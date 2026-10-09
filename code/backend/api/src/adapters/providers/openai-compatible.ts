@@ -19,6 +19,7 @@ import { LocalCompletionEndpointSchema } from '../../domain/providers/local.ts';
 import { memoryOutputFormat } from '../../domain/memory/output.ts';
 import {
   LLAMA_REFINEMENT_MODEL,
+  DEEPSEEK_REFINEMENT_MODEL,
   validOpenRouterPayment,
 } from '../../domain/providers/openrouter.ts';
 
@@ -330,7 +331,7 @@ export function createOpenAiCompatibleProvider(
       content: string;
       maxTokens: number;
       systemPrompt?: string;
-      purpose?: 'conversation' | 'memory';
+      purpose?: 'conversation' | 'memory' | 'expression';
       memoryTask?: ProviderInput['memoryTask'];
       history?: ProviderInput['history'];
       sessionId?: ProviderInput['sessionId'];
@@ -357,12 +358,16 @@ export function createOpenAiCompatibleProvider(
             { role: 'user', content: input.content },
           ],
           max_tokens: input.maxTokens,
-          ...(input.purpose === 'memory'
-            ? { temperature: 0 }
-            : config.adapter === 'openrouter' &&
-                config.model === LLAMA_REFINEMENT_MODEL
-              ? { temperature: 0.6 }
-              : {}),
+          ...(input.purpose === 'expression'
+            ? { temperature: 0, response_format: { type: 'json_object' } }
+            : input.purpose === 'memory'
+              ? { temperature: 0 }
+              : config.adapter === 'openrouter' &&
+                  [LLAMA_REFINEMENT_MODEL, DEEPSEEK_REFINEMENT_MODEL].includes(
+                    config.model ?? '',
+                  )
+                ? { temperature: 0.6 }
+                : {}),
           ...(config.adapter === 'zai' && input.purpose === 'memory'
             ? {
                 response_format: { type: 'json_object' },

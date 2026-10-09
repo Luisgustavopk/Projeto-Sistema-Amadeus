@@ -162,7 +162,7 @@ export const ProviderSchema = z
       ctx.addIssue({
         code: 'custom',
         message:
-          'Limites locais só podem ser desativados para Llama pago ou contabilização Jev.',
+          'Limites locais só podem ser desativados para modelos pagos aprovados ou contabilização Jev.',
       });
     }
 

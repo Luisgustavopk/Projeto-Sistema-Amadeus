@@ -28,6 +28,7 @@ process.exitCode = result.status ?? 1;
 
 if (process.exitCode === 0) {
   for (const file of [
+    'input-repair-v1.md',
     'conversation-presence-v2.md',
     'expressive-direction-v1.md',
     'presence-turn-v2.md',

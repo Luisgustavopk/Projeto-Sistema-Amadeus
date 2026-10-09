@@ -18,6 +18,10 @@ export const VOICE_PIPELINE_PROTOCOL = {
     stateScope:
       'segment expression within the session; bounded artistic PAD/energy and familiarity persist per owner/data class with decay',
     nativeDeliveryControlsApplied: false,
+    parallelExpression:
+      'Optional observer emits initial/update events for the same segment; audio never waits for expression classification. Personal observation requires explicit consent.',
+    authorSelection:
+      'Manual configured/Llama/DeepSeek selection before opening a call; semantic selection by Jev is not enabled.',
   },
   clientEventSchema: z.toJSONSchema(ClientEvent),
   presence: {

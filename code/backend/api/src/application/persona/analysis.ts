@@ -383,10 +383,8 @@ export function createPersonaAnalysis(dependencies: {
         onClarity?.(
           Boolean(
             clarity &&
-            ((clarity.choice === 'clarify' &&
-              clarity.confidence >= Math.max(0.9, config.minimumConfidence)) ||
-              // A weak claim of comprehension is not grounds for inventing a term.
-              (clarity.choice === 'clear' && clarity.confidence < 0.6)),
+            clarity.choice === 'clarify' &&
+            clarity.confidence >= Math.max(0.9, config.minimumConfidence),
           ),
         );
         const direction =

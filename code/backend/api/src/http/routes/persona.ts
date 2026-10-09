@@ -8,6 +8,11 @@ import {
 } from '../../application/persona/configuration.ts';
 import { VoiceVersionSchema } from '../../application/voice/versions.ts';
 import { security, errors } from './schemas/common.ts';
+import {
+  VoiceRuntimeStateSchema,
+  VoiceRuntimeEditSchema,
+} from '../../application/voice/runtime-configuration.ts';
+import { ProvidersSchema } from '../../domain/providers/model.ts';
 import { PersonaStateSchema } from '../../application/persona/persistent-state.ts';
 import {
   PersonaAnalysisEditSchema,
@@ -19,6 +24,38 @@ export function registerPersonaRoutes(
   services: HttpServices,
 ) {
   const app = instance.withTypeProvider<ZodTypeProvider>();
+  app.get(
+    '/v1/voice/runtime',
+    {
+      schema: {
+        security,
+        response: { 200: VoiceRuntimeStateSchema, ...errors },
+      },
+    },
+    () => services.voiceRuntime.get(),
+  );
+  app.put(
+    '/v1/voice/runtime',
+    {
+      schema: {
+        security,
+        body: VoiceRuntimeEditSchema,
+        response: { 200: VoiceRuntimeStateSchema, ...errors },
+      },
+    },
+    (req) => services.voiceRuntime.configure(req.body),
+  );
+  app.post(
+    '/v1/voice/runtime/author',
+    {
+      schema: {
+        security,
+        body: z.strictObject({ author: z.enum(['llama', 'deepseek']) }),
+        response: { 200: ProvidersSchema, ...errors },
+      },
+    },
+    (req) => services.voiceRuntime.selectAuthor(req.body.author),
+  );
   const stateQuery = z.object({
     dataClass: z
       .enum(['personal', 'synthetic', 'local-only'])

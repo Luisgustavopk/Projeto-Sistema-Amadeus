@@ -445,10 +445,13 @@ it.each([true, false])(
   'usa somente a decisão de clareza disponível antes da fala: %s',
   async (needsClarification) => {
     const spoken: string[] = [];
+    let authorCalls = 0;
+    const metrics = createVoiceMetrics();
     const processor = createTurnProcessor(
       {
         execute: vi.fn(),
         executeStream: async function* () {
+          authorCalls++;
           yield {
             content:
               '<expression>{"memory":[]}</expression>Uma interpretação inventada sobre o assunto.',
@@ -467,7 +470,7 @@ it.each([true, false])(
         setAudio: async () => {},
         acknowledge: async () => true,
       },
-      createVoiceMetrics(),
+      metrics,
       undefined,
       undefined,
       {
@@ -502,9 +505,13 @@ it.each([true, false])(
     );
     expect(spoken).toEqual([
       needsClarification
-        ? 'Não entendi essa última parte. Pode repetir?'
+        ? 'Hã? Não entendi essa parte. Repete?'
         : 'Uma interpretação inventada sobre o assunto.',
     ]);
+    expect(authorCalls).toBe(needsClarification ? 0 : 1);
+    expect(metrics.snapshot().stages.llmFirstSpeechSegment?.samples ?? 0).toBe(
+      needsClarification ? 0 : 1,
+    );
   },
 );
 

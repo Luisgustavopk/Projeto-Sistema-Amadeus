@@ -27,6 +27,7 @@ export function createVoiceSessions(dependencies: {
   persistentState?: import('../persona/persistent-state.ts').PersistentPersonaState;
   references?: import('../../ports/persona-references.ts').PersonaReferenceRetriever;
   analysis?: Pick<import('../persona/analysis.ts').PersonaAnalysis, 'analyze'>;
+  runtime?: Parameters<typeof createTurnProcessor>[8];
   memory?: Pick<
     import('../memory/service.ts').MemoryService,
     'retrieve' | 'interruptBackground'
@@ -127,6 +128,7 @@ export function createVoiceSessions(dependencies: {
             dependencies.analysis,
             dependencies.persistentState,
             dependencies.references,
+            dependencies.runtime,
           ),
           gate: dependencies.gate,
           metrics: dependencies.metrics,

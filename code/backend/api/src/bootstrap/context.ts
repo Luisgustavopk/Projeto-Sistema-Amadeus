@@ -32,6 +32,8 @@ import { createMemoryProvider } from '../application/memory/provider.ts';
 import { createLocalMemoryEmbeddings } from '../adapters/embeddings/local.ts';
 import { createLocalMemoryReranker } from '../adapters/embeddings/reranker.ts';
 import { createPersonaAnalysis } from '../application/persona/analysis.ts';
+import { createExpressionClassifier } from '../application/persona/expression-classifier.ts';
+import { createVoiceRuntimeConfiguration } from '../application/voice/runtime-configuration.ts';
 import { createJevClient } from '../adapters/providers/jev.ts';
 import { createPersonaReferenceRepository } from '../adapters/database/persona-reference-repository.ts';
 import { loadPersonaReferenceCatalog } from '../application/persona/reference-catalog.ts';
@@ -100,6 +102,21 @@ export async function createContext(
   const voiceMetrics = createVoiceMetrics();
   const revisions = createRevisionRepository(database.client);
   const persona = createPersonaConfiguration(revisions, config.OWNER_ID);
+  const voiceRuntime = createVoiceRuntimeConfiguration(
+    revisions,
+    config.OWNER_ID,
+    activity,
+    providers,
+  );
+  const expressionClassifier =
+    options.expressionClassifier ??
+    createExpressionClassifier({
+      configuration,
+      usage,
+      ownerId: config.OWNER_ID,
+      factory: createProviderFactory(secrets),
+      gate: activity,
+    });
   const persistentState = createPersistentPersonaState(
     revisions,
     config.OWNER_ID,
@@ -178,6 +195,7 @@ export async function createContext(
     analysis: personaAnalysis,
     persistentState,
     references: personaReferences,
+    runtime: { get: voiceRuntime.get, classifier: expressionClassifier },
   });
 
   return {
@@ -185,6 +203,7 @@ export async function createContext(
     context: {
       providers,
       voiceProfiles,
+      voiceRuntime,
       persona,
       persistentState,
       personaAnalysis,
