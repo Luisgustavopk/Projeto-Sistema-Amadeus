@@ -1,0 +1,13 @@
+/* Tokens and foundations */
+:root {
+  color-scheme: dark;
+  --screen: #080b0c;
+  --surface: #111412;
+  --amber: #dda442;
+  --amber-bright: #f3c576;
+  --ink: #ece6d9;
+  --muted: #9d9c8f;
+  --line: rgba(221, 164, 66, 0.26);
+  --mono: 'Cascadia Mono', Consolas, 'Courier New', monospace;
+  --sans: 'Segoe UI', system-ui, sans-serif;
+}

@@ -1,0 +1,25 @@
+{
+  "reviewedAt": "2026-10-09",
+  "implementation": "Procedural Canvas 2D backgrounds and CSS/SVG CRT textures",
+  "references": [
+    {
+      "file": "bg.mp4",
+      "sha256": "da97f94df66d0596fe12a8dff443a8ea9b75966c44869fe49c1f58fc10533ab0",
+      "resolution": "1280x720",
+      "durationSeconds": 45.29525,
+      "observed": "dark blue background, glowing cyan fragments, data streaks and scanline interference",
+      "embeddedForeground": "recorded Kurisu portrait"
+    },
+    {
+      "file": "01-11-15.mp4",
+      "sha256": "e242b4fa71e4ebd0ad9cb7fbd6dcdee17a4f06835b237ae891eeff7f4e65d531",
+      "resolution": "2560x1440",
+      "durationSeconds": 17.355,
+      "observed": "scrolling red code panes, progressive boot terminal, training output and sweeping screen reflection",
+      "embeddedForeground": "logo, login fields, Windows taskbar and recorder watermark"
+    }
+  ],
+  "referenceMediaEmbedded": false,
+  "pixelIdentical": false,
+  "reason": "References are composite recordings, without separate clean background layers. Effects are reconstructed for the responsive UI and interactive Live2D."
+}

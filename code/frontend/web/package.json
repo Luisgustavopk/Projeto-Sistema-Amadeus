@@ -1,0 +1,33 @@
+{
+  "name": "@amadeus/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "node scripts/prepare-public.mjs",
+    "dev": "vite",
+    "prebuild": "node scripts/prepare-public.mjs",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview",
+    "start": "npm run build && node server.mjs",
+    "test": "npm run build && node --experimental-strip-types --test tests/*.test.mjs",
+    "check:ui": "npm run build && node scripts/check-ui.mjs"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "typescript": "7.0.2",
+    "vite": "8.3.4",
+    "playwright-core": "1.64.0"
+  },
+  "dependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-router-dom": "7.18.4"
+  }
+}
