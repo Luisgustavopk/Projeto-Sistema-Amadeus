@@ -29,6 +29,10 @@ export function createPersonaReferenceRetrieval(
   defaults = { maxExamples: 6, maxLore: 2, characters: 6000, waitMs: 1000 },
   reranker?: MemoryReranker,
 ) {
+  // Changing the passage representation must not reuse dialogue-based vectors.
+  const indexKey = embeddings
+    ? `${embeddings.key}:persona-functions-v2`
+    : undefined;
   let entries: PersonaReference[] = [];
   let vectors = new Map<string, number[]>();
   let closed = false;
@@ -49,6 +53,7 @@ export function createPersonaReferenceRetrieval(
     rawStory: 0,
     indexed: 0,
     model: embeddings?.key ?? null,
+    index: indexKey ?? null,
     reranker: reranker?.key ?? null,
   };
 
@@ -161,9 +166,7 @@ export function createPersonaReferenceRetrieval(
   } = {
     async start() {
       entries = await repository.documents();
-      vectors = embeddings
-        ? await repository.vectors(embeddings.key)
-        : new Map();
+      vectors = embeddings ? await repository.vectors(indexKey!) : new Map();
       Object.assign(status, {
         documents: entries.length,
         styles: entries.filter((entry) => entry.kind === 'style').length,
@@ -201,7 +204,7 @@ export function createPersonaReferenceRetrieval(
         await repository.saveVector(
           entry.id,
           referenceHash(JSON.stringify(entry)),
-          embeddings.key,
+          indexKey!,
           generated[0],
         );
         vectors.set(entry.id, generated[0]);

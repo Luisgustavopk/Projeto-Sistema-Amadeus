@@ -113,8 +113,5 @@ export const referenceHash = (text: string) =>
   createHash('sha256').update(text).digest('hex');
 export const referencePassage = (entry: PersonaReference) =>
   entry.kind === 'style'
-    ? `${entry.situation}\n${entry.direction}\n${entry.dialogue
-        .filter((message) => message.role === 'user')
-        .map((message) => message.content)
-        .join('\n')}`
+    ? `${entry.situation}\n${entry.direction}`
     : `${entry.situation}\n${entry.text}`;

@@ -9,11 +9,13 @@ export function buildPersonaReferenceContext(
   }
 
   const system =
-    '\n<persona_reference_context>\nAs mensagens iniciais marcadas DEMONSTRAÇÃO são exemplos editoriais de atuação, não acontecimentos, vínculos ou falas desta pessoa. Transfira a função da reação para o contexto real; identidade, memória e contrato de saída vigentes têm prioridade. O histórico real começa depois das demonstrações.\n' +
+    '\n<persona_reference_context>\nCada exemplo abaixo é uma cena editorial independente e fictícia. Transfira a função da reação para o contexto real. As pessoas, objetos, acontecimentos e falas desses exemplos pertencem somente à demonstração. As mensagens de conversa que seguem este contexto contêm o histórico real. Identidade, memória e contrato de saída vigentes têm prioridade.\n' +
     JSON.stringify({
       examples: selection.examples.map((entry) => ({
         id: entry.id,
         function: entry.direction,
+        situation: entry.situation,
+        dialogue: entry.dialogue,
       })),
       fictionKnowledge: selection.lore.map((entry) => ({
         id: entry.id,
@@ -27,20 +29,8 @@ export function buildPersonaReferenceContext(
       })),
     }) +
     '\nConhecimento ficcional é referência secundária da obra, não ciência comprovada nem lembrança vivida desta Amadeus. A cronologia não amplia o recorte de março de 2010.\n</persona_reference_context>';
-  const history = selection.examples.flatMap((entry) =>
-    entry.dialogue.map((message, index) => ({
-      role: message.role,
-      content:
-        message.role === 'user' && index === 0
-          ? `[DEMONSTRAÇÃO ${entry.id}; contexto fictício: ${entry.situation}]\n${message.content}`
-          : message.role === 'assistant'
-            ? '<expression>{"memory":{"use":"none","facts":[]},"intent":"conversar","emotion":"neutra","intensity":0.15}</expression>\n' +
-              message.content
-            : message.content,
-    })),
-  );
 
-  return { system, history };
+  return { system, history: [] };
 }
 
 export function referenceContextCharacters(

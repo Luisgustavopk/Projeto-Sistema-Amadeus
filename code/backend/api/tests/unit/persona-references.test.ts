@@ -13,6 +13,7 @@ import { createPersonaReferenceRetrieval } from '../../src/application/persona/r
 import {
   PersonaReferenceSchema,
   referenceHash,
+  referencePassage,
 } from '../../src/domain/persona/reference.ts';
 import { MEMORY_EMBEDDING_DIMENSIONS } from '../../src/domain/memory/embeddings.ts';
 import { openDatabase } from '../../src/adapters/database/index.ts';
@@ -149,6 +150,46 @@ describe('contextual persona references', () => {
     return { retriever, embed, rank, close, entries };
   }
 
+  it('indexes and reranks interaction functions without fictional dialogue and invalidates the old vector namespace', async () => {
+    const [entry] = (await loadPersonaReferenceCatalog(false)).filter(
+      (entry) => entry.kind === 'style',
+    );
+    const database = await openDatabase('file::memory:');
+    cleanup.push(() => database.client.close());
+    const repository = createPersonaReferenceRepository(database.client);
+    await repository.synchronize([entry!]);
+    await repository.saveVector(
+      entry!.id,
+      referenceHash(JSON.stringify(entry)),
+      'fixture',
+      vector(),
+    );
+    const embed = vi.fn(async () => [vector()]);
+    const rank = vi.fn(async () => [0.9]);
+    const retriever = createPersonaReferenceRetrieval(
+      repository,
+      { key: 'fixture', embed, close: async () => {} },
+      undefined,
+      { key: 'fixture', rank, close: async () => {} },
+    );
+    cleanup.push(() => retriever.close());
+    await retriever.start();
+    expect(retriever.status().state).toBe('unindexed');
+    await retriever.index();
+    expect(embed).toHaveBeenCalledWith(
+      [`${entry!.situation}\n${entry!.direction}`],
+      'passage',
+    );
+    expect(referencePassage(entry!)).not.toContain(entry!.dialogue[0]!.content);
+    expect(
+      (await repository.vectors('fixture:persona-functions-v2')).size,
+    ).toBe(1);
+    await retriever.retrieve('A new interaction.', signal());
+    expect(rank).toHaveBeenCalledWith('A new interaction.', [
+      referencePassage(entry!),
+    ]);
+  });
+
   it('varies only the example cap, reuses query inference and measures the complete rendered context budget', async () => {
     const { retriever, embed, close } = await fixture();
     const sizes = [];
@@ -266,7 +307,7 @@ describe('contextual persona references', () => {
     await new Promise((done) => setTimeout(done, 0));
   });
 
-  it('injects demonstrations before real history without persisting them as user utterances', async () => {
+  it('isolates independent fictional scenes in the system context and keeps only real conversation turns in history', async () => {
     const entry = (await loadPersonaReferenceCatalog(false)).find(
       (entry) => entry.id === 'estilo-elogio-direto',
     )!;
@@ -277,7 +318,13 @@ describe('contextual persona references', () => {
       endSession: async () => {},
       beginTurn: async () => {},
       updateTurn,
-      recent: async () => [],
+      recent: async () => [
+        {
+          userText: 'Earlier real utterance.',
+          generatedText: 'Earlier real answer.',
+          dataClass: 'synthetic' as const,
+        },
+      ],
       addSegment: async () => {},
       setAudio: async () => {},
       acknowledge: async () => true,
@@ -328,8 +375,11 @@ describe('contextual persona references', () => {
       { send: () => {}, audio: async () => {} },
     );
     expect(input!.systemPrompt).toContain('<persona_reference_context>');
-    expect(input!.history![0]!.content).toContain('[DEMONSTRAÇÃO');
-    expect(input!.history).toHaveLength(entry.dialogue.length);
+    expect(input!.systemPrompt).toContain(JSON.stringify(entry.dialogue));
+    expect(input!.history).toEqual([
+      { role: 'user', content: 'Earlier real utterance.' },
+      { role: 'assistant', content: 'Earlier real answer.' },
+    ]);
     expect(input!.content).toBe('Real utterance.');
     expect(updateTurn).toHaveBeenCalledWith('fixture', {
       userText: 'Real utterance.',

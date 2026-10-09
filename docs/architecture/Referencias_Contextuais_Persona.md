@@ -33,7 +33,7 @@ flowchart TD
     Q --> B[BGE-M3: candidatos por significado]
     B --> R[Jina: pertinência à situação]
     R --> S[Diversidade, origem e orçamento de contexto]
-    S --> E[Demonstrações antes do histórico real]
+    S --> E[Cenas fictícias independentes no sistema]
     S --> L[Conhecimento ficcional separado no sistema]
     E --> P[Núcleo atual, histórico real e contratos]
     L --> P
@@ -46,7 +46,9 @@ A busca de candidatos considera esse contexto, mas o Jina recebe separadamente a
 
 O seletor usa pertinência, uma janela relativa de pontuação e diversidade. Dois exemplos apoiados na mesma intervenção original não ocupam duas posições. O número configurado é um máximo: uma saudação, elogio ou consulta sem referência pode retornar poucos exemplos ou nenhum. A relevância não é probabilidade de verdade ou certificado de personalidade.
 
-As demonstrações são mensagens `user/assistant`, explicitamente marcadas, com metadados neutros válidos nas falas de exemplo. Entram antes do histórico real e nunca são persistidas como turnos da pessoa. Função e conhecimento ficcional têm delimitação própria no sistema; os contratos vigentes prevalecem. Reparações preservam as referências escolhidas; uma inferência atrasada não modifica uma geração iniciada.
+Na revisão v8, as demonstrações são cenas independentes serializadas no sistema, com seus diálogos e funções. Deixam de ser mensagens anteriores `user/assistant` e não recebem cabeçalhos artificiais de emoção neutra. Somente turnos reais ocupam o histórico enviado ao modelo. Função e conhecimento ficcional têm delimitação própria no sistema; os contratos vigentes prevalecem. Reparações preservam as referências escolhidas; uma inferência atrasada não modifica uma geração iniciada.
+
+A representação de busca de estilo usa situação e direção curadas, sem as falas fictícias. O índice versionado `:persona-functions-v2` exige reindexação local; a API não reutiliza vetores da representação antiga. Consulte a [arquitetura e limites do candidato v8](Separacao_Fala_Expressao_v8.md). Os resultados da verificação inicial abaixo são históricos, anteriores a essa mudança.
 
 ## Quantidade, orçamento e tempo
 
