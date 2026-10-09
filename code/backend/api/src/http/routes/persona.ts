@@ -13,6 +13,7 @@ import {
   VoiceRuntimeEditSchema,
 } from '../../application/voice/runtime-configuration.ts';
 import { ProvidersSchema } from '../../domain/providers/model.ts';
+import { actingDiagnostics } from '../../application/persona/acting-core.ts';
 import { PersonaStateSchema } from '../../application/persona/persistent-state.ts';
 import {
   PersonaAnalysisEditSchema,
@@ -24,6 +25,9 @@ export function registerPersonaRoutes(
   services: HttpServices,
 ) {
   const app = instance.withTypeProvider<ZodTypeProvider>();
+  app.get('/v1/voice/runtime/acting', { schema: { security } }, async () =>
+    actingDiagnostics((await services.voiceRuntime.get()).options.actingMode),
+  );
   app.get(
     '/v1/voice/runtime',
     {

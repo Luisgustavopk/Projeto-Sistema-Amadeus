@@ -5,6 +5,43 @@ import { SqliteProviderConfigurationRepository } from '../../src/adapters/databa
 import { DEFAULT_PROVIDERS } from '../../src/domain/providers/model.ts';
 import { loadConfig } from '../../src/config/index.ts';
 
+it('protege diagnóstico do núcleo e persiste seleção refinada e expressiva sem mudar consentimento', async () => {
+  const token = 'test-only-credential-of-more-than-32-characters';
+  const headers = { authorization: `Bearer ${token}` };
+  const app = await buildApp({ token });
+
+  try {
+    expect(
+      (await app.inject({ url: '/v1/voice/runtime/acting' })).statusCode,
+    ).toBe(401);
+    const initial = (
+      await app.inject({ url: '/v1/voice/runtime', headers })
+    ).json();
+    const update = await app.inject({
+      method: 'PUT',
+      url: '/v1/voice/runtime',
+      headers,
+      payload: {
+        expectedRevision: initial.revision,
+        options: {
+          ...initial.options,
+          expressionMode: 'expressive',
+          actingMode: 'refined',
+        },
+      },
+    });
+    expect(update.statusCode).toBe(200);
+    expect(update.json().options.observerPersonalConsent).toBe(false);
+    const acting = (
+      await app.inject({ url: '/v1/voice/runtime/acting', headers })
+    ).json();
+    expect(acting).toMatchObject({ mode: 'refined' });
+    expect(acting.coreHash).toMatch(/^[a-f0-9]{64}$/);
+  } finally {
+    await app.close();
+  }
+});
+
 it('protege as opções, mantém consentimento desligado, valida revisão e rejeita troca sem pagamento configurado', async () => {
   const token = 'test-only-credential-of-more-than-32-characters';
   const headers = { authorization: `Bearer ${token}` };

@@ -19,15 +19,17 @@ import { buildVoiceContext } from './context.ts';
 import { buildHistoryContext } from './history-context.ts';
 import {
   applyPersonaConfiguration,
+  addressNameDirection,
   type PersonaConfiguration,
 } from '../persona/configuration.ts';
 import { measureVoiceAudio } from './audio-observations.ts';
 import { providerWaitPhrase } from './provider-wait.ts';
 import { providerWaitAudio } from './provider-wait-audio.ts';
+import { voiceOutputFormat } from '../persona/voice-prompt.ts';
 import {
-  buildVoicePersonaCore,
-  voiceOutputFormat,
-} from '../persona/voice-prompt.ts';
+  buildActingCore,
+  actingTurnDirection,
+} from '../persona/acting-core.ts';
 import { createConversationStyleObserver } from '../persona/conversation-style.ts';
 import { createExpressionState } from '../../domain/persona/expression-policy.ts';
 import { createSegmentExpressionObserver } from '../persona/segment-expression.ts';
@@ -254,6 +256,14 @@ export function createTurnProcessor(
         const runtimeOptions = (await runtime?.get())?.options;
         const parallelExpression =
           runtimeOptions?.expressionMode === 'parallel';
+        const expressiveVoice = runtimeOptions?.expressionMode === 'expressive';
+        const actingMode = runtimeOptions?.actingMode ?? 'curated';
+        const presenceReference =
+          actingMode === 'refined' ? '' : PERSONA_PRESENCE_REFERENCE;
+        const addressDirection = addressNameDirection(
+          personaConfiguration,
+          context.dataClass,
+        );
         const artisticState = await persistentState
           ?.snapshot(context.dataClass)
           .catch(() => {
@@ -411,7 +421,7 @@ export function createTurnProcessor(
 
         context.systemPrompt =
           applyPersonaConfiguration(
-            buildVoicePersonaCore(true, false),
+            buildActingCore(actingMode),
             personaConfiguration,
           ) +
           referenceContext.system +
@@ -420,8 +430,10 @@ export function createTurnProcessor(
           context.conversationDirection +
           stateDirection +
           memoryContent('', memories ?? '') +
-          PERSONA_PRESENCE_REFERENCE +
+          presenceReference +
           initiativeDirection +
+          actingTurnDirection(actingMode) +
+          addressDirection +
           (parallelExpression && !factCount
             ? '\nFORMATO: somente a fala em prosa, sem cabeçalhos, JSON, tags, gestos ou rubricas.'
             : voiceOutputFormat(factCount, parallelExpression));
@@ -569,6 +581,39 @@ export function createTurnProcessor(
           let sampleRate: 16000 | 24000;
           const synthesisStart = performance.now();
           let measuredFirstTtsAudio = false;
+          const speechExpression =
+            expressiveVoice && metadataValid && !waiting
+              ? expression
+              : undefined;
+          let announcedDelivery = false;
+
+          const recordDelivery = (
+            output: import('../../ports/provider.ts').ProviderOutput,
+          ) => {
+            if (
+              !speechExpression ||
+              !output.speechExpressionApplied ||
+              announcedDelivery
+            ) {
+              return;
+            }
+
+            announcedDelivery = true;
+            emit({
+              type: 'reply.expression',
+              turnId,
+              responseId,
+              segmentId,
+              position,
+              personaVersion: PERSONA_VERSION,
+              ...output.speechExpressionApplied,
+              ...describeDelivery(output.speechExpressionApplied),
+              voiceProfileId: turn.profile?.id ?? null,
+              metadataValid: true,
+              deliveryApplied: true,
+              phase: 'update',
+            });
+          };
 
           const recordFirstTtsAudio = () => {
             if (!waiting && !measuredFirstTtsAudio) {
@@ -603,6 +648,7 @@ export function createTurnProcessor(
                   dataClass: context.dataClass,
                   maxTokens: 1,
                   speechContextId: responseId,
+                  ...(speechExpression ? { speechExpression } : {}),
                   voice: {
                     id: turn.profile.id,
                     referenceFile: turn.profile.referenceFile,
@@ -622,6 +668,7 @@ export function createTurnProcessor(
 
                 const rate = first.value.audio.sampleRate;
                 recordFirstTtsAudio();
+                recordDelivery(first.value);
 
                 if (!first.value.progressiveAudio) {
                   bufferedOutput = first.value;
@@ -705,6 +752,7 @@ export function createTurnProcessor(
                     content: spokenText,
                     dataClass: context.dataClass,
                     maxTokens: 1,
+                    ...(speechExpression ? { speechExpression } : {}),
                     voice: {
                       id: turn.profile.id,
                       referenceFile: turn.profile.referenceFile,
@@ -720,6 +768,8 @@ export function createTurnProcessor(
               if (!synthesized.audio) {
                 throw new VoiceInputError('O TTS não retornou áudio PCM.');
               }
+
+              recordDelivery(synthesized);
 
               sampleRate = synthesized.audio.sampleRate;
 
@@ -865,7 +915,7 @@ export function createTurnProcessor(
                 systemPrompt:
                   speechOnly || withoutPersistentMemory
                     ? applyPersonaConfiguration(
-                        buildVoicePersonaCore(true, false),
+                        buildActingCore(actingMode),
                         personaConfiguration,
                       ) +
                       referenceContext.system +
@@ -877,8 +927,10 @@ export function createTurnProcessor(
                         '',
                         withoutPersistentMemory ? '' : (memories ?? ''),
                       ) +
-                      PERSONA_PRESENCE_REFERENCE +
+                      presenceReference +
                       initiativeDirection +
+                      actingTurnDirection(actingMode) +
+                      addressDirection +
                       (continuation
                         ? '\nContinue a resposta a partir do trecho ja fornecido. Nao repita nem recomece esse trecho. Responda somente com a continuacao falavel, sem mencionar modelos, cotas ou a troca de provedor.'
                         : parallelExpression && !sourceFactCount
@@ -1062,6 +1114,9 @@ export function createTurnProcessor(
               context.dataClass,
               signal,
               buildHistoryContext(recent, 1800),
+              addressDirection
+                ? (personaConfiguration?.preferredAddressName ?? undefined)
+                : undefined,
             );
             metrics.time('memoryReplyCheck', performance.now() - reviewStarted);
 

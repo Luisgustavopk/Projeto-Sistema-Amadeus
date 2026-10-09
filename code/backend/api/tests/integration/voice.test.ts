@@ -87,16 +87,20 @@ const start = {
   },
 };
 
-it('avisa o cliente quando a API encerra para reinicialização', async () => {
-  const f = await setup();
-  const ws = f.connect(await f.ticket());
-  await once(ws, 'open');
-  const closed = once(ws, 'close');
-  await f.app.close();
-  const [code, reason] = await closed;
-  expect(code).toBe(1012);
-  expect(String(reason)).toBe('Service restart');
-});
+it.each(['1.0', '1.1'])(
+  'avisa a sessão %s quando a API encerra para reinicialização',
+  async (protocolVersion) => {
+    const f = await setup();
+    const ws = f.connect(await f.ticket());
+    await once(ws, 'open');
+    await exchange(ws, { ...start, protocolVersion, dataClass: 'synthetic' });
+    const closed = once(ws, 'close');
+    await f.app.close();
+    const [code, reason] = await closed;
+    expect(code).toBe(1012);
+    expect(String(reason)).toBe('Service restart');
+  },
+);
 
 async function exchange(ws: WebSocket, payload: unknown) {
   const result = once(ws, 'message');

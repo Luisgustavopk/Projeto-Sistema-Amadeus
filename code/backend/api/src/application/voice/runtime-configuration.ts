@@ -6,7 +6,10 @@ import { conversationAuthor } from '../providers/conversation-author.ts';
 import { ProviderBusyError } from '../../domain/errors/providers.ts';
 
 export const VoiceRuntimeOptionsSchema = z.strictObject({
-  expressionMode: z.enum(['embedded', 'parallel']).default('embedded'),
+  expressionMode: z
+    .enum(['embedded', 'parallel', 'expressive'])
+    .default('embedded'),
+  actingMode: z.enum(['curated', 'refined']).optional(),
   firstFlushMs: z.union([z.literal(200), z.literal(700)]).default(700),
   observerTimeoutMs: z.number().int().min(100).max(3000).default(1500),
   // Explicit owner consent is separate from the conversation provider policy.

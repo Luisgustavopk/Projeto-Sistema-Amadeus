@@ -3,6 +3,7 @@ import type {
   Role,
   ProviderConfig,
 } from '../domain/providers/model.ts';
+import type { Expression } from '../domain/persona/expression.ts';
 
 export type ProviderFactory = (role: Role, config: ProviderConfig) => Provider;
 export type ProviderCapabilities = {
@@ -24,6 +25,7 @@ export type ProviderInput = {
   audio?: { pcmBase64: string; sampleRate: 16000; channels: 1 } | undefined;
   voice?: { id: string; referenceFile: string; referenceSha256: string };
   speechContextId?: string;
+  speechExpression?: Expression;
 };
 export type ProviderOutput = {
   cache?: {
@@ -34,6 +36,7 @@ export type ProviderOutput = {
     generationId: string | null;
   };
   progressiveAudio?: boolean;
+  speechExpressionApplied?: Expression;
   content: string;
   inputTokens: number | null;
   outputTokens: number | null;

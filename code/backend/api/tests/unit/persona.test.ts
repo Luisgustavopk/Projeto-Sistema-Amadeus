@@ -244,7 +244,7 @@ it('envia o complemento curado como orientação separada do histórico real', (
   expect(buildPersonaPrompt().length).toBeLessThanOrEqual(32768);
 });
 
-it('eventos por segmento declaram direção artística sem prometer atuação nativa', () => {
+it('eventos por segmento distinguem direção artística e confirmação de controle nativo', () => {
   const id = 'aee69d12-56dc-431f-a3f1-639377f77552';
   const value = VoicePayload.parse({
     type: 'reply.expression',
@@ -260,8 +260,15 @@ it('eventos por segmento declaram direção artística sem prometer atuação na
     deliveryApplied: false,
   });
   expect(value.type).toBe('reply.expression');
+  expect(
+    VoicePayload.parse({
+      ...value,
+      metadataValid: true,
+      deliveryApplied: true,
+    }),
+  ).toMatchObject({ deliveryApplied: true });
   expect(() =>
-    VoicePayload.parse({ ...value, deliveryApplied: true }),
+    VoicePayload.parse({ ...value, deliveryApplied: 'yes' }),
   ).toThrow();
 });
 

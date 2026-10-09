@@ -49,7 +49,7 @@ const event = z.discriminatedUnion('type', [
     voiceProfileId: z.uuid().nullable(),
     metadataValid: z.boolean(),
     phase: z.enum(['initial', 'update']).optional(),
-    deliveryApplied: z.literal(false),
+    deliveryApplied: z.boolean(),
     deliveryPresetId: DeliveryPresetSchema,
     avatarExpression: z.enum([
       'sorriso_discreto',

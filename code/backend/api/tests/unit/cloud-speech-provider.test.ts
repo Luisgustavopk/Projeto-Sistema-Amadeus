@@ -203,6 +203,49 @@ it('limita o tamanho do áudio retornado pela Cartesia', async () => {
   ).rejects.toMatchObject({ code: 'PROVIDER_INVALID' });
 });
 
+it('envia a expressão também na rota de áudio completo e a confirma após PCM válido', async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>(
+    async () => new Response(Buffer.alloc(4800)),
+  );
+  vi.stubGlobal('fetch', fetch);
+  const provider = createProviderFactory({ CARTESIA_API_KEY: 'test-only-key' })(
+    'tts',
+    ProviderSchema.parse({
+      adapter: 'cartesia',
+      model: 'sonic-3.6',
+      voiceId: '43df381e-ea60-4277-bd90-91ceb0c71007',
+      apiKeyEnv: 'CARTESIA_API_KEY',
+      dataPolicy: 'personal-approved',
+      policyReviewedAt: '2025-01-01T00:00:00.000Z',
+      policyReference: 'https://example.com/privacy',
+    }),
+  );
+  const speechExpression = {
+    intent: 'agradecer' as const,
+    emotion: 'constrangimento' as const,
+    intensity: 0.4,
+  };
+  const output = await provider.execute({
+    content: 'Ah… obrigada.',
+    dataClass: 'synthetic',
+    maxTokens: 1,
+    speechExpression,
+  });
+  expect(JSON.parse(fetch.mock.calls[0]?.[1]?.body as string)).toMatchObject({
+    generation_config: { emotion: 'hesitant' },
+  });
+  expect(output.speechExpressionApplied).toEqual(speechExpression);
+  fetch.mockImplementation(async () => new Response(Buffer.alloc(3)));
+  await expect(
+    provider.execute({
+      content: 'Obrigada.',
+      dataClass: 'synthetic',
+      maxTokens: 1,
+      speechExpression,
+    }),
+  ).rejects.toThrow();
+});
+
 it.each([
   [401, 'PROVIDER_CONFIGURATION'],
   [429, 'QUOTA_EXCEEDED'],

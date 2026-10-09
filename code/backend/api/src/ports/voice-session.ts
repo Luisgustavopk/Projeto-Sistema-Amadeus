@@ -37,7 +37,7 @@ export type VoiceEvent =
         voiceProfileId: string | null;
         metadataValid: boolean;
         phase?: 'initial' | 'update';
-        deliveryApplied: false;
+        deliveryApplied: boolean;
       })
   | { type: 'state'; turnId: number; state: CallState }
   | { type: 'transcript.final'; turnId: number; text: string }

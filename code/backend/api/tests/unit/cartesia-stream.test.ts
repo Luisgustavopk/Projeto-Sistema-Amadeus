@@ -124,6 +124,26 @@ it('entrega PCM antes de concluir e continua no mesmo contexto sem reiniciar a c
   ).toBe(true);
 });
 
+it('envia emoção antes da síntese e reporta aplicação apenas com PCM válido', async () => {
+  const f = await fixture();
+  const speechExpression = {
+    intent: 'limitar' as const,
+    emotion: 'raiva' as const,
+    intensity: 0.8,
+  };
+  const audio = f.adapter.streamAudio({ ...f.input, speechExpression });
+  const stream = audio[Symbol.asyncIterator]();
+  expect((await stream.next()).value).toMatchObject({
+    speechExpressionApplied: speechExpression,
+  });
+  expect(f.requests[0]).toMatchObject({
+    generation_config: { emotion: 'mad' },
+  });
+  expect(f.requests[0]).not.toHaveProperty('volume');
+  f.finish();
+  expect((await stream.next()).done).toBe(true);
+});
+
 it('abre outro contexto para um bloco tardio em vez de reutilizar um ID expirado', async () => {
   const f = await fixture();
 

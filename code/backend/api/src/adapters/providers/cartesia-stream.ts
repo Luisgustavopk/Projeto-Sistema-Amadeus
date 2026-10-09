@@ -1,6 +1,7 @@
 import { WebSocket, type ClientOptions } from 'ws';
 import { randomUUID, createHash } from 'node:crypto';
 import type { ProviderInput, ProviderOutput } from '../../ports/provider.ts';
+import { cartesiaExpression } from './cartesia-expression.ts';
 import {
   ProviderInvalidError,
   ProviderTemporarilyUnavailableError,
@@ -205,7 +206,11 @@ export function cartesiaStreaming(
           throw state.failure;
         }
 
+        const delivery = cartesiaExpression(input.speechExpression);
         const settings = {
+          ...(delivery
+            ? { generation_config: delivery.generation_config }
+            : {}),
           model_id: 'sonic-3.6',
           voice: { id: voiceId },
           language: 'pt',
@@ -316,6 +321,9 @@ export function cartesiaStreaming(
 
             yield {
               progressiveAudio: true,
+              ...(delivery
+                ? { speechExpressionApplied: delivery.expression }
+                : {}),
               content: '',
               inputTokens: null,
               outputTokens: null,

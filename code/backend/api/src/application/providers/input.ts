@@ -6,6 +6,7 @@ import {
 } from '../../domain/providers/model.ts';
 import { InvalidProviderInputError } from '../../domain/errors/providers.ts';
 import type { ProviderInput } from '../../ports/provider.ts';
+import { ExpressionSchema } from '../../domain/persona/expression.ts';
 
 const InputSchema = z.strictObject({
   content: z.string().max(65536),
@@ -31,6 +32,7 @@ const InputSchema = z.strictObject({
     .optional(),
   maxTokens: z.number().int().min(1).max(1000000),
   speechContextId: z.uuid().optional(),
+  speechExpression: ExpressionSchema.optional(),
   sessionId: z.uuid().optional(),
   history: z
     .array(
@@ -56,6 +58,7 @@ export function validateProviderInput(role: Role, input: ProviderInput) {
       0,
     ) ?? 0) > 65536 ||
     (role !== 'tts' && input.speechContextId !== undefined) ||
+    (role !== 'tts' && input.speechExpression !== undefined) ||
     (input.memoryTask !== undefined && input.purpose !== 'memory') ||
     (role === 'stt' ? !input.audio : !input.content.trim())
   ) {

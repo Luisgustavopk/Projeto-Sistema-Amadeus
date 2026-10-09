@@ -195,10 +195,18 @@ it('escolha manual preserva reservas e política sem permitir ativar pagamento e
   ).toBe(false);
 });
 
-async function processorFixture(rejectMemory = false) {
+async function processorFixture(
+  rejectMemory = false,
+  expressive = false,
+  nativeDelivery = true,
+  preferredAddressName?: string,
+) {
   const events: VoiceEvent[] = [];
   const inputs: ProviderInput[] = [];
-  const execute = vi.fn(async () => ({
+  const execute = vi.fn(async (_role: unknown, input: ProviderInput) => ({
+    ...(nativeDelivery && input.speechExpression
+      ? { speechExpressionApplied: input.speechExpression }
+      : {}),
     content: '',
     inputTokens: 0,
     outputTokens: 0,
@@ -235,7 +243,9 @@ async function processorFixture(rejectMemory = false) {
           content:
             rejectMemory && inputs.length === 1
               ? '<expression>{"memory":{"use":"recall","facts":[0]}}</expression>Você gosta de chá.'
-              : 'Hmm… isso ainda precisa de evidência.',
+              : (expressive
+                  ? '<expression>{"intent":"limitar","emotion":"raiva","intensity":0.8,"memory":{"use":"none","facts":[]}}</expression>'
+                  : '') + 'Hmm… isso ainda precisa de evidência.',
           inputTokens: 1,
           outputTokens: 1,
         };
@@ -243,7 +253,17 @@ async function processorFixture(rejectMemory = false) {
     },
     history,
     createVoiceMetrics(),
-    undefined,
+    preferredAddressName
+      ? {
+          get: async () => ({
+            version: 'test',
+            revision: 1,
+            direction: '',
+            updatedAt: null,
+            preferredAddressName,
+          }),
+        }
+      : undefined,
     rejectMemory
       ? {
           interruptBackground: vi.fn(),
@@ -259,7 +279,8 @@ async function processorFixture(rejectMemory = false) {
     {
       get: async () => ({
         options: {
-          expressionMode: 'parallel',
+          expressionMode: expressive ? 'expressive' : 'parallel',
+          actingMode: 'refined',
           firstFlushMs: 200,
           observerTimeoutMs: 2000,
           observerPersonalConsent: false,
@@ -276,7 +297,7 @@ async function processorFixture(rejectMemory = false) {
       ownerId: 'owner',
       turnId: 1,
       responseId: randomUUID(),
-      dataClass: 'synthetic',
+      dataClass: preferredAddressName ? 'personal' : 'synthetic',
       text: 'Você tem certeza?',
       profile: {
         id: randomUUID(),
@@ -293,6 +314,47 @@ async function processorFixture(rejectMemory = false) {
 
   return { events, inputs, execute, classify, verify, finish, controller };
 }
+
+it('modo expressivo leva a reação do autor ao TTS sem classificador adicional', async () => {
+  const f = await processorFixture(false, true);
+  expect(f.classify).not.toHaveBeenCalled();
+  expect(f.execute).toHaveBeenCalledWith(
+    'tts',
+    expect.objectContaining({
+      speechExpression: { intent: 'limitar', emotion: 'raiva', intensity: 0.8 },
+    }),
+    expect.any(AbortSignal),
+  );
+  const text = f.events.find((e) => e.type === 'reply.text');
+  expect(
+    f.events.find((e) => e.type === 'reply.expression' && e.deliveryApplied),
+  ).toMatchObject({
+    phase: 'update',
+    segmentId: text && 'segmentId' in text ? text.segmentId : null,
+  });
+  f.controller.abort();
+});
+
+it('não declara controle aplicado se a reserva não implementa a expressão', async () => {
+  const f = await processorFixture(false, true, false);
+  expect(
+    f.events.some((e) => e.type === 'reply.expression' && e.deliveryApplied),
+  ).toBe(false);
+  f.controller.abort();
+});
+
+it('preserva atuação e vocativo no reparo sem fatos e fornece a preferência ao revisor', async () => {
+  const f = await processorFixture(true, false, true, 'Alex');
+  expect(f.inputs).toHaveLength(2);
+
+  for (const input of f.inputs) {
+    expect(input.systemPrompt).toContain('Ficha experimental de Amadeus');
+    expect(input.systemPrompt).toContain('"preferredAddressName":"Alex"');
+  }
+
+  expect(f.verify.mock.calls[0]?.at(-1)).toBe('Alex');
+  f.controller.abort();
+});
 
 it('áudio e resposta completa são liberados antes dos metadados, que atualizam o mesmo segmento', async () => {
   const f = await processorFixture();
