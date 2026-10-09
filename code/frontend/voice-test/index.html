@@ -15,6 +15,39 @@
       <form id="connect-form">
         <div class="fields"><label>Endereço da API<input id="api-url" type="url" value="http://127.0.0.1:3001" required></label><label>Token de acesso da API<input id="token" type="password" autocomplete="off" placeholder="API_ACCESS_TOKEN do .env" required></label><label>Classificação dos dados<select id="data-class"><option value="personal" selected>Personal — microfone e mensagens reais</option><option value="synthetic">Synthetic — somente conteúdo artificial</option></select></label></div>
         <p class="hint">Personal é o padrão para voz real. A opção synthetic só pode ser usada com conteúdo inteiramente artificial; nela, o microfone fica desabilitado. O token permanece apenas nesta página enquanto ela estiver aberta.</p>
+        <div class="fields">
+            <label
+              >Modelo da conversa<select id="conversation-author">
+                <option value="configured">Principal configurado</option>
+                <option value="llama">Llama 3.3 70B</option>
+                <option value="deepseek">DeepSeek V4.1 Flash</option>
+              </select></label
+            >
+            <label
+              >Expressões<select id="expression-mode">
+                <option value="parallel">Classificação em paralelo</option>
+                <option value="embedded">Metadados gerados com a fala</option>
+              </select></label
+            >
+            <label
+              >Liberação da primeira frase<select id="first-flush">
+                <option value="700">700 ms — referência</option>
+                <option value="200">200 ms — validar em voz</option>
+              </select></label
+            >
+          </div>
+          <label
+            ><input id="observer-personal-consent" type="checkbox" /> Autorizo
+            enviar minha mensagem, o histórico recente e a fala da Amadeus ao
+            DeepSeek via OpenRouter para classificar expressões nas chamadas
+            enquanto esta opção estiver ativada, usando meus créditos.</label
+          >
+          <p class="hint">
+            A seleção do modelo é manual. Em modo paralelo, a classificação não
+            segura o áudio; sem autorização para dados pessoais, a expressão
+            permanece neutra. A voz não recebe controles emocionais do
+            classificador nesta etapa.
+          </p>
         <div class="actions"><button id="connect" type="submit">Conectar</button><button id="disconnect" type="button" class="secondary" disabled>Encerrar chamada</button><button id="inspect" type="button" class="secondary">Verificar serviços</button></div>
       </form>
       <div id="providers" class="providers" aria-live="polite">LLM, STT e TTS precisam estar em execução.</div>
@@ -23,6 +56,9 @@
     </section>
     <section class="panel conversation-panel" aria-labelledby="conversation-title">
       <div class="section-heading"><h2 id="conversation-title">Conversa</h2><span id="microphone-status" class="muted">Microfone desligado</span></div>
+      <p id="expression-status" class="muted" role="status">
+          Expressão: aguardando reprodução.
+        </p>
       <div class="actions"><button id="microphone" disabled>Iniciar microfone</button><button id="interrupt" class="secondary" disabled>Interromper resposta</button></div>
       <label><input id="presence" type="checkbox" checked> Permitir saudação e iniciativa ocasional nesta chamada</label>
       <p class="muted">A iniciativa espera sua disponibilidade e respeita a fala e a reprodução. Ao pausar o microfone ou ocultar a página, ela é suspensa.</p>

@@ -1,4 +1,4 @@
-export function createPlayback(context, send, onError, onStart) {
+export function createPlayback(context, send, onError, onStart, onPlayback) {
   let pending = null;
   let cursor = context.currentTime;
   let turnId = 0;
@@ -62,7 +62,16 @@ export function createPlayback(context, send, onError, onStart) {
     source.connect(context.destination);
     const start = Math.max(context.currentTime + 0.02, cursor);
     cursor = start + audio.duration;
-    const item = { meta, start, offset, count, last: 0, segment, timer: null };
+    const item = {
+      meta,
+      start,
+      offset,
+      count,
+      last: 0,
+      segment,
+      timer: null,
+      startTimer: null,
+    };
     item.timer = setInterval(() => progress(item), 500);
     confirmations.add(item);
     sources.add(source);
@@ -72,9 +81,27 @@ export function createPlayback(context, send, onError, onStart) {
       confirmations.delete(item);
       sources.delete(source);
       source.disconnect();
+      clearTimeout(item.startTimer);
+      onPlayback?.();
       finish();
     };
     source.start(start);
+    if (onPlayback) {
+      const notifyStarted = () => {
+        if (context.currentTime < start) {
+          item.startTimer = setTimeout(
+            notifyStarted,
+            Math.max(4, (start - context.currentTime) * 1000),
+          );
+          return;
+        }
+        onPlayback();
+      };
+      item.startTimer = setTimeout(
+        notifyStarted,
+        Math.max(0, (start - context.currentTime) * 1000),
+      );
+    }
     if (offset === 0) {
       onStart?.({
         turnId,
@@ -85,6 +112,18 @@ export function createPlayback(context, send, onError, onStart) {
     segment.scheduled += count;
   };
   return {
+    activeSegment() {
+      return (
+        [...confirmations]
+          .filter(
+            (item) =>
+              context.currentTime >= item.start &&
+              context.currentTime <
+                item.start + item.count / item.meta.sampleRate,
+          )
+          .sort((a, b) => b.start - a.start)[0]?.meta ?? null
+      );
+    },
     abortStream(meta) {
       if (
         pending?.streaming &&
@@ -178,6 +217,7 @@ export function createPlayback(context, send, onError, onStart) {
             latest.set(item.meta.segmentId, item);
         }
         clearInterval(item.timer);
+        clearTimeout(item.startTimer);
       }
       for (const item of latest.values()) progress(item, false, true);
       confirmations.clear();
@@ -191,6 +231,7 @@ export function createPlayback(context, send, onError, onStart) {
       cursor = context.currentTime;
       turnId = nextTurn;
       lastProgressTime = -Infinity;
+      onPlayback?.();
     },
     metadata(meta) {
       const frameSamples = meta.sampleRate / 50;

@@ -2,8 +2,9 @@ import { createCallClient } from "/call-client/index.mjs";
 import { createVoiceBaseline } from "/call-client/baseline.mjs";
 import { createTestReport } from "./report.mjs";
 import { attachTtsDiagnostic } from "./tts-diagnostic.mjs";
-import { attachSttDiagnostic } from './stt-diagnostic.mjs';
+import { attachSttDiagnostic } from "./stt-diagnostic.mjs";
 import { describeCallClosure } from "./connection-status.mjs";
+import { prepareConversationRuntime } from "./conversation-runtime.mjs";
 
 const element = (id) => document.getElementById(id);
 const baseline = createVoiceBaseline();
@@ -42,7 +43,8 @@ function renderControls() {
   };
   element("status").textContent = labels[state] || state;
   element("status").dataset.active = String(connected);
-  element("connect").disabled = connected || state === "connecting" || diagnosticBusy;
+  element("connect").disabled =
+    connected || state === "connecting" || diagnosticBusy;
   element("disconnect").disabled = !connected;
   element("api-url").disabled = connected || state === "connecting";
   element("token").disabled = connected || state === "connecting";
@@ -51,6 +53,13 @@ function renderControls() {
     ["personal-approved", "local-approved"].includes(dataPolicy),
   );
   element("data-class").disabled = connected || state === "connecting";
+  for (const id of [
+    "conversation-author",
+    "expression-mode",
+    "first-flush",
+    "observer-personal-consent",
+  ])
+    element(id).disabled = connected || state === "connecting";
   element("microphone").disabled =
     !connected ||
     microphonePending ||
@@ -98,6 +107,7 @@ function receive(event) {
       intensity: event.intensity,
       deliveryPresetId: event.deliveryPresetId,
       metadataValid: event.metadataValid,
+      phase: event.phase,
       deliveryApplied: event.deliveryApplied,
       reason: event.type === "connection.closed" ? event.reason : undefined,
       wasClean: event.wasClean,
@@ -350,7 +360,9 @@ async function inspect() {
   }
 }
 
-element("presence").addEventListener("change", () => client?.setPresence(element("presence").checked));
+element("presence").addEventListener("change", () =>
+  client?.setPresence(element("presence").checked),
+);
 element("connect-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   if (client || state === "connecting" || diagnosticBusy) return;
@@ -365,10 +377,19 @@ element("connect-form").addEventListener("submit", async (event) => {
     const resumeOptions =
       pendingResume?.apiUrl === options.apiUrl &&
       pendingResume?.dataClass === options.dataClass
-        ? { conversationId: pendingResume.conversationId, resume: pendingResume.resume }
+        ? {
+            conversationId: pendingResume.conversationId,
+            resume: pendingResume.resume,
+          }
         : {};
     state = "connecting";
     renderControls();
+    await prepareConversationRuntime(options, {
+      author: element("conversation-author").value,
+      expressionMode: element("expression-mode").value,
+      firstFlushMs: Number(element("first-flush").value),
+      observerPersonalConsent: element("observer-personal-consent").checked,
+    });
     client = await createCallClient({
       ...options,
       ...resumeOptions,
@@ -377,6 +398,12 @@ element("connect-form").addEventListener("submit", async (event) => {
         if (current === generation) receive(value);
       },
       onTiming: timing,
+      onExpression: (expression) => {
+        if (current !== generation) return;
+        element("expression-status").textContent = expression
+          ? `Expressão: ${expression.emotion} · intenção: ${expression.intent} · intensidade: ${expression.intensity}${expression.metadataValid ? "" : " (provisória)"}`
+          : "Expressão: aguardando reprodução.";
+      },
       onError: (error) => {
         if (current === generation) showError(error);
       },
@@ -465,7 +492,14 @@ element("export").addEventListener("click", () => {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
-renderDiagnostic = attachSttDiagnostic(() => !client && state !== 'connecting', (busy) => { diagnosticBusy = busy; element('connect').disabled = Boolean(client) || state === 'connecting' || busy; });
+renderDiagnostic = attachSttDiagnostic(
+  () => !client && state !== "connecting",
+  (busy) => {
+    diagnosticBusy = busy;
+    element("connect").disabled =
+      Boolean(client) || state === "connecting" || busy;
+  },
+);
 attachTtsDiagnostic();
 
 window.addEventListener("pagehide", () => {

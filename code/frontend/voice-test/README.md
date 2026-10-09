@@ -1,5 +1,7 @@
 # Teste local de voz
 
+Antes de conectar, escolha o autor da conversa (principal configurado, Llama ou DeepSeek), o modo de expressão e a primeira liberação de 700 ou 200 ms. A escolha é manual; o Jev ainda não escolhe o autor pelo contexto. Em modo paralelo, o observador DeepSeek classifica segmentos sem atrasar o TTS. Para dados pessoais, marque a autorização específica na interface; desmarcada, o observador remoto não recebe esses dados. A expressão exibida acompanha a reprodução do segmento e é descartada após interrupção. Os controles do TTS não são modificados. Compare os dois prazos com as mesmas falas e encerre a chamada antes de mudar a configuração. [Arquitetura e roteiro de validação](../../../docs/architecture/Integracao_Fala_Expressoes_Streaming.md).
+
 A opção de presença, marcada inicialmente, permite uma saudação espontânea e iniciativas moderadas durante a chamada. Reinicie a API e recarregue a página para usar a negociação nova. Conecte sem enviar nada para ouvir a saudação; uma mensagem imediata sua a dispensa. Após conversar, mantenha a página visível e a presença ativa: uma iniciativa pode vir depois de 90 segundos de silêncio, respeitando também 180 segundos desde a última oferta. O limite é duas iniciativas por chamada. Pausar o microfone, ocultar a página ou desmarcar a opção suspende esse comportamento. Não há backchannels gravados nesta versão.
 
 As falas espontâneas usam os provedores configurados e consomem suas cotas. Sua validação automática utiliza serviços simulados; um teste manual com voz consome TTS normalmente.

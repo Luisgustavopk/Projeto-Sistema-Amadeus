@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createPlayback } from "../playback.mjs";
-function fixture() {
+function fixture(onPlayback) {
   const sent = [];
   const sources = [];
   const context = {
@@ -33,6 +33,8 @@ function fixture() {
     (error) => {
       throw error;
     },
+    undefined,
+    onPlayback,
   );
   player.stop(1);
   return { player, context, sent, sources };
@@ -64,6 +66,29 @@ function liveFrames(f, count) {
     f.player.frame(data);
   }
 }
+
+test("a expressão acompanha o relógio de áudio, mesmo se o timer disparar antes do início real", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
+  const states = [];
+  let f;
+  f = fixture(() => {
+    if (f) states.push(f.player.activeSegment()?.segmentId ?? null);
+  });
+  try {
+    fill(f);
+    states.length = 0;
+    t.mock.timers.tick(25);
+    assert.deepEqual(states, []);
+    f.context.currentTime = 0.021;
+    t.mock.timers.tick(25);
+    assert.deepEqual(states, ["segment"]);
+    f.context.currentTime = 0.061;
+    f.sources[0].onended();
+    assert.equal(states.at(-1), null);
+  } finally {
+    f.player.stop();
+  }
+});
 
 test("receiving the end of a queued minute does not confirm unheard audio", (t) => {
   t.mock.timers.enable({ apis: ["setInterval"] });

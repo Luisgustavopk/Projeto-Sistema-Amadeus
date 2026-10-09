@@ -34,6 +34,8 @@ test("servidor publica somente arquivos da interface e módulos do cliente", asy
     "/tts-diagnostic.mjs",
     "/report.mjs",
     "/connection-status.mjs",
+    "/conversation-runtime.mjs",
+    "/call-client/expression-playback.mjs",
     "/stt-sample.mjs",
     "/stt-diagnostic.mjs",
     "/speech-evaluation-client.mjs",
