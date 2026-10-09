@@ -58,6 +58,8 @@ function renderControls() {
     "expression-mode",
     "first-flush",
     "observer-personal-consent",
+    "acting-mode",
+    "preferred-address-name",
   ])
     element(id).disabled = connected || state === "connecting";
   element("microphone").disabled =
@@ -389,6 +391,8 @@ element("connect-form").addEventListener("submit", async (event) => {
       expressionMode: element("expression-mode").value,
       firstFlushMs: Number(element("first-flush").value),
       observerPersonalConsent: element("observer-personal-consent").checked,
+      actingMode: element("acting-mode").value,
+      preferredAddressName: element("preferred-address-name").value,
     });
     client = await createCallClient({
       ...options,
@@ -401,7 +405,7 @@ element("connect-form").addEventListener("submit", async (event) => {
       onExpression: (expression) => {
         if (current !== generation) return;
         element("expression-status").textContent = expression
-          ? `Expressão: ${expression.emotion} · intenção: ${expression.intent} · intensidade: ${expression.intensity}${expression.metadataValid ? "" : " (provisória)"}`
+          ? `Expressão: ${expression.emotion} · intenção: ${expression.intent} · intensidade: ${expression.intensity}${expression.metadataValid ? "" : " (provisória)"}${expression.deliveryApplied ? " · controle enviado ao TTS" : ""}`
           : "Expressão: aguardando reprodução.";
       },
       onError: (error) => {

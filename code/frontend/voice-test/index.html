@@ -27,6 +27,7 @@
               >Expressões<select id="expression-mode">
                 <option value="parallel">Classificação em paralelo</option>
                 <option value="embedded">Metadados gerados com a fala</option>
+                <option value="expressive">Voz expressiva — emoção antes da síntese</option>
               </select></label
             >
             <label
@@ -35,6 +36,8 @@
                 <option value="200">200 ms — validar em voz</option>
               </select></label
             >
+            <label>Atuação<select id="acting-mode"><option value="refined">Núcleo refinado</option><option value="curated">Núcleo anterior — comparação</option></select></label>
+            <label>Nome de tratamento (opcional)<input id="preferred-address-name" maxlength="80" autocomplete="given-name" placeholder="Como prefere ser chamado"></label>
           </div>
           <label
             ><input id="observer-personal-consent" type="checkbox" /> Autorizo
@@ -45,8 +48,10 @@
           <p class="hint">
             A seleção do modelo é manual. Em modo paralelo, a classificação não
             segura o áudio; sem autorização para dados pessoais, a expressão
-            permanece neutra. A voz não recebe controles emocionais do
-            classificador nesta etapa.
+            permanece neutra. Voz expressiva usa os metadados do próprio autor
+            antes da síntese, sem classificador adicional; isso pode aumentar a
+            espera inicial. O nome de tratamento fica salvo para suas próximas
+            conversas pessoais. Campo vazio mantém a preferência existente.
           </p>
         <div class="actions"><button id="connect" type="submit">Conectar</button><button id="disconnect" type="button" class="secondary" disabled>Encerrar chamada</button><button id="inspect" type="button" class="secondary">Verificar serviços</button></div>
       </form>

@@ -37,12 +37,23 @@ export async function prepareConversationRuntime(
     await invoke("/v1/voice/runtime/author", "POST", {
       author: choices.author,
     });
+  const preferredAddressName = choices.preferredAddressName?.trim();
+  if (preferredAddressName && connection.dataClass !== "synthetic") {
+    const persona = await invoke("/v1/persona");
+    if (persona.preferredAddressName !== preferredAddressName)
+      await invoke("/v1/persona", "PUT", {
+        expectedRevision: persona.revision,
+        direction: persona.direction,
+        preferredAddressName,
+      });
+  }
   const state = await invoke("/v1/voice/runtime");
   const options = {
     ...state.options,
     expressionMode: choices.expressionMode,
     firstFlushMs: choices.firstFlushMs,
     observerPersonalConsent: choices.observerPersonalConsent,
+    ...(choices.actingMode ? { actingMode: choices.actingMode } : {}),
   };
   if (JSON.stringify(options) === JSON.stringify(state.options)) return state;
   return invoke("/v1/voice/runtime", "PUT", {
