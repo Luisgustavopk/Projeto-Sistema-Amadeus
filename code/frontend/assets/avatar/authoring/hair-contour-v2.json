@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "method": "local-pixel-edit",
+  "authorization": "Usuário autorizou edição local apenas no contorno, sem geração de imagem, em 10/10/2026.",
+  "colour": [45, 23, 22],
+  "widthPixels": 2.1,
+  "alphaThreshold": 128,
+  "changes": [
+    {
+      "id": "hand-on-hip",
+      "source": "hand-on-hip-v1.png",
+      "sourceSha256": "00c1f824cfe1556bbc6be5aeefdbbea0a639cafb73aa1f63b2fcea706c911fe3",
+      "output": "hand-on-hip-v2.png",
+      "region": [464, 176, 632, 434],
+      "endFadePixels": 12
+    },
+    {
+      "id": "lean-forward",
+      "source": "lean-forward-v1.png",
+      "sourceSha256": "860b675834e69bc5f14907be0cc343fadf979cc0e258fb0b02241a5ad8cf5766",
+      "output": "lean-forward-v2.png",
+      "region": [386, 80, 604, 364],
+      "endFadePixels": 12
+    }
+  ],
+  "invariants": [
+    "Dimensões, posição e geometria idênticas ao PNG aprovado.",
+    "Canal alfa inteiro preservado byte a byte, sem halo ou expansão da silhueta.",
+    "RGB alterado somente na borda exterior do cabelo dentro da região delimitada.",
+    "Rosto, olhos, fios internos, roupa e pose preservados byte a byte."
+  ]
+}

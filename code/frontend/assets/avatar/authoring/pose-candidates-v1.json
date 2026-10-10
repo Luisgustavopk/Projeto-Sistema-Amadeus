@@ -1,16 +1,17 @@
 {
-  "version": 1,
+  "version": 2,
   "date": "2026-10-10",
-  "status": "visual-review-required",
+  "status": "local-contour-refinement",
   "runtimeEnabled": false,
   "generationMode": "built-in-imagegen",
   "artworkFormat": "flattened-transparent-png",
   "identityVerified": false,
+  "userReview": "Desenhos aceitos pelo usuário, com pedido de corrigir somente o contorno do cabelo em mão na cintura e inclinação. As revisões v2 aplicam apenas esse ajuste local.",
   "reference": "authoring-v1/neutral/current-palette-reference.png",
   "referenceBounds": [196, 396, 576, 1404],
   "referenceSha256": "8618a57f32e12669785563a7ab6d4c7e73798350a25ee9103d836be9e126a080",
   "limitations": [
-    "O desenho gerado não preserva os pixels originais do rosto e cabelo; não foi aprovado como idêntico ao avatar.",
+    "A aprovação visual dos desenhos não significa identidade de pixels com o modelo original. As revisões v2 preservam todos os pixels aprovados fora da borda corrigida.",
     "Os PNGs são candidatos de desenho, sem peças separadas, pintura oculta, malhas, deformadores ou keyforms.",
     "Não há novo CMO3 ou MOC3; nenhuma dessas poses foi ativada no avatar atual."
   ],
@@ -22,16 +23,18 @@
       "bounds": [206, 115, 533, 1548],
       "sha256": "1aa587681bfb22b9cbb6b660510ed674d14d72db9ad08282ccbae243d2b549e9",
       "check": "Conferir cruzamento dos antebraços, mãos, punhos e dobras do jaleco.",
-      "observation": "O cruzamento está legível. Contornos e acabamento ainda precisam ser comparados com o original."
+      "observation": "Desenho aceito pelo usuário; nenhuma alteração nesta revisão."
     },
     {
       "id": "hand-on-hip",
       "label": "Mão na cintura",
-      "file": "hand-on-hip-v1.png",
+      "file": "hand-on-hip-v2.png",
+      "previousFile": "hand-on-hip-v1.png",
+      "previousSha256": "00c1f824cfe1556bbc6be5aeefdbbea0a639cafb73aa1f63b2fcea706c911fe3",
       "bounds": [161, 181, 693, 1502],
-      "sha256": "00c1f824cfe1556bbc6be5aeefdbbea0a639cafb73aa1f63b2fcea706c911fe3",
-      "check": "Conferir contato da mão com a cintura, dedos e continuidade entre ombro, cotovelo e punho.",
-      "observation": "A mão está apoiada na cintura e o cotovelo está afastado. A manga e o contorno da mão precisam de revisão."
+      "sha256": "f1c3bbae75c2c4452c39f45f67c8b54edaf34e58dcfdeeaa5aca3c89a5a11abe",
+      "check": "Conferir o contorno escuro contínuo na curva superior direita do cabelo. Use Antes do contorno para comparar.",
+      "observation": "Correção local v2: 556 pixels da borda do cabelo ajustados; rosto, roupa, pose e todo o canal alfa idênticos à versão aprovada."
     },
     {
       "id": "idea-pointing",
@@ -40,16 +43,18 @@
       "bounds": [155, 252, 599, 1431],
       "sha256": "b184b19e441c70226c063a7866569a44cb8a9851737476f958e655fcee966e1b",
       "check": "Conferir anatomia da mão, dedo indicador e proporção da mão em relação ao rosto.",
-      "observation": "O indicador está levantado e os demais dedos estão dobrados. Conferir espessura do traço nos dedos."
+      "observation": "Desenho aceito pelo usuário; nenhuma alteração nesta revisão."
     },
     {
       "id": "lean-forward",
       "label": "Inclinação com mão na cintura",
-      "file": "lean-forward-v1.png",
+      "file": "lean-forward-v2.png",
+      "previousFile": "lean-forward-v1.png",
+      "previousSha256": "860b675834e69bc5f14907be0cc343fadf979cc0e258fb0b02241a5ad8cf5766",
       "bounds": [100, 87, 823, 1596],
-      "sha256": "860b675834e69bc5f14907be0cc343fadf979cc0e258fb0b02241a5ad8cf5766",
-      "check": "Conferir profundidade dos ombros, gola e tronco, mantendo a mão na cintura e a identidade original.",
-      "observation": "Há perspectiva do tronco e mão na cintura. O rosto gerado não deve substituir as peças faciais originais; piscadela e sorriso continuam independentes."
+      "sha256": "4b2b7e94189ce0585107a87511180b35c130cc3d18876c69d6238629d9360da7",
+      "check": "Conferir o contorno escuro contínuo na curva superior direita do cabelo. Use Antes do contorno para comparar.",
+      "observation": "Correção local v2: 959 pixels da borda do cabelo ajustados; rosto, roupa, pose e todo o canal alfa idênticos à versão aprovada."
     }
   ]
 }

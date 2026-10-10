@@ -11,12 +11,17 @@ const digest = (buffer) => createHash('sha256').update(buffer).digest('hex');
 const reference = await readFile(new URL(manifest.reference, local));
 if (digest(reference) !== manifest.referenceSha256) throw new Error('Review reference changed; remeasure its bounds.');
 for (const pose of manifest.poses) {
-  if (!/^[a-z-]+-v1\.png$/.test(pose.file)) throw new Error('Invalid candidate file');
+  if (!/^[a-z-]+-v[1-9]\d*\.png$/.test(pose.file)) throw new Error('Invalid candidate file');
   const png = await readFile(new URL(pose.file, output));
   if (!png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw new Error('Invalid PNG: ' + pose.file);
   pose.width = png.readUInt32BE(16);
   pose.height = png.readUInt32BE(20);
   if (digest(png) !== pose.sha256) throw new Error('Candidate changed; version and remeasure it: ' + pose.file);
+  if (pose.previousFile) {
+    if (!/^[a-z-]+-v[1-9]\d*\.png$/.test(pose.previousFile)) throw new Error('Invalid previous file');
+    const previous = await readFile(new URL(pose.previousFile, output));
+    if (digest(previous) !== pose.previousSha256) throw new Error('Approved previous drawing changed: ' + pose.previousFile);
+  }
 }
 
 // Keep the current compiled avatar and textures unchanged.
