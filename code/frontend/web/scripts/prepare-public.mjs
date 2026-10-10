@@ -19,13 +19,18 @@ try {
       resolve(web, 'public/live2d/amadeus', directory),
       { recursive: true },
     );
-  await rm(
-    resolve(
-      web,
-      'public/live2d/amadeus/motions/amadeus/kz_risada_balanco.motion3.json',
-    ),
-    { force: true },
-  );
+  for (const name of [
+    'risada_balanco',
+    'inclinar_para_frente',
+    'abrir_bracos_leve',
+  ])
+    await rm(
+      resolve(
+        web,
+        `public/live2d/amadeus/motions/amadeus/kz_${name}.motion3.json`,
+      ),
+      { force: true },
+    );
   await mkdir(resolve(web, 'public/live2d/runtime'), { recursive: true });
   for (const file of [
     'pixi.min.js',

@@ -2,7 +2,7 @@
 
 Adaptado do `kurisu-expressions.zip` fornecido pelo usuário, SHA-256 `a21477febb3eedf8c862715a736ef3bd89db63798ccc1a4a3418f657e2111fc5`.
 
-São **177 expressões**: uma neutra, 49 emoções em três níveis (sutil, média e forte) e 29 gestos faciais; mais **12 movimentos**. O gerador confere as 50 emoções e as 39 intenções contra o contrato do backend integrado da branch `feat/refinamento-llama`. `ranges.json` registra os limites observados no modelo Cubism local, com mínimo, máximo e padrão para seus 72 parâmetros.
+São **177 expressões**: uma neutra, 49 emoções em três níveis (sutil, média e forte) e 29 gestos faciais; mais **10 movimentos**. O gerador confere as 50 emoções e as 39 intenções contra o contrato do backend integrado da branch `feat/refinamento-llama`. `ranges.json` registra os limites observados no modelo Cubism local, com mínimo, máximo e padrão para seus 72 parâmetros.
 
 ## Regenerar
 
@@ -21,11 +21,10 @@ Após o feedback de 10/10, as curvas dos movimentos também recebem prioridade n
 | Movimento | Ajuste |
 | --- | --- |
 | Virar emburrada | Giro de cabeça até −28°, olhos fechados no trecho principal e expressão contrariada. |
-| Inclinar para frente | Cabeça e tronco inclinados, piscadela e aproximação de 18% no enquadramento. Aproximação da referência, sem acrescentar um novo deformador. |
 | Surpresa e recuo | Olhos e sobrancelhas erguidos, boca aberta, movimento de tronco e recuo de 10% no enquadramento. |
 | Gesto leve dos braços | Usa os seis controles físicos existentes, com liberação temporária da mão no queixo e restauração da pose depois. |
 
-A risada com balanço foi removida do catálogo e dos arquivos gerados/publicados. O enquadramento dos movimentos compõe com o zoom escolhido pelo usuário e volta ao valor anterior ao terminar. É aplicado antes da renderização, sem outro ticker.
+A inclinação aproximada e o gesto leve dos braços foram rejeitados visualmente e removidos. As peças e os controles novos estão descritos em [authoring/README.md](../authoring/README.md). A risada com balanço também foi removida do catálogo e dos arquivos gerados/publicados. O enquadramento dos movimentos compõe com o zoom escolhido pelo usuário e volta ao valor anterior ao terminar. É aplicado antes da renderização, sem outro ticker.
 
 Braços cruzados, mão na cintura e dedo apontando para cima **não estão implementados nesse rig**. O pacote local e `kurisu.tar.gz` não contêm o projeto `.cmo3` nem PSD editável. Para essas poses será necessário preparar as camadas e os deformadores correspondentes em um projeto Cubism e exportar outro `.moc3`; os sprites de referência não acrescentam essas capacidades ao binário atual.
 

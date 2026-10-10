@@ -136,9 +136,7 @@ try {
   }
   const cases = [
     ['virar_emburrada', 14, 78],
-    ['inclinar_para_frente', 14, 72],
     ['surpresa_recuo', 6, 66],
-    ['abrir_bracos_leve', 16, 72],
   ];
   let completed = 0;
   for (const [name, peak, finish] of cases) {
@@ -146,7 +144,7 @@ try {
       .getByRole('button', { name: 'Expressões do avatar', exact: true })
       .click();
     await page
-      .getByText('Catálogo completo · 177 expressões e 12 movimentos', {
+      .getByText('Catálogo completo · 177 expressões e 10 movimentos', {
         exact: true,
       })
       .evaluate((el) => {
@@ -156,6 +154,11 @@ try {
       await page.locator('[data-motion="kz_risada_balanco"]').count(),
       0,
     );
+    for (const rejected of ['inclinar_para_frente', 'abrir_bracos_leve'])
+      assert.equal(
+        await page.locator(`[data-motion="kz_${rejected}"]`).count(),
+        0,
+      );
     await page
       .locator(`[data-motion="kz_${name}"]`)
       .evaluate((el) => el.click());
@@ -189,20 +192,12 @@ try {
       );
       assert.equal(moved.values.ParamEyeLOpen, 0);
     }
-    if (name === 'inclinar_para_frente') {
-      assert.ok(Math.abs(state.scale / baseline.scale - 1.18) < 0.001);
-      assert.equal(state.values.ParamEyeLOpen, 0);
-      assert.ok(state.values.ParamMouthOpenY > 0.2);
-      assert.ok(state.values.ParamBodyAngleZ < -7);
-    }
     if (name === 'surpresa_recuo') {
       assert.ok(state.scale / baseline.scale < 0.92);
       assert.equal(state.values.Surprissed, 1);
       assert.ok(state.values.ParamMouthOpenY > 0.4);
       assert.ok(state.values.ParamBodyAngleY > 8);
     }
-    if (name === 'abrir_bracos_leve')
-      assert.ok(Math.abs(state.values.UpperArmLPhy + 8) < 0.1);
     await page.screenshot({ path: output + '/' + name + '.png' });
     const reset = await frames(finish);
     assert.ok(Math.abs(reset.scale - baseline.scale) < 0.001);
@@ -223,8 +218,8 @@ try {
         motions: completed,
         eyes: 'closed while sulking',
         reaction: 'surprised with open mouth',
-        framing: 'lean and recoil visible, baseline restored',
-        arms: 'bounded light movement',
+        framing: 'recoil visible, baseline restored',
+        rejected: 'lean and light arms removed from preview',
         originalHashes: 'unchanged',
         errors,
         external,

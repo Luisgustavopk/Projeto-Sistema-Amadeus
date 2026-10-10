@@ -187,17 +187,10 @@ test('movement owns eyelids and reaction, then restores selected face and framin
   f.frame();
   assert.equal(f.suppressed, false);
   assert.ok(f.values.get('Smile') > 0);
-  await f.actor.motion('kz_inclinar_para_frente');
-  f.clock.elapsed += 700;
-  assert.equal(f.frame().mouth, true);
-  assert.equal(f.presentation.scale, 1.18);
-  assert.equal(f.values.get('ParamEyeLOpen'), 0);
-  assert.ok(f.values.get('ParamMouthOpenY') > 0);
-  f.clock.elapsed += 4000;
   assert.equal(f.frame().mouth, false);
   assert.deepEqual(f.presentation, { scale: 1, x: 0, y: 0 });
 });
-test('surprise uses a facial reaction; light arm gesture releases its temporary hand pose', async () => {
+test('surprise uses a facial reaction without replacing the existing arm pose', async () => {
   const f = fixture();
   f.actor.setArms(true);
   f.frame();
@@ -214,15 +207,20 @@ test('surprise uses a facial reaction; light arm gesture releases its temporary 
   f.clock.elapsed += 3500;
   f.frame();
   assert.ok(f.values.get('Sad') > 0);
-  await f.actor.motion('kz_abrir_bracos_leve');
-  f.clock.elapsed += 800;
-  f.frame();
-  assert.equal(f.values.get('HandChange'), 0);
-  assert.equal(f.values.get('UpperArmLPhy'), -8);
-  f.clock.elapsed += 4000;
-  f.frame();
   assert.equal(f.values.get('HandChange'), 1);
   assert.equal(await f.actor.motion('kz_risada_balanco'), false);
+});
+test('rejected arm and lean approximations cannot be requested or alter the avatar', async () => {
+  const f = fixture();
+  f.clock.running = true;
+  assert.equal(ACTING_CATALOG.motions.length, 10);
+  const before = [...f.values];
+  for (const name of ['kz_inclinar_para_frente', 'kz_abrir_bracos_leve']) {
+    assert.equal(await f.actor.motion(name), false);
+    assert.ok(!ACTING_CATALOG.motions.some((m) => m.Name === name));
+  }
+  assert.deepEqual([...f.values], before);
+  assert.equal(f.suppressed, false);
 });
 test('transitions fade without accumulating offsets; gaze resumes when a motion ends', async () => {
   const f = fixture();

@@ -1452,12 +1452,6 @@
       "FadeOutTime": 0.5
     },
     {
-      "Name": "kz_inclinar_para_frente",
-      "File": "motions/amadeus/kz_inclinar_para_frente.motion3.json",
-      "FadeInTime": 0.4,
-      "FadeOutTime": 0.5
-    },
-    {
       "Name": "kz_suspiro",
       "File": "motions/amadeus/kz_suspiro.motion3.json",
       "FadeInTime": 0.4,
@@ -1478,12 +1472,6 @@
     {
       "Name": "kz_timida_virar_rosto",
       "File": "motions/amadeus/kz_timida_virar_rosto.motion3.json",
-      "FadeInTime": 0.4,
-      "FadeOutTime": 0.5
-    },
-    {
-      "Name": "kz_abrir_bracos_leve",
-      "File": "motions/amadeus/kz_abrir_bracos_leve.motion3.json",
       "FadeInTime": 0.4,
       "FadeOutTime": 0.5
     },

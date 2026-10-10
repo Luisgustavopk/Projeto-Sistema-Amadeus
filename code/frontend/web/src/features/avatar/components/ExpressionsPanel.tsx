@@ -3,7 +3,7 @@ import type { VoicePreview } from '../types';
 import type { ReactionKey } from '../expressions';
 import { Button } from '../../../components/ui/Button';
 import { ConsolePanel } from '../../../components/hud/ConsolePanel';
-import { QUICK_REACTIONS } from '../expressions';
+import { ACTING_CATALOG, QUICK_REACTIONS } from '../expressions';
 import { ActingCatalog } from './ActingCatalog';
 export function ExpressionsPanel({
   open,
@@ -57,7 +57,10 @@ export function ExpressionsPanel({
           <span>{performance.arms ? 'ATIVO' : 'INATIVO'}</span>
         </Button>
         <details className="catalog-details">
-          <summary>Catálogo completo · 177 expressões e 12 movimentos</summary>
+          <summary>
+            Catálogo completo · {ACTING_CATALOG.expressions.length} expressões e{' '}
+            {ACTING_CATALOG.motions.length} movimentos
+          </summary>
           <ActingCatalog performance={performance} ready={ready} />
         </details>
         <p className="panel-note">

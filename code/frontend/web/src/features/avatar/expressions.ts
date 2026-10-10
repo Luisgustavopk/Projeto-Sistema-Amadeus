@@ -96,7 +96,6 @@ export const EMOTION_LABELS: Record<string, string> = {
   culpa: 'Culpa',
 };
 export function readableName(value: string) {
-  if (value === 'kz_abrir_bracos_leve') return 'Gesto leve dos braços';
   const s = value.replace(/^kz_/, '').replaceAll('_', ' ');
   return s.charAt(0).toUpperCase() + s.slice(1);
 }

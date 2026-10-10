@@ -690,81 +690,6 @@ const M = {
       ],
     },
   ],
-  inclinar_para_frente: [
-    2.8,
-    {
-      ParamAngleY: [
-        [0, 0],
-        [0.65, -20],
-        [1.8, -20],
-        [2.8, 0],
-      ],
-      ParamBodyAngleY: [
-        [0, 0],
-        [0.65, -10],
-        [1.8, -10],
-        [2.8, 0],
-      ],
-      ParamBreath: [
-        [0, 0],
-        [0.65, 0.6],
-        [1.8, 0.6],
-        [2.8, 0],
-      ],
-      ParamAngleZ: [
-        [0, 0],
-        [0.65, -18],
-        [1.8, -18],
-        [2.8, 0],
-      ],
-      ParamBodyAngleZ: [
-        [0, 0],
-        [0.65, -8],
-        [1.8, -8],
-        [2.8, 0],
-      ],
-      ParamEyeLOpen: [
-        [0, 1],
-        [0.65, 0],
-        [1.8, 0],
-        [2.8, 1],
-      ],
-      ParamEyeROpen: [
-        [0, 1],
-        [0.65, 1.15],
-        [1.8, 1.15],
-        [2.8, 1],
-      ],
-      ParamEyeLSmile: [
-        [0, 0],
-        [0.65, 0.8],
-        [1.8, 0.8],
-        [2.8, 0],
-      ],
-      ParamMouthForm: [
-        [0, 0],
-        [0.65, 0.65],
-        [1.8, 0.65],
-        [2.8, 0],
-      ],
-      ParamMouthOpenY: [
-        [0, 0],
-        [0.65, 0.22],
-        [1.8, 0.22],
-        [2.8, 0],
-      ],
-      Smile: [
-        [0, 0],
-        [0.65, 0.45],
-        [1.8, 0.45],
-        [2.8, 0],
-      ],
-      Angry: [
-        [0, 0],
-        [2.8, 0],
-      ],
-    },
-  ],
   suspiro: [
     3,
     {
@@ -916,51 +841,6 @@ const M = {
       ],
     },
   ],
-  abrir_bracos_leve: [
-    2.8,
-    {
-      HandChange: [
-        [0, 0],
-        [2.8, 0],
-      ],
-      UpperArmLPhy: [
-        [0, 0],
-        [0.6, -8],
-        [1.8, -8],
-        [2.8, 0],
-      ],
-      UpperArmRPhy: [
-        [0, 0],
-        [0.6, 8],
-        [1.8, 8],
-        [2.8, 0],
-      ],
-      LowerArmLPhy: [
-        [0, 0],
-        [0.6, 7],
-        [1.8, 7],
-        [2.8, 0],
-      ],
-      LowerArmLRhy: [
-        [0, 0],
-        [0.6, -7],
-        [1.8, -7],
-        [2.8, 0],
-      ],
-      HandLPhy: [
-        [0, 0],
-        [0.6, -3],
-        [1.8, -3],
-        [2.8, 0],
-      ],
-      HandLRhy: [
-        [0, 0],
-        [0.6, 3],
-        [1.8, 3],
-        [2.8, 0],
-      ],
-    },
-  ],
   piscar_lento: [
     1.2,
     {
@@ -1003,11 +883,7 @@ const FACE_REST = {
   ParamBrowLForm: 0,
   ParamBrowRForm: 0,
 };
-for (const name of [
-  'virar_emburrada',
-  'inclinar_para_frente',
-  'surpresa_recuo',
-]) {
+for (const name of ['virar_emburrada', 'surpresa_recuo']) {
   const [duration, curves] = M[name];
   for (const [id, value] of Object.entries(FACE_REST))
     curves[id] ??= [
@@ -1018,26 +894,6 @@ for (const name of [
 
 // Renderer framing complements the existing torso deformation; no new rig.
 const PRESENTATION = {
-  inclinar_para_frente: {
-    scale: [
-      [0, 1],
-      [0.65, 1.18],
-      [1.8, 1.18],
-      [2.8, 1],
-    ],
-    x: [
-      [0, 0],
-      [0.65, -0.025],
-      [1.8, -0.025],
-      [2.8, 0],
-    ],
-    y: [
-      [0, 0],
-      [0.65, 0.09],
-      [1.8, 0.09],
-      [2.8, 0],
-    ],
-  },
   surpresa_recuo: {
     scale: [
       [0, 1],

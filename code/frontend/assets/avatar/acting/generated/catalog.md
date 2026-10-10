@@ -1,6 +1,6 @@
 # Catálogo de expressões geradas
 
-177 expressões (.exp3.json) e 12 movimentos. Tudo usa só parâmetros que o rig já expõe.
+177 expressões (.exp3.json) e 10 movimentos. Tudo usa só parâmetros que o rig já expõe.
 
 ## Emoções do expression.ts (50) — arquivos `kz_<emoção>_<sutil|media|forte>`
 
@@ -100,10 +100,8 @@
 | kz_inclinar_curiosa | 2.4s |
 | kz_desviar_olhar | 2.4s |
 | kz_virar_emburrada | 3.2s |
-| kz_inclinar_para_frente | 2.8s |
 | kz_suspiro | 3s |
 | kz_pensando | 3s |
 | kz_surpresa_recuo | 2.4s |
 | kz_timida_virar_rosto | 3s |
-| kz_abrir_bracos_leve | 2.8s |
 | kz_piscar_lento | 1.2s |

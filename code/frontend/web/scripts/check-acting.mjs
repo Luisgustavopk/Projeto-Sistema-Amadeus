@@ -137,7 +137,7 @@ try {
     .click();
   await frames();
   await page
-    .getByText('Catálogo completo · 177 expressões e 12 movimentos', {
+    .getByText('Catálogo completo · 177 expressões e 10 movimentos', {
       exact: true,
     })
     .click();
@@ -241,7 +241,10 @@ try {
     );
     assert.ok(Object.values(state.values).every(Number.isFinite));
   }
-  assert.equal(await page.evaluate(() => window.__actingMotions.length), 12);
+  assert.equal(
+    await page.evaluate(() => window.__actingMotions.length),
+    ACTING_CATALOG.motions.length,
+  );
   assert.ok(
     await page.evaluate(() => window.__actingMotions.every((m) => m.accepted)),
     'Native motion manager rejected a motion',
@@ -272,7 +275,7 @@ try {
     JSON.stringify(
       {
         expressions: 177,
-        motions: 12,
+        motions: ACTING_CATALOG.motions.length,
         composedSadGratitude: 'preserved',
         arms: 'independent',
         bounds: 'actual rig parameters',
