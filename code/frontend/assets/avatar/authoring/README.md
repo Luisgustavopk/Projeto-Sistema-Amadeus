@@ -49,7 +49,7 @@ V4 foi rejeitada por regressão: afinar a linha sobreposta tornou aparente o seg
 
 `npm run avatar:refine-contours` reproduz **v5** por padrão, usando `hair-contour-v5.json`, `reference-hair-outline.mjs` e o render original com hash conferido. O relatório local é `contour-provenance-v5.json`. Depois execute `npm run avatar:review-poses`; **Antes do contorno** mostra v4 → v5 e a legenda identifica a versão do PNG. As versões anteriores permanecem disponíveis. Amostrar o contorno original aproxima o traço, mas não implica identidade exata entre desenhos de poses distintas.
 
-Ainda falta completar as peças com áreas ocultas, preservar os controles faciais, construir as malhas/deformadores e exportar o modelo. Não há `.cmo3`, PSD original ou Cubism Editor disponível na instalação local inspecionada; será necessário obter o projeto de autoria ou montar outro a partir dessa base. `runtimeEnabled` continua `false`.
+Ainda falta completar as peças com áreas ocultas, preservar os controles faciais, construir as malhas/deformadores e exportar o modelo. Não há `.cmo3` ou PSD original; será necessário obter o projeto de autoria ou montar outro a partir dessa base. `runtimeEnabled` continua `false`.
 
 ## Separação das poses aprovadas
 
@@ -67,7 +67,15 @@ Próximas operações de autoria:
 4. Importar os PSDs completos em um novo projeto Cubism, montar ArtMeshes, máscaras, deformadores e keyforms do `rig-blueprint.json` e gerar as transições.
 5. Exportar o modelo para uma pasta nova e validar os parâmetros reais, aparência e transições antes de ativá-lo na interface.
 
-O Editor não foi localizado nas pastas padrão inspecionadas. A [API externa documentada do Cubism](https://docs.live2d.com/en/cubism-editor-manual/external-application-integration-api-list/) permite consultar/alterar valores de parâmetros e receber notificações de exportação; a lista consultada não fornece operações para criar ArtMeshes, deformadores ou um novo rig. Portanto, não é uma alternativa de compilação dos PSDs por Node.js. A montagem e a [exportação para MOC3](https://docs.live2d.com/en/cubism-editor-manual/export-moc3-motion3-files/) continuam pendentes no Editor. Nenhum novo CMO3/MOC3 foi produzido nesta etapa.
+A [API externa documentada do Cubism](https://docs.live2d.com/en/cubism-editor-manual/external-application-integration-api-list/) permite consultar/alterar valores de parâmetros e receber notificações de exportação; a lista consultada não fornece operações para criar ArtMeshes, deformadores ou um novo rig. Portanto, não é uma alternativa de compilação dos PSDs por Node.js. A montagem e a [exportação para MOC3](https://docs.live2d.com/en/cubism-editor-manual/export-moc3-motion3-files/) continuam pendentes no Editor. Nenhum novo CMO3/MOC3 foi produzido nesta etapa.
+
+## Biblioteca de importação e Cubism Pro
+
+Depois de o usuário informar a ativação do teste Pro, a instalação `C:\Program Files\Live2D Cubism 5.3` foi encontrada. O controle do Editor está bloqueado pelo runtime da ferramenta de automação: `failed to start Node runtime: O sistema não pode encontrar o caminho especificado (os error 3)`, inclusive após reset e nova tentativa. A licença ativa ainda não foi conferida pela UI. O usuário concordou em reiniciar o Codex e deixar o Cubism aberto; a nova tentativa também falhou.
+
+`npm run avatar:prepare-library` reúne os recortes já preparados em `../local/cubism-import-v1/pose-library.psd`, com quatro pastas, 56 peças e nomes únicos. Mantém os pixels em suas coordenadas originais e somente amplia o canvas com espaço transparente até 1000 × 1800. Exibe apenas mão na cintura ao abrir; as demais pastas ficam ocultas. Não alinha anatomia nem aplica escalas para fingir transições prontas. Inclui duas bases PSD originais com a ordem de desenho corrigida, preservando os recortes e as cores de origem. O escritor PSD passa a preservar a ordem de entrada de trás para frente e suporta delimitadores de pastas e visibilidade.
+
+O leitor independente confirmou a hierarquia das quatro pastas, os 56 recortes e a pose visível. A conferência no Cubism ainda está pendente. [CUBISM-IMPORTAR.md](CUBISM-IMPORTAR.md) descreve os arquivos, a importação de verificação e o trabalho de autoria restante. Os PSDs são materiais de importação; não constituem um projeto editável CMO3 nem um MOC3 exportado.
 
 O usuário informou a origem: [FrancescoCaracciolo/Amadeus](https://github.com/FrancescoCaracciolo/Amadeus#avatar). O `Kurisu.zip` apontado pelo README foi baixado e conferido em 10/10/2026: SHA-256 `bd47f975a21b46e1755957aeede9b87d4e03baddbdc8f563eb3144b55b107051`, igual ao manifesto já existente. Seus 21 registros, incluindo diretórios, não contêm `.cmo3`, `.can3` ou PSD. O pacote antigo `kurisu.tar.gz` também não contém esses projetos. O link do repositório fornece o avatar exportado, não resolve a ausência da autoria editável.
 
