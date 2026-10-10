@@ -13,18 +13,37 @@ export function createProviderCooldowns(now: () => number = Date.now) {
       error: QuotaExceededError | ProviderTemporarilyUnavailableError;
     }
   >();
-  const key = (config: ProviderConfig, account = false) =>
+  const key = (
+    config: ProviderConfig,
+    scope: 'model' | 'account' | 'paid' | 'free' = 'model',
+  ) =>
     JSON.stringify([
       config.adapter,
       config.apiKeyEnv,
       config.accountId,
       config.endpoint,
-      account ? null : config.model,
+      scope === 'model'
+        ? config.model
+        : scope === 'paid'
+          ? 'paid-credit'
+          : scope === 'free'
+            ? 'free-quota'
+            : null,
+      scope === 'model' && config.adapter === 'cartesia'
+        ? config.voiceId
+        : null,
     ]);
 
   return {
     blocked(config: ProviderConfig) {
-      for (const id of [key(config), key(config, true)]) {
+      for (const id of [
+        key(config),
+        key(config, 'account'),
+        ...(config.openRouterPaid ? [key(config, 'paid')] : []),
+        ...(config.adapter === 'openrouter' && !config.openRouterPaid
+          ? [key(config, 'free')]
+          : []),
+      ]) {
         const failure = failures.get(id);
 
         if (!failure) {
@@ -57,9 +76,15 @@ export function createProviderCooldowns(now: () => number = Date.now) {
       failures.set(
         key(
           config,
-          config.adapter === 'openrouter' &&
-            error instanceof QuotaExceededError &&
-            error.quotaScope === 'account',
+          config.adapter === 'cartesia' && error instanceof QuotaExceededError
+            ? 'account'
+            : config.adapter === 'openrouter' &&
+                error instanceof QuotaExceededError &&
+                (error.quotaScope === 'account' ||
+                  error.quotaScope === 'paid' ||
+                  error.quotaScope === 'free')
+              ? error.quotaScope
+              : 'model',
         ),
         { until: now() + duration, error },
       );

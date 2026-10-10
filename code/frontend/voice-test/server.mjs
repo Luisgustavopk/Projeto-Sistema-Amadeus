@@ -18,6 +18,7 @@ const allowed = {
   "/stt-diagnostic.mjs": "stt-diagnostic.mjs",
   "/speech-evaluation-client.mjs": "speech-evaluation-client.mjs",
   "/connection-status.mjs": "connection-status.mjs",
+  "/conversation-runtime.mjs": "conversation-runtime.mjs",
 };
 const types = {
   ".html": "text/html; charset=utf-8",
@@ -34,7 +35,9 @@ class EvaluationError extends Error {
 }
 
 const json = (response, status, value) => {
-  response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  response.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+  });
   response.end(JSON.stringify(value));
 };
 
@@ -134,7 +137,7 @@ function parseWav(wav) {
 
   let format;
   let data;
-  for (let offset = 12; offset + 8 <= wav.length; ) {
+  for (let offset = 12; offset + 8 <= wav.length;) {
     const id = wav.toString("ascii", offset, offset + 4);
     const size = wav.readUInt32LE(offset + 4);
     const start = offset + 8;
@@ -171,18 +174,22 @@ function parseWav(wav) {
 }
 
 function normalizeWords(text) {
-  return text
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLocaleLowerCase("pt-BR")
-    .match(/[\p{L}\p{N}]+/gu) ?? [];
+  return (
+    text
+      .normalize("NFD")
+      .replace(/\p{M}/gu, "")
+      .toLocaleLowerCase("pt-BR")
+      .match(/[\p{L}\p{N}]+/gu) ?? []
+  );
 }
 
 export function wordErrorRate(expected, actual) {
   const reference = normalizeWords(expected);
   const hypothesis = normalizeWords(actual);
   if (!reference.length)
-    throw new EvaluationError("Enter a transcript containing at least one word");
+    throw new EvaluationError(
+      "Enter a transcript containing at least one word",
+    );
   let previous = Array.from({ length: hypothesis.length + 1 }, (_, i) => i);
   for (let i = 1; i <= reference.length; i++) {
     const current = [i];
@@ -214,7 +221,7 @@ function repairWavHeader(wav) {
   ) {
     throw new EvaluationError("Cartesia returned an invalid WAV file", 502);
   }
-  for (let offset = 12; offset + 8 <= output.length; ) {
+  for (let offset = 12; offset + 8 <= output.length;) {
     const id = output.toString("ascii", offset, offset + 4);
     const size = output.readUInt32LE(offset + 4);
     if (id === "data" && size === 0xffffffff) {
@@ -309,7 +316,9 @@ async function evaluateTts(body) {
       );
     const { profile } = await profileResponse.json();
     if (!profile?.id || !profile.referenceFile || !profile.referenceSha256) {
-      throw new EvaluationError("There is no active voice profile in the local API");
+      throw new EvaluationError(
+        "There is no active voice profile in the local API",
+      );
     }
     const serviceToken = await configuredSecret("TTS_SERVICE_TOKEN", [
       resolve(apiDirectory, ".env"),
@@ -499,7 +508,10 @@ export function createTestServer() {
         }
         assertLocalBrowserRequest(request);
         if (!request.headers["content-type"]?.startsWith("application/json")) {
-          throw new EvaluationError("Content-Type must be application/json", 415);
+          throw new EvaluationError(
+            "Content-Type must be application/json",
+            415,
+          );
         }
         const body = await readJson(request);
         if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -551,11 +563,9 @@ export function createTestServer() {
             : error.name === "TypeError"
               ? 502
               : 500);
-        json(
-          response,
-          status,
-          { error: error.message || "Speech evaluation failed" },
-        );
+        json(response, status, {
+          error: error.message || "Speech evaluation failed",
+        });
       } else {
         response.writeHead(404).end();
       }

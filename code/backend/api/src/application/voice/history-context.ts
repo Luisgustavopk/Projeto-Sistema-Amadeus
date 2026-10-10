@@ -21,6 +21,7 @@ function excerpt(text: string, maximum = MAX_MESSAGE_CHARACTERS) {
 export function buildHistoryContext(
   history: StoredTurn[],
   budget = MAX_HISTORY_CHARACTERS,
+  includeSentText = false,
 ) {
   const selected = [];
   let characters = 0;
@@ -35,7 +36,18 @@ export function buildHistoryContext(
         turn.generatedText,
         Math.min(MAX_MESSAGE_CHARACTERS, Math.floor(budget / 3)),
       ),
+      ...(includeSentText &&
+      turn.sentText !== undefined &&
+      turn.sentText !== turn.generatedText
+        ? {
+            assistantSent: excerpt(
+              turn.sentText ?? turn.generatedText,
+              Math.min(MAX_MESSAGE_CHARACTERS, Math.floor(budget / 3)),
+            ),
+          }
+        : {}),
       responseStatus: turn.responseStatus ?? 'completed',
+      ...(turn.initiativeKind ? { initiativeKind: turn.initiativeKind } : {}),
       partiallyPlayed: turn.partiallyPlayed ?? false,
     };
     const size = JSON.stringify(entry).length;

@@ -17,8 +17,15 @@ import { decodeServerSentEvents } from './sse.ts';
 import { NO_CAPABILITIES } from './http-json.ts';
 import { LocalCompletionEndpointSchema } from '../../domain/providers/local.ts';
 import { memoryOutputFormat } from '../../domain/memory/output.ts';
+import {
+  LLAMA_REFINEMENT_MODEL,
+  DEEPSEEK_REFINEMENT_MODEL,
+  validOpenRouterPayment,
+} from '../../domain/providers/openrouter.ts';
 
 const Completion = z.object({
+  id: z.string().optional(),
+  provider: z.string().optional(),
   choices: z.array(
     z.object({
       finish_reason: z.string().nullable().optional(),
@@ -31,11 +38,20 @@ const Completion = z.object({
     .object({
       prompt_tokens: z.number().int().nonnegative().optional(),
       completion_tokens: z.number().int().nonnegative().optional(),
+      cost: z.number().nonnegative().nullish(),
+      prompt_tokens_details: z
+        .object({
+          cached_tokens: z.number().int().nonnegative().optional(),
+          cache_write_tokens: z.number().int().nonnegative().optional(),
+        })
+        .optional(),
     })
     .optional(),
 });
 
 const StreamChunk = z.object({
+  id: z.string().optional(),
+  provider: z.string().optional(),
   choices: z
     .array(
       z.object({
@@ -50,6 +66,13 @@ const StreamChunk = z.object({
     .object({
       prompt_tokens: z.number().int().nonnegative().optional(),
       completion_tokens: z.number().int().nonnegative().optional(),
+      cost: z.number().nonnegative().nullish(),
+      prompt_tokens_details: z
+        .object({
+          cached_tokens: z.number().int().nonnegative().optional(),
+          cache_write_tokens: z.number().int().nonnegative().optional(),
+        })
+        .optional(),
     })
     .optional(),
 });
@@ -103,9 +126,9 @@ function getCredentials(
   }
 
   if (config.adapter === 'mistral' || config.adapter === 'openrouter') {
-    if (config.adapter === 'openrouter' && !config.model.endsWith(':free')) {
+    if (!validOpenRouterPayment(config)) {
       throw new ProviderConfigurationError(
-        'OpenRouter aceita somente modelos :free.',
+        'OpenRouter pago exige Llama 3.3 e teto de preço explícito.',
       );
     }
 
@@ -308,8 +331,10 @@ export function createOpenAiCompatibleProvider(
       content: string;
       maxTokens: number;
       systemPrompt?: string;
-      purpose?: 'conversation' | 'memory';
+      purpose?: 'conversation' | 'memory' | 'expression';
       memoryTask?: ProviderInput['memoryTask'];
+      history?: ProviderInput['history'];
+      sessionId?: ProviderInput['sessionId'];
     },
     stream: boolean,
     signal?: AbortSignal,
@@ -329,10 +354,20 @@ export function createOpenAiCompatibleProvider(
             ...(input.systemPrompt
               ? [{ role: 'system', content: input.systemPrompt }]
               : []),
+            ...(input.history ?? []),
             { role: 'user', content: input.content },
           ],
           max_tokens: input.maxTokens,
-          ...(input.purpose === 'memory' ? { temperature: 0 } : {}),
+          ...(input.purpose === 'expression'
+            ? { temperature: 0, response_format: { type: 'json_object' } }
+            : input.purpose === 'memory'
+              ? { temperature: 0 }
+              : config.adapter === 'openrouter' &&
+                  [LLAMA_REFINEMENT_MODEL, DEEPSEEK_REFINEMENT_MODEL].includes(
+                    config.model ?? '',
+                  )
+                ? { temperature: 0.6 }
+                : {}),
           ...(config.adapter === 'zai' && input.purpose === 'memory'
             ? {
                 response_format: { type: 'json_object' },
@@ -362,10 +397,21 @@ export function createOpenAiCompatibleProvider(
             : {}),
           ...(config.adapter === 'openrouter'
             ? {
+                ...(input.sessionId ? { session_id: input.sessionId } : {}),
                 provider: {
-                  max_price: { prompt: 0, completion: 0 },
+                  max_price: {
+                    prompt: config.openRouterPaid?.maxPromptPrice ?? 0,
+                    completion: config.openRouterPaid?.maxCompletionPrice ?? 0,
+                    request: 0,
+                  },
                   data_collection: 'deny',
                   sort: 'latency',
+                  ...(config.openRouterPaid
+                    ? {
+                        preferred_min_throughput: { p50: 40 },
+                        preferred_max_latency: { p50: 2 },
+                      }
+                    : {}),
                 },
                 reasoning: { enabled: false, exclude: true },
               }
@@ -418,9 +464,15 @@ export function createOpenAiCompatibleProvider(
         // Platform rate-limit responses carry X-RateLimit-* headers; an upstream
         // provider's 429 need not exhaust other providers or free model variants.
         error.quotaScope =
-          response.status === 402 || response.headers.has('x-ratelimit-limit')
-            ? 'account'
-            : 'model';
+          response.status === 402 && config.openRouterPaid
+            ? 'paid'
+            : response.status === 402
+              ? 'account'
+              : response.headers.has('x-ratelimit-limit')
+                ? config.openRouterPaid
+                  ? 'account'
+                  : 'free'
+                : 'model';
       }
 
       if (
@@ -497,6 +549,13 @@ export function createOpenAiCompatibleProvider(
       let inputTokens: number | null = null;
       let outputTokens: number | null = null;
       let deliveredContent = false;
+      const cache: NonNullable<ProviderOutput['cache']> = {
+        readTokens: null,
+        writeTokens: null,
+        costUsd: null,
+        provider: null,
+        generationId: null,
+      };
 
       try {
         for await (const value of decodeServerSentEvents(response)) {
@@ -508,9 +567,18 @@ export function createOpenAiCompatibleProvider(
               .safeParse(value);
 
             if (failure.success) {
-              throw mapHttpFailure(
+              const error = mapHttpFailure(
                 failure.data.error.code === 404 ? 503 : failure.data.error.code,
               );
+
+              if (
+                error instanceof QuotaExceededError &&
+                failure.data.error.code === 402
+              ) {
+                error.quotaScope = config.openRouterPaid ? 'paid' : 'account';
+              }
+
+              throw error;
             }
           }
 
@@ -524,6 +592,15 @@ export function createOpenAiCompatibleProvider(
 
           inputTokens = chunk.usage?.prompt_tokens ?? inputTokens;
           outputTokens = chunk.usage?.completion_tokens ?? outputTokens;
+          cache.readTokens =
+            chunk.usage?.prompt_tokens_details?.cached_tokens ??
+            cache.readTokens;
+          cache.writeTokens =
+            chunk.usage?.prompt_tokens_details?.cache_write_tokens ??
+            cache.writeTokens;
+          cache.costUsd = chunk.usage?.cost ?? cache.costUsd;
+          cache.provider = chunk.provider ?? cache.provider;
+          cache.generationId = chunk.id ?? cache.generationId;
           const content = choice?.delta?.content ?? '';
 
           if (content) {
@@ -546,7 +623,14 @@ export function createOpenAiCompatibleProvider(
       }
 
       if (inputTokens !== null || outputTokens !== null) {
-        yield { content: '', inputTokens, outputTokens };
+        yield {
+          content: '',
+          inputTokens,
+          outputTokens,
+          ...(Object.values(cache).some((value) => value !== null)
+            ? { cache }
+            : {}),
+        };
       }
     },
     async execute(input, signal): Promise<ProviderOutput> {
@@ -598,6 +682,24 @@ export function createOpenAiCompatibleProvider(
           content,
           inputTokens: completion.usage?.prompt_tokens ?? null,
           outputTokens: completion.usage?.completion_tokens ?? null,
+          ...(completion.id ||
+          completion.provider ||
+          completion.usage?.prompt_tokens_details ||
+          completion.usage?.cost != null
+            ? {
+                cache: {
+                  readTokens:
+                    completion.usage?.prompt_tokens_details?.cached_tokens ??
+                    null,
+                  writeTokens:
+                    completion.usage?.prompt_tokens_details
+                      ?.cache_write_tokens ?? null,
+                  costUsd: completion.usage?.cost ?? null,
+                  provider: completion.provider ?? null,
+                  generationId: completion.id ?? null,
+                },
+              }
+            : {}),
         };
       } catch (error) {
         if (

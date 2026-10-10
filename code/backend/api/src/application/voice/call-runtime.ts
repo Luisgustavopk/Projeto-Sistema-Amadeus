@@ -7,10 +7,15 @@ import type { DataClass } from '../../domain/providers/model.ts';
 import { AudioTurnBuffer } from '../../domain/voice/audio-buffer.ts';
 import { VoiceInputError } from '../../domain/errors/voice.ts';
 import { ApplicationError } from '../../domain/errors/application-error.ts';
+import { ProviderBusyError } from '../../domain/errors/providers.ts';
 import type { createTurnProcessor } from './turn-processor.ts';
 import type { VoiceMetrics } from './metrics.ts';
 import { createSpeechPreview } from './speech-preview.ts';
 import { measureVoiceAudio } from './audio-observations.ts';
+import {
+  createPresenceController,
+  type PresenceKind,
+} from './presence-controller.ts';
 
 export function createCallRuntime(input: {
   sessionId: string;
@@ -23,6 +28,7 @@ export function createCallRuntime(input: {
   gate: ExecutionGate;
   sink: VoiceSink;
   metrics: VoiceMetrics;
+  resumed?: boolean;
 }) {
   let active: {
     responseId: string;
@@ -31,6 +37,7 @@ export function createCallRuntime(input: {
     finished: Promise<void>;
     generated: boolean;
     playbackEnded: boolean;
+    initiative: boolean;
   } | null = null;
   let capture: { turnId: number; buffer: AudioTurnBuffer } | null = null;
   let pendingSpeech: { turnId: number; abort: AbortController } | null = null;
@@ -38,6 +45,12 @@ export function createCallRuntime(input: {
   let closed = false;
   const pending = new Set<Promise<void>>();
   let previousExecution = Promise.resolve();
+  const presence = createPresenceController({
+    busy: () => active !== null || capture !== null || pendingSpeech !== null,
+    resumed: input.resumed ?? false,
+    offer: (offerId, kind) =>
+      input.sink.send({ type: 'presence.offer', offerId, kind }),
+  });
 
   const finishPlayback = (turn: NonNullable<typeof active>) => {
     if (active !== turn || !turn.generated || !turn.playbackEnded || closed) {
@@ -46,6 +59,7 @@ export function createCallRuntime(input: {
 
     active = null;
     input.sink.send({ type: 'state', turnId: turn.turnId, state: 'idle' });
+    presence.idle();
   };
 
   const interrupt = () => {
@@ -110,6 +124,7 @@ export function createCallRuntime(input: {
       text?: string;
       audio?: { pcmBase64: string; sampleRate: 16000; channels: 1 };
       audioObservations?: ReturnType<typeof measureVoiceAudio>;
+      initiativeKind?: PresenceKind;
     },
     speechEndedAt = performance.now(),
   ) => {
@@ -125,6 +140,7 @@ export function createCallRuntime(input: {
       finished: Promise.resolve(),
       generated: false,
       playbackEnded: false,
+      initiative: Boolean(source.initiativeKind),
     };
     active = turn;
     const preceding = previousExecution;
@@ -142,6 +158,9 @@ export function createCallRuntime(input: {
           clientTurnId: turnId,
           responseId,
           dataClass: input.dataClass,
+          ...(source.initiativeKind
+            ? { initiativeKind: source.initiativeKind }
+            : {}),
         });
         abort.signal.throwIfAborted();
         await input.processor.process(
@@ -174,6 +193,8 @@ export function createCallRuntime(input: {
         );
 
         if (!cancelled) {
+          presence.pauseAfterFailure();
+
           if (active === turn) {
             active = null;
           }
@@ -205,6 +226,10 @@ export function createCallRuntime(input: {
         }
       } finally {
         release();
+
+        if (!active) {
+          presence.idle();
+        }
       }
     })().catch(() => {
       if (active === turn) {
@@ -245,6 +270,7 @@ export function createCallRuntime(input: {
           return;
         }
 
+        presence.activity(true);
         interrupt();
         pendingSpeech = null;
         run(
@@ -287,6 +313,10 @@ export function createCallRuntime(input: {
       } finally {
         if (pendingSpeech?.abort === abort) {
           pendingSpeech = null;
+
+          if (!active) {
+            presence.idle();
+          }
         }
       }
     })();
@@ -295,7 +325,53 @@ export function createCallRuntime(input: {
   };
 
   return {
+    presenceUpdate(value: { enabled: boolean; available: boolean }) {
+      presence.update(value);
+
+      if (!value.enabled || !value.available) {
+        if (active?.initiative) {
+          interrupt();
+          input.sink.send({
+            type: 'state',
+            turnId: latestTurnId,
+            state: 'idle',
+          });
+        }
+      }
+    },
+    presenceAccept(offerId: string, turnId: number) {
+      const kind = presence.consume(offerId);
+
+      if (!kind || turnId <= latestTurnId || closed) {
+        if (!closed) {
+          input.sink.send({ type: 'presence.cancelled', offerId, turnId });
+        }
+
+        return;
+      }
+
+      try {
+        validateTurn(turnId);
+        run(turnId, { initiativeKind: kind });
+      } catch (error) {
+        if (!(error instanceof ProviderBusyError)) {
+          throw error;
+        }
+
+        presence.pauseAfterFailure();
+        input.sink.send({ type: 'presence.cancelled', offerId, turnId });
+      }
+    },
+    presenceDecline(offerId: string) {
+      presence.decline(offerId);
+    },
     speechStart(turnId: number) {
+      presence.activity();
+
+      if (active?.initiative) {
+        interrupt();
+      }
+
       validateTurn(turnId, false);
       capture = { turnId, buffer: new AudioTurnBuffer(turnId) };
       preview.start(turnId);
@@ -332,17 +408,20 @@ export function createCallRuntime(input: {
         throw new VoiceInputError('Texto deve conter de 1 a 4000 caracteres.');
       }
 
+      presence.activity(true);
       validateTurn(turnId);
       capture = null;
       run(turnId, { text });
     },
     interrupt() {
+      presence.activity();
       preview.cancel();
       capture = null;
       pendingSpeech?.abort.abort();
       pendingSpeech = null;
       interrupt();
       input.sink.send({ type: 'state', turnId: latestTurnId, state: 'idle' });
+      presence.idle();
     },
     async acknowledge(event: {
       responseId: string;
@@ -370,6 +449,7 @@ export function createCallRuntime(input: {
       }
 
       closed = true;
+      presence.close();
       preview.cancel();
       capture = null;
       pendingSpeech?.abort.abort();

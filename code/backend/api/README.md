@@ -1,6 +1,70 @@
 # API
 
+## Referências contextuais da persona
+
+O corpus da Kurisu agora alimenta um catálogo de 33 exemplos de atuação e seis resumos de lore, curados em Markdown com origem verificável. A recuperação local usa BGE-M3/Jina e permite até seis exemplos pertinentes por padrão, dentro de 6.000 caracteres, sem preencher posições com resultados fracos. Os 40 trechos brutos de história ficam em tabelas próprias do SQLite, fora do prompt e da memória pessoal. Execute `npm run persona:references -- index` e reinicie a API para carregar o índice. `npm run persona:references -- status` mostra a preparação. [Arquitetura, controles e comparação zero/dois/quatro/seis exemplos](../../../docs/architecture/Referencias_Contextuais_Persona.md). A seleção foi verificada localmente; a melhora de fidelidade/naturalidade do Llama ainda exige avaliação de geração. O reranqueamento acrescenta trabalho local, limitado por `PERSONA_REFERENCE_TIMEOUT_MS`; referências indisponíveis conservam a compilação estática.
+
+## Presença e estado persistente da persona
+
+A versão 0.4.19 adiciona presença moderada durante a chamada e PAD/energia no SQLite. Reinicie `npm run dev` para aplicar a migração `0010_call_initiatives`; recarregue também o voice-test. A caixa de presença permite saudação uma vez e iniciativas ocasionais. Falar, gerar ou reproduzir áudio impede uma nova iniciativa; captura nova cancela a fala espontânea. Pausar o microfone ou ocultar a página suspende a presença.
+
+Depois de interação real, a iniciativa exige 90 segundos de silêncio e 180 segundos desde a última oferta, com no máximo duas ofertas por chamada. Não há consulta periódica a modelo. Ofertas aceitas consomem LLM/TTS normalmente. Backchannels e reconhecimentos gravados continuam pendentes; a validação automatizada usa TTS simulado, sem consumo de Cartesia.
+
+As rotas autenticadas `GET /v1/persona/state?dataClass=personal` e `DELETE` na mesma URL consultam e reiniciam o estado artístico. Também aceitam `synthetic` e `local-only`, isoladamente. O reset não apaga fatos ou histórico, nem reinicia a familiaridade calculada por interações retidas. Energia e humor variam gradualmente com atividade e tempo; a direção permanece subordinada à personalidade canônica.
+
+Para avaliar a atuação em diálogos encadeados quando houver cota:
+
+```powershell
+npm run check:conversation -- --run --require-primary --only=saudacao,apelido,opiniao-e-continuidade,correcao-e-concisao
+```
+
+Esse ensaio é textual e sintético, sem STT/Cartesia/Jev ou extração remota. Consome cota do LLM. Com `--require-primary`, o teto local já esgotado impede iniciar chamadas; uma troca para reserva invalida a rodada e interrompe os próximos cenários. As memórias do ensaio são fixtures; ele não valida recuperação real. [Arquitetura, implementação e sequência de fases](../../../docs/architecture/Presenca_e_Autonomia_Amadeus.md).
+
+`--suite=presence` seleciona o [roteiro de 18 conversas e 45 turnos](../../../docs/analysis/Roteiro_Naturalidade_Presenca_v1.md), incluindo saudação/iniciativa sem fala da pessoa, callbacks, correção de nome, memória fornecida, referências em inglês e retomada após interrupção simulada. Usa a direção administrativa ativa e estado artístico isolado; gera também transcrição Markdown para revisão. O agendamento e a arbitragem de presença são verificados separadamente nos testes do runtime/controlador. A [avaliação de 07/10/2026](../../../docs/analysis/Avaliacao_Naturalidade_Presenca_2026-10-07.md) registra acertos e falhas de atuação que persistem.
+
+A [avaliação conversacional v2](../../../docs/analysis/Avaliacao_Conversacional_v2.md) separa desenvolvimento, 36 conversas reservadas e regressão congelada. `npm run eval:conversation-quality -- --only=H01,H02` prepara 60 turnos: cinco amostras, Llama como único autor padrão e duas variantes; `--run` executa com juiz independente, sem áudio. O foco é refinar o Llama principal; a comparação inicial com outros autores permanece documentada. Todas as chamadas compartilham o teto acumulado da rodada autorizada no registro ativo; novos comandos não renovam o orçamento. O relatório conserva prompts finais, fatos fornecidos, custos e primeiro texto utilizável; as notas permanecem provisórias até a calibração humana. O núcleo curto é experimental e não altera a produção.
+
+A [segunda rodada de refinamento do Llama](../../../docs/analysis/Resultados_Refinamento_Llama_Rodada_2.md) concluiu 268 de 270 turnos textuais, contabilizando US$ 0,20724567 do novo teto de US$ 0,25. A diretiva curta reduziu o tamanho das respostas, mas naturalidade e fidelidade continuam sem aprovação. As 30 fichas receberam avaliações humanas em 08/10/2026, revelando falsas aprovações do juiz anterior; os cenários ainda reservados e a etapa de voz permanecem preservados. Os braços experimentais não alteram o prompt de produção.
+
+A [preparação v2.1](../../../docs/analysis/Preparacao_Refinamento_Llama_v2_1.md) adiciona perfil estatístico do corpus, 19 exemplos rastreáveis e braços `current/card/card-shots`, com Llama como único autor. `--suite=quality-v2.1` exige `--budget` e usa dez amostras; sem `--run` apenas planeja. `npm run eval:persona-pairwise` compara respostas nas duas ordens com o mesmo teto agregado do autor e do juiz absoluto. Perfil, curadoria e testes locais não aprovam persona nem autorizam uma rodada paga. Produção e orçamento v2 permanecem preservados.
+
+A [calibração humana v2.1](../../../docs/analysis/Calibracao_Juiz_Llama_v2_1.md) usa `npm run calibrate:persona-v2-1 -- --report=ARQUIVO-quality-v2.json --judge=qwen --budget=0.25` para planejar o rejulgamento das 30 fichas já avaliadas; `--run` consome o mesmo teto agregado da rodada. As notas humanas ficam ocultas do juiz, os vereditos anteriores são preservados e abstenções não contam como acertos. Os bancos recebidos no patch ficam em `patch-candidates.json`, separados dos exemplos rastreáveis e sem elegibilidade para produção. A rodada autorizada tem teto total de US$ 0,25; nenhum juiz atingiu os portões de calibração até aqui.
+
+A [comparação exploratória Llama × DeepSeek](../../../docs/analysis/Comparacao_Llama_DeepSeek_Flash.md) usa `npm run compare:llama-deepseek` para preparar e `-- --run` para executar. Compartilha o saldo da rodada v2.1, sem renovar o teto, com Llama/DeepInfra Turbo e DeepSeek/inference.net em rotas fixas. O braço `card-shots` e os fatos sintéticos são iguais para os dois; não há juiz pago, extração de memória nem áudio. São no máximo duas amostras por cenário, com fichas cegas locais para revisão humana. A comparação não altera o modelo principal de produção.
+
+A [rodada v3](../../../docs/analysis/Refinamento_Persona_v3.md) isola exemplos com fatos, direções positivas de atuação, posição da memória e formato de saída. `npm run eval:persona-v3` prepara; `-- --run` executa somente com autorização de gasto. O teto agregado próprio é US$ 0,25, sem renovar os orçamentos anteriores. Llama é o foco e DeepSeek/Morph FP8 a referência. São testes sintéticos sem áudio, com mensagens finais e falhas preservadas, comparações de conversas completas e fichas cegas. Notas de outro modelo não contam como calibração humana; os candidatos não alteram a produção.
+
+Os [resultados v3](../../../docs/analysis/Resultados_Refinamento_Persona_v3.md) registram 621 respostas concluídas e US$ 0,213530835 contabilizados. O protótipo sem cabeçalho reduziu o primeiro texto do Llama, mas atuação, iniciativa e leitura factual continuam sem aprovação. Para a revisão pessoal do principal, `node scripts/review-llama-v3.mjs CAMINHO_DO_RELATORIO` gera trinta fichas com ajustes ocultos; `node scripts/audit-persona-v3.mjs CAMINHO_DO_RELATORIO` audita os metadados localmente. Nenhum dos dois chama modelos.
+
+`npm run compare:models-three` prepara a comparação com Qwen2.5 72B Instruct (`qwen/qwen-2.5-72b-instruct`), fixado em `deepinfra/fp8` via OpenRouter, usando a chave existente. A preparação consulta apenas o catálogo público, sem inferência nem consumo de créditos. São seis cenários de três turnos, uma amostra e três modelos: 54 respostas planejadas. Com 3.800 tokens de entrada e 70 de saída por turno, a estimativa sem cache é US$ 0,03583. A execução (`-- --run`) exige autorização de uma nova rodada de até US$ 0,05; esse teto não renova o saldo histórico. Os registros ficam em `data/refinement/models-three-005/`, com trava e orçamento persistente independentes. Reexecutar consome o saldo restante dessa rodada, sem zerar o gasto. O Qwen participa somente da avaliação. As fichas cegas passam a ter A/B/C; para resumir apenas conversas completas nos três, use `node scripts/summarize-llama-deepseek.mjs NOME_DO_RELATORIO.json --three-models`. Uma amostra por cenário serve como diagnóstico, sem aprovar fidelidade ou declarar um vencedor.
+
+## Llama principal e Jev auxiliar
+
+Na instalação atual, por decisão do proprietário, os tetos locais pagos estão desativados: Llama usa `limits.enforced: false` e Jev usa `localLimitsEnabled: false`. Os números de pedidos/tokens anteriores ficam disponíveis para eventual reativação, mas não bloqueiam chamadas nesse modo. A contabilização diária permanece; saldo, limite da chave, rate limits e indisponibilidade são impostos pelo OpenRouter. HTTP 402 ainda permite tentar as reservas gratuitas elegíveis. Os limites do extrator, áudio e reservas não foram removidos. O script `setup:llama` preserva essa escolha quando reexecutado.
+
+O SQLite coordena operações do mesmo cliente e aguarda o término das transações curtas: a persistência da fala de espera não disputa escrita com a reserva do próximo provedor. Chamadas remotas ficam fora da fila do banco. A proteção não substitui a coordenação entre processos distintos.
+
+O refinamento usa Llama 3.3 70B Instruct pago no OpenRouter como principal, com os modelos gratuitos existentes como reservas para cota, crédito ou indisponibilidade. Jev usa a mesma `OPENROUTER_API_KEY` para uma direção curta de tom, com orçamento próprio e prazo padrão de 600 ms. A revisão de lembranças tem prazo próprio de 2 segundos; o extrator de novas memórias permanece independente. Falha da análise de tom não impede a resposta. Com a API encerrada, `npm run setup:llama` mostra a proposta e `npm run setup:llama -- --apply` salva a configuração, com backup local. Reinicie com `npm run dev`.
+
+Os tetos iniciais são 100 pedidos e 1 milhão de tokens/dia para Llama; 100 pedidos e 200 mil tokens/dia para Jev. O preço máximo do Llama é US$ 0,15/M de entrada e US$ 0,40/M de saída; os modelos `:free` continuam com preço zero. `npm run check:llama-jev` compara três cenários sintéticos e consome créditos. [Arquitetura, configuração, reversão e resultados](../../../docs/architecture/Refinamento_Llama_Jev.md).
+
+Persona 0.4.18: a conversa recebe mensagens `user`/`assistant`, com a última fala literal, em vez de um histórico serializado dentro dela. Texto enviado e áudio ouvido são registrados separadamente; isso permite resolver “1” mesmo quando o áudio falhou, preservando evidências de reprodução. O Markdown `src/application/persona/conversation-presence-v1.md` orienta nome de tratamento curto, tamanho proporcional, callbacks e continuidade. Familiaridade usa interações retidas do mesmo proprietário entre sessões; não implica afeto ou estado emocional persistente.
+
+O contrato vocal usa **um cabeçalho inicial** com `memory`, `intent`, `emotion` e `intensity`, seguido da fala. A curadoria de Kurisu e a persona estável ficam no início do sistema; memórias e direção do turno vêm depois. OpenRouter recebe `session_id` da conversa, e as métricas incluem tokens de cache e custo quando reportados. Não há garantia de cache para todo endpoint/modelo. O prompt vocal conserva uma compilação dos documentos; o completo de comparação tem teto explícito de 27.000 caracteres.
+
+A recuperação conversacional prioriza três fatos diretos; empates relevantes e até dois complementos da mesma fonte podem ampliar a seleção, com teto de oito fatos e 3.000 caracteres, além do orçamento separado dos checkpoints. `memoryReviewMode` em `GET/PUT /v1/persona/analysis` tem padrão `selective`: declarações `recall` ou cabeçalho ausente continuam passando pelo juiz; `none`/`context` dispensam essa chamada e revalidam localmente permissão, versão e validade antes da fala. `strict` revisa todo bloco quando há fatos. Autodeclaração não comprova verdade; o modo seletivo troca parte da supervisão semântica por menor espera. Para editar, consulte a revisão atual e envie `{revision, configuration}` preservando os demais campos.
+
+Uma primeira parte completa pode sair após 700 ms de texto falável, com pelo menos 24 caracteres; os demais blocos têm até 220 caracteres. Cartesia entrega PCM mono de 24 kHz, reutilizando o contexto entre blocos enquanto válido. Cada tentativa de LLM tem até 8 segundos para começar a entregar texto; esse prazo não limita a cadeia inteira de reservas. [Fluxo atual, decisões e evidências](../../../docs/architecture/Refinamento_Llama_Jev.md).
+
+`npm run check:conversation` mostra o plano; `npm run check:conversation -- --run` executa dez cenários sintéticos encadeados, consumindo cotas/créditos vigentes. `--only=nome-de-tratamento,escolha-numerica` restringe casos. Não usa Cartesia, STT, Jev ou extração remota; memórias são fixtures, portanto não avalia a recuperação real. Relatórios ignorados em `data/refinement/` incluem roteamento, respostas e métricas para revisão humana. Sucesso técnico não é aprovação artística da persona. Reinicie a API para carregar o Markdown e a migração `0009_speech_text_delivery`; para `dist`, gere novo build.
+
+Iniciativa automática, backchannels, pesquisa com memória própria e notificações ainda são extensões, descritas em [Presença e autonomia](../../../docs/architecture/Presenca_e_Autonomia_Amadeus.md). Não ficam habilitadas só por entrar no prompt.
+
 ## Memória híbrida e retomada — fase 3
+
+Persona 0.4.17: fatos confirmados e elegíveis continuam no prompt quando os revisores auxiliares estão sem cota. A verificação mantém as checagens locais de política, permissão, versão e expiração; revisão semântica indisponível retorna `null` e é medida em `memoryReviewUnavailable`, sem fingir aprovação. Rejeição explícita retorna `false` e mantém a recuperação sem fatos rejeitados. A extração de novas memórias continua dependente de cota. [Decisão atual](../../../docs/architecture/Refinamento_Llama_Jev.md#recuperação-independente-da-cota-auxiliar--persona-0417).
+
+No TTS Cartesia, `fallbackVoiceId` define a voz reserva e `fallbackVoiceApiKeyEnv` sua variável de chave. A configuração ativa usa `CARTESIA_API_KEY` na principal e `CARTESIA_FALLBACK_API_KEY` na reserva da conta do parceiro; Qwen está fora da produção. Cota da principal não bloqueia uma reserva com credencial distinta. As duas tentativas compartilham o orçamento local existente. Não há troca após entregar áudio parcial. Com ambas indisponíveis, a resposta pode continuar em texto. Reinicie a API após alterar variáveis no `.env`.
 
 O extrator independente utiliza seu orçamento completo, sem a reserva antiga de 20% para conversas. Nome declarado e correção de grafia no mesmo lote são considerados juntos. A recuperação de fatos usa embeddings multilíngues locais, sem listas de palavras em português ou expressões fixas para perguntas de identidade. A aprovação automática continua dependendo de extração válida e cota disponível.
 
@@ -16,7 +80,7 @@ Fatos selecionados podem incluir `coMentioned`, índices que indicam quais foram
 
 A cota local contabiliza a reserva enquanto a operação está em andamento. Quando uma chamada concluída informa tokens de entrada e saída, passa a contar o consumo reportado; falhas e relatórios parciais conservam a estimativa. Tentativas falhas continuam contando como pedidos. Isso não muda planos, limites remotos, chaves ou as restrições a modelos gratuitos.
 
-Durante a chamada, cota/indisponibilidade da LLM aciona as reservas elegíveis. O evento `reply.wait` acompanha uma fala curta, no máximo uma vez por turno. Edite `src/application/voice/provider-wait-presets.json` para alterar a primeira frase de `phrases` ou use `enabled: false` para desativar a fala. Reinicie a API após editar esse arquivo; o build leva uma cópia para `dist`. A fala passa pelo TTS normal, com a voz ativa, e participa da reprodução/interrupção. Se uma resposta falada já começou, há uma tentativa limitada de continuação com o trecho fornecido, sem iniciar outra resposta do zero. Todas as reservas sem cota ainda resultam em erro; nenhum orçamento ou plano pago é aumentado automaticamente.
+Durante a chamada, cota/indisponibilidade da LLM aciona as reservas elegíveis. `reply.wait` acompanha uma fala curta, no máximo uma vez por turno, enquanto o roteador tenta o próximo modelo. O áudio vem de `data/voice-presets/provider-wait.wav`, preparado uma única vez com a voz ativa por `npm run prepare:voice-presets`. A preparação consome uma síntese; tocar o arquivo não chama TTS nem consome cota remota. Edite `src/application/voice/provider-wait-presets.json` e prepare novamente após mudar frase, clone ou referência; reinicie a API. Use `enabled: false` para desativar. Áudio ausente, inválido ou incompatível com a voz gera somente o texto de espera e `WAIT_PRESET_NOT_READY`, sem síntese durante a falha. O WAV/manifesto ficam ignorados pelo Git; o build copia as instruções, não o áudio pessoal. Reprodução e interrupção continuam confirmando apenas o que foi ouvido. Se uma resposta falada já começou, há uma tentativa limitada de continuação com o trecho fornecido. Todas as reservas sem cota ainda resultam em erro; nenhum orçamento ou plano pago é aumentado automaticamente.
 
 Histórico, checkpoints extrativos, fatos revisáveis e relações entre entidades são persistidos no SQLite. O fluxo de voz recupera somente memória pertinente e autorizada. Por padrão, sugestões precisam de confirmação e fatos/resumos começam restritos ao local. A opção persistida `autoApprove` permite aprovar automaticamente novas extrações validadas. A arquitetura, limites, políticas, exclusão, backup e comandos estão em [Memoria_Fase_3.md](../../../docs/architecture/Memoria_Fase_3.md).
 
@@ -60,7 +124,7 @@ npm run eval:memory-semantic -- --run --profile=config/memory-extractor.zai.exam
 
 `POST /v1/voice/versions` recebe `{"name":"Voz aprovada"}` e registra clone/referência/hash, modelo, configuração TTS, formato PCM, accent, segmentação e presets artísticos, sem valores de credenciais. `GET /v1/voice/versions` lista até 256 versões preservadas. `POST /v1/voice/versions/:id/restore` restaura somente o TTS, preservando LLM/STT. Uma voz local exige reativar sua referência original antes da restauração; a operação respeita o bloqueio de configuração. As versões registram o contrato da API; configurações internas de um serviço local externo e pesos não são reinstalados por esse endpoint.
 
-Persona 0.4.13: a direção principal está em `backend/assets/persona/conversation-directions-v1.md`, carregada diretamente no prompt normal e na recuperação. Reações são orientadas por gatilhos, sem frases prontas nessa direção; correção científica, identidade ficcional, memória da sessão e formato recebem ajustes após o reteste. O código mantém montagem e contrato expressivo. Limite do arquivo: 5.000 caracteres; orçamento do prompt normal completo: 20.000, com rejeição sem truncamento; versão atual: 19.146 caracteres. Reinicie a API após editar Markdown; para `dist`, gere novo build. A skill completa e as fontes originais permanecem preservadas. O histórico confirmado continua limitado a 3.000 caracteres. `npm run eval:persona -- --refinement` valida a rodada curta de oito regressões e quatro situações novas; `--run` consulta o modelo configurado e consome cota. Isso não substitui os 30 casos, continuidade ou revisão humana. [Decisão de avançar para a fase 3 e experimentar técnicas avançadas depois](../../../docs/decisions/Decisao_Persona_Fase_3.md).
+Persona 0.4.14: a direção principal está em `backend/assets/persona/conversation-directions-v1.md`, carregada diretamente no prompt normal e na recuperação. Reações são orientadas por gatilhos, sem frases prontas nessa direção; correção científica, identidade ficcional, memória da sessão e formato recebem ajustes após o reteste. O código mantém montagem e contrato expressivo. Limite do arquivo: 5.000 caracteres; orçamento do prompt base completo: 20.000, com rejeição sem truncamento; versão atual: 19.249 caracteres, antes dos complementos operacionais de memória e tom. Reinicie a API após editar Markdown; para `dist`, gere novo build. A skill completa e as fontes originais permanecem preservadas. O histórico confirmado continua limitado a 3.000 caracteres. `npm run eval:persona -- --refinement` valida a rodada curta de oito regressões e quatro situações novas; `--run` consulta o modelo configurado e consome cota. Isso não substitui os 30 casos, continuidade ou revisão humana. [Decisão de avançar para a fase 3 e experimentar técnicas avançadas depois](../../../docs/decisions/Decisao_Persona_Fase_3.md).
 
 A redução anterior da 0.4.10 resolveu o 413 observado no Groq; cotas continuam valendo. `npm run eval:persona -- --run --interval-ms=60000` espaça os cenários por um minuto sem alterar limites ou faturamento.
 
@@ -68,7 +132,7 @@ O usuário aprovou a qualidade vocal atual em 05/10/2026. O gate aceita `voiceAc
 
 ## Provedores LLM e reservas
 
-O LLM pode usar Gemini, Groq ou Cloudflare Workers AI. Groq e Cloudflare usam endpoints oficiais compatíveis com Chat Completions e suportam entrega SSE. Configure suas chaves somente no ambiente da API (`GEMINI_API_KEY`, `GROQ_API_KEY` e `CLOUDFLARE_AI_TOKEN`); nunca envie valores de segredo no JSON da configuração. Para privilegiar baixa latência, esta instalação local usa Groq como principal, Cloudflare como primeira reserva e Gemini por último. Um smoke test sintético isolado mediu o primeiro texto em 303 ms no Groq e 398 ms no Cloudflare, enquanto o Gemini estava sem cota. Esses valores não representam a conversa completa nem garantem desempenho futuro.
+O LLM pode usar OpenRouter, Gemini, Groq ou Cloudflare Workers AI, com entrega SSE. Configure suas chaves somente no ambiente da API (`OPENROUTER_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY` e `CLOUDFLARE_AI_TOKEN`); nunca envie valores de segredo no JSON da configuração. Nesta instalação, o refinamento usa Llama/OpenRouter como principal e conserva Groq, Cloudflare e OpenRouter gratuito como reservas; Gemini gratuito fica restrito a dados sintéticos. Antes do refinamento, um smoke test sintético isolado mediu o primeiro texto em 303 ms no Groq e 398 ms no Cloudflare, enquanto o Gemini estava sem cota. Esses valores históricos não representam a conversa completa nem garantem desempenho futuro.
 
 O Groq também pode responder HTTP 413 quando o prompt excede o limite de tokens por minuto da conta. Quando o corpo identifica `error.code: "rate_limit_exceeded"` e `error.type: "tokens"`, a API classifica como `QUOTA_EXCEEDED` e permite a mesma cadeia de reservas. Outros erros 413 são tratados como configuração/entrada recusada. A mensagem remota não é exposta. O prompt completo com documento e skill pode exceder o limite do modelo principal mesmo sem histórico; nesse caso, a geração depende de uma reserva elegível e disponível.
 
@@ -255,7 +319,7 @@ Para ativar na instalação existente:
 1. Crie uma chave em [OpenRouter](https://openrouter.ai/settings/keys). O campo
    `Credit limit` limita o gasto autorizado pela chave; não é uma compra de créditos.
    `No limit` remove esse teto, mas não remove as cotas dos modelos gratuitos.
-   O Amadeus restringe esse adaptador a modelos `:free` e preço máximo zero.
+   As reservas deste instalador usam modelos `:free` e preço máximo zero.
    Não é necessário comprar créditos para começar a usar esses modelos.
    A Mistral é opcional: use-a somente se sua conta permitir criar uma chave sem
    pagamento. Embora a documentação descreva acesso gratuito, a conta do usuário
@@ -295,9 +359,10 @@ já estiver configurada, passa a usá-la por último com `localRouting: cloud-fi
 Não instala nem ativa um runtime local novo. O modo híbrido anterior continua
 disponível com `localRouting: hybrid`.
 
-OpenRouter exige um modelo explícito terminado em `:free`; os routers aleatórios
-e os modelos pagos são recusados. Cada pedido também limita os preços de entrada
-e saída a zero. O instalador define um orçamento local conservador de 50 pedidos
+As reservas OpenRouter exigem um modelo explícito terminado em `:free`; routers
+aleatórios e reservas pagas são recusados. Nesses pedidos, os preços de entrada
+e saída são limitados a zero. O principal Llama pago exige a configuração explícita
+descrita na seção de refinamento. O instalador gratuito define 50 pedidos
 por dia UTC, **compartilhado entre os modelos que usam a mesma variável de chave**.
 Pedidos que falham também contam. Em `/v1/usage`, esses modelos exibem a mesma
 contagem agregada; não some suas linhas. Esse orçamento não mede a cota restante
@@ -306,12 +371,12 @@ real do provedor, nem outras aplicações usando a conta.
 Erros de cota e indisponibilidade temporária colocam o modelo em pausa entre
 turnos, compartilhada por execução comum e streaming. `Retry-After` é respeitado;
 sem esse cabeçalho, a pausa é de 60 segundos para cota e 15 segundos para falha
-temporária. Limites confirmados da conta OpenRouter (402 ou 429 com cabeçalhos
-`X-RateLimit-*`) pausam os modelos dessa credencial em conjunto. Um 429 sem esses
+temporária. Falta de crédito do Llama pausa o acesso pago; um 429 gratuito com
+`X-RateLimit-*` pausa as reservas gratuitas dessa credencial em conjunto. Um 429 sem esses
 cabeçalhos pausa somente o modelo, permitindo tentar a próxima reserva gratuita.
 As pausas ficam em memória e são apagadas ao reiniciar a API; a contagem
-de orçamento permanece no SQLite. Falhas após texto entregue nunca iniciam uma
-segunda geração. A API não retoma automaticamente uma fala que já falhou.
+de orçamento permanece no SQLite. Falhas após texto entregue usam somente a
+recuperação limitada descrita no fluxo de retomada, sem iniciar outra resposta do zero.
 
 Para verificar os novos modelos com um cenário sintético por vez:
 

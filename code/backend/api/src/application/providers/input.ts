@@ -6,12 +6,13 @@ import {
 } from '../../domain/providers/model.ts';
 import { InvalidProviderInputError } from '../../domain/errors/providers.ts';
 import type { ProviderInput } from '../../ports/provider.ts';
+import { ExpressionSchema } from '../../domain/persona/expression.ts';
 
 const InputSchema = z.strictObject({
   content: z.string().max(65536),
   systemPrompt: z.string().min(1).max(32768).optional(),
   dataClass: DataClassSchema,
-  purpose: z.enum(['conversation', 'memory']).optional(),
+  purpose: z.enum(['conversation', 'memory', 'expression']).optional(),
   memoryTask: z
     .enum(['extract', 'review', 'reconcile', 'answer', 'verify-answer'])
     .optional(),
@@ -30,6 +31,18 @@ const InputSchema = z.strictObject({
     })
     .optional(),
   maxTokens: z.number().int().min(1).max(1000000),
+  speechContextId: z.uuid().optional(),
+  speechExpression: ExpressionSchema.optional(),
+  sessionId: z.uuid().optional(),
+  history: z
+    .array(
+      z.strictObject({
+        role: z.enum(['user', 'assistant']),
+        content: z.string().min(1).max(8192),
+      }),
+    )
+    .max(24)
+    .optional(),
 });
 
 export function validateProviderInput(role: Role, input: ProviderInput) {
@@ -38,6 +51,14 @@ export function validateProviderInput(role: Role, input: ProviderInput) {
     !RoleSchema.safeParse(role).success ||
     (role !== 'llm' && input.systemPrompt !== undefined) ||
     (role !== 'llm' && input.purpose !== undefined) ||
+    (role !== 'llm' &&
+      (input.history !== undefined || input.sessionId !== undefined)) ||
+    (input.history?.reduce(
+      (size, message) => size + message.content.length,
+      0,
+    ) ?? 0) > 65536 ||
+    (role !== 'tts' && input.speechContextId !== undefined) ||
+    (role !== 'tts' && input.speechExpression !== undefined) ||
     (input.memoryTask !== undefined && input.purpose !== 'memory') ||
     (role === 'stt' ? !input.audio : !input.content.trim())
   ) {
@@ -49,6 +70,10 @@ export function estimateProviderBudget(input: ProviderInput) {
   return (
     Buffer.byteLength(input.content, 'utf8') +
     Buffer.byteLength(input.systemPrompt ?? '', 'utf8') +
+    (input.history?.reduce(
+      (size, message) => size + Buffer.byteLength(message.content, 'utf8'),
+      0,
+    ) ?? 0) +
     Math.ceil((input.audio?.pcmBase64.length ?? 0) / 4) +
     input.maxTokens
   );

@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { streamSpeech } from '../../src/application/voice/speech-stream.ts';
 import { createTurnProcessor } from '../../src/application/voice/turn-processor.ts';
 import { createVoiceMetrics } from '../../src/application/voice/metrics.ts';
@@ -240,4 +240,45 @@ it('keeps short sentences in one synthesis block', async () => {
   }
 
   expect(segments).toEqual(['Sim. Vamos conferir? Agora faz sentido!']);
+});
+
+it.each([
+  'Essa hipótese é interessante. Vamos investigar juntos o que os dados realmente mostram.',
+  'Você prefere café sem açúcar.',
+])('libera uma primeira parte completa antes do fim: %s', async (prefix) => {
+  vi.useFakeTimers();
+
+  let finish = () => {};
+
+  const pending = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const stream = streamSpeech(async function* () {
+    yield prefix;
+    await pending;
+    yield ' Depois comparamos os resultados.';
+  }, new AbortController().signal)[Symbol.asyncIterator]();
+
+  try {
+    const first = stream.next();
+    await vi.advanceTimersByTimeAsync(699);
+    let delivered = false;
+    void first.then(() => {
+      delivered = true;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(delivered).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await first).toEqual({ value: prefix, done: false });
+    finish();
+    expect(await stream.next()).toEqual({
+      value: 'Depois comparamos os resultados.',
+      done: false,
+    });
+    expect((await stream.next()).done).toBe(true);
+  } finally {
+    finish();
+    await stream.return?.();
+    vi.useRealTimers();
+  }
 });

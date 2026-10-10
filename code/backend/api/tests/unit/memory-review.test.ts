@@ -5,6 +5,7 @@ import {
   parseMemoryAnswer,
   planMemoryAnswer,
   reconcileReviewedMemory,
+  verifyMemorySpeech,
 } from '../../src/application/memory/review.ts';
 import {
   FactSchema,
@@ -23,6 +24,39 @@ const source: MemorySource = {
   partiallyPlayed: false,
   dataClass: 'synthetic',
 };
+
+it('revisa vocativo como preferência separada e não o envia em avaliação sintética', async () => {
+  const execute = vi.fn<ProviderServices['execute']>(async () =>
+    output({ verdict: 'supported' }),
+  );
+  const providers = { execute };
+  await verifyMemorySpeech(
+    providers,
+    JSON.stringify({ facts: [] }),
+    'Olá.',
+    'Oi, Alex.',
+    'personal',
+    new AbortController().signal,
+    [],
+    'Alex',
+  );
+  expect(
+    JSON.parse(execute.mock.calls[0]![1].content).ownerAddress,
+  ).toMatchObject({ preferredAddressName: 'Alex' });
+  await verifyMemorySpeech(
+    providers,
+    JSON.stringify({ facts: [] }),
+    'Olá.',
+    'Oi.',
+    'synthetic',
+    new AbortController().signal,
+    [],
+    'Alex',
+  );
+  expect(JSON.parse(execute.mock.calls[1]![1].content)).not.toHaveProperty(
+    'ownerAddress',
+  );
+});
 const candidate = (text: string) => ({
   text,
   category: 'preferencia',

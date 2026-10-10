@@ -1,0 +1,1336 @@
+{
+  "version": 1,
+  "sourceCatalogHash": "f3cfdd320e302caf7e6e0ed399beca656057aef69ba25c6d12f1eda522aa4081",
+  "examinedSources": 17,
+  "selected": [
+    {
+      "id": "estilo-saudacao",
+      "kind": "style-adaptation",
+      "sourceIds": ["kurisu-dialogue-02137"],
+      "situation": "Chegada casual; responder sem transformar a saudação numa tarefa.",
+      "sourceProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 18,
+          "p90": 18,
+          "p95": 18
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 18,
+          "p90": 18,
+          "p95": 18
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 3,
+          "p90": 3,
+          "p95": 3
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "adaptationProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 7,
+          "p90": 7,
+          "p95": 7
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 7,
+          "p90": 7,
+          "p95": 7
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": true,
+      "contextAvailable": true,
+      "autobiographicalEligible": false
+    },
+    {
+      "id": "estilo-elogio-direto",
+      "kind": "style-adaptation",
+      "sourceIds": ["kurisu-dialogue-00646"],
+      "situation": "Elogio direto pela explicação; gratidão breve e continuidade, sem transformar o reconhecimento em consulta técnica.",
+      "sourceProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 6,
+          "p90": 6,
+          "p95": 6
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 7,
+          "p90": 7,
+          "p95": 7
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "adaptationProfile": {
+        "samples": 2,
+        "whitespaceWords": {
+          "samples": 2,
+          "p50": 10,
+          "p90": 10,
+          "p95": 10
+        },
+        "lexicalWords": {
+          "samples": 2,
+          "p50": 10,
+          "p90": 10,
+          "p95": 10
+        },
+        "sentences": {
+          "samples": 2,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 2,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": true,
+      "contextAvailable": true,
+      "autobiographicalEligible": false
+    },
+    {
+      "id": "estilo-discordancia",
+      "kind": "style-adaptation",
+      "sourceIds": ["kurisu-dialogue-01021"],
+      "situation": "Uma explicação não corresponde ao resultado observado.",
+      "sourceProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 14,
+          "p90": 14,
+          "p95": 14
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 15,
+          "p90": 15,
+          "p95": 15
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "adaptationProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 21,
+          "p90": 21,
+          "p95": 21
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 21,
+          "p90": 21,
+          "p95": 21
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": true,
+      "contextAvailable": true,
+      "autobiographicalEligible": false
+    },
+    {
+      "id": "estilo-escuta",
+      "kind": "style-adaptation",
+      "sourceIds": ["kurisu-dialogue-01921"],
+      "situation": "A pessoa hesita em falar de algo pessoal e precisa de espaço.",
+      "sourceProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 35,
+          "p90": 35,
+          "p95": 35
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 38,
+          "p90": 38,
+          "p95": 38
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 5,
+          "p90": 5,
+          "p95": 5
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 4,
+          "p90": 4,
+          "p95": 4
+        },
+        "hasQuestionRate": 1,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "adaptationProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 14,
+          "p90": 14,
+          "p95": 14
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 14,
+          "p90": 14,
+          "p95": 14
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": true,
+      "contextAvailable": true,
+      "autobiographicalEligible": false
+    },
+    {
+      "id": "estilo-apelido",
+      "kind": "style-adaptation",
+      "sourceIds": ["kurisu-dialogue-02054"],
+      "situation": "Em brincadeira recíproca, a pessoa troca um apelido errado por outro.",
+      "sourceProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 11,
+          "p90": 11,
+          "p95": 11
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 12,
+          "p90": 12,
+          "p95": 12
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 1,
+          "p90": 1,
+          "p95": 1
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "adaptationProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 16,
+          "p90": 16,
+          "p95": 16
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 16,
+          "p90": 16,
+          "p95": 16
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": true,
+      "contextAvailable": true,
+      "autobiographicalEligible": false
+    },
+    {
+      "id": "estilo-reparo",
+      "kind": "style-adaptation",
+      "sourceIds": ["kurisu-dialogue-00234"],
+      "situation": "A pessoa critica uma resposta ríspida; reconhecer e corrigir.",
+      "sourceProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 45,
+          "p90": 45,
+          "p95": 45
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 47,
+          "p90": 47,
+          "p95": 47
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 6,
+          "p90": 6,
+          "p95": 6
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 1,
+        "exclamationRate": 1,
+        "stutterRate": 0
+      },
+      "adaptationProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 17,
+          "p90": 17,
+          "p95": 17
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 17,
+          "p90": 17,
+          "p95": 17
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": true,
+      "contextAvailable": true,
+      "autobiographicalEligible": false
+    },
+    {
+      "id": "estilo-evidencia",
+      "kind": "style-adaptation",
+      "sourceIds": ["kurisu-dialogue-00321"],
+      "situation": "Resultado inesperado desperta curiosidade científica.",
+      "sourceProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 36,
+          "p90": 36,
+          "p95": 36
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 38,
+          "p90": 38,
+          "p95": 38
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 8,
+          "p90": 8,
+          "p95": 8
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "hasQuestionRate": 1,
+        "endsQuestionRate": 1,
+        "ellipsisRate": 0,
+        "exclamationRate": 1,
+        "stutterRate": 0
+      },
+      "adaptationProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 16,
+          "p90": 16,
+          "p95": 16
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 16,
+          "p90": 16,
+          "p95": 16
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": true,
+      "contextAvailable": true,
+      "autobiographicalEligible": false
+    },
+    {
+      "id": "estilo-limite",
+      "kind": "style-adaptation",
+      "sourceIds": ["kurisu-dialogue-00092"],
+      "situation": "Pergunta fora da especialidade; separar conhecimento de hipótese.",
+      "sourceProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 39,
+          "p90": 39,
+          "p95": 39
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 44,
+          "p90": 44,
+          "p95": 44
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 3,
+          "p90": 3,
+          "p95": 3
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "adaptationProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 18,
+          "p90": 18,
+          "p95": 18
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 18,
+          "p90": 18,
+          "p95": 18
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": true,
+      "contextAvailable": true,
+      "autobiographicalEligible": false
+    },
+    {
+      "id": "estilo-afeto",
+      "kind": "style-adaptation",
+      "sourceIds": ["kurisu-dialogue-02931"],
+      "situation": "A pessoa expressa que valoriza a relação construída nas conversas.",
+      "sourceProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 21,
+          "p90": 21,
+          "p95": 21
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 21,
+          "p90": 21,
+          "p95": 21
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 3,
+          "p90": 3,
+          "p95": 3
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 1,
+          "p90": 1,
+          "p95": 1
+        },
+        "hasQuestionRate": 1,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 1,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "adaptationProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 15,
+          "p90": 15,
+          "p95": 15
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 15,
+          "p90": 15,
+          "p95": 15
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": true,
+      "contextAvailable": true,
+      "autobiographicalEligible": false
+    },
+    {
+      "id": "estilo-simplicidade",
+      "kind": "style-adaptation",
+      "sourceIds": ["kurisu-dialogue-03338"],
+      "situation": "O interlocutor rejeita uma proposta por ela parecer simples demais.",
+      "sourceProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 19,
+          "p90": 19,
+          "p95": 19
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 22,
+          "p90": 22,
+          "p95": 22
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 3,
+          "p90": 3,
+          "p95": 3
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 1,
+          "p90": 1,
+          "p95": 1
+        },
+        "hasQuestionRate": 1,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 1,
+        "stutterRate": 1
+      },
+      "adaptationProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 19,
+          "p90": 19,
+          "p95": 19
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 19,
+          "p90": 19,
+          "p95": 19
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": true,
+      "contextAvailable": true,
+      "autobiographicalEligible": false
+    },
+    {
+      "id": "estilo-revisao",
+      "kind": "style-adaptation",
+      "sourceIds": ["kurisu-dialogue-01475"],
+      "situation": "A pessoa apresenta evidência de que a afirmação anterior estava errada.",
+      "sourceProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 19,
+          "p90": 19,
+          "p95": 19
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 21,
+          "p90": 21,
+          "p95": 21
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 3,
+          "p90": 3,
+          "p95": 3
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 1,
+          "p90": 1,
+          "p95": 1
+        },
+        "hasQuestionRate": 1,
+        "endsQuestionRate": 1,
+        "ellipsisRate": 1,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "adaptationProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 15,
+          "p90": 15,
+          "p95": 15
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 15,
+          "p90": 15,
+          "p95": 15
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": true,
+      "contextAvailable": true,
+      "autobiographicalEligible": false
+    },
+    {
+      "id": "estilo-rotulo",
+      "kind": "style-adaptation",
+      "sourceIds": ["kurisu-dialogue-00384"],
+      "situation": "Brincadeira recíproca; a pessoa atribui um papel subordinado.",
+      "sourceProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 13,
+          "p90": 13,
+          "p95": 13
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 14,
+          "p90": 14,
+          "p95": 14
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 4,
+          "p90": 4,
+          "p95": 4
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 3,
+          "p90": 3,
+          "p95": 3
+        },
+        "hasQuestionRate": 1,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 1,
+        "stutterRate": 0
+      },
+      "adaptationProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 16,
+          "p90": 16,
+          "p95": 16
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 16,
+          "p90": 16,
+          "p95": 16
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 3,
+          "p90": 3,
+          "p95": 3
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 1,
+          "p90": 1,
+          "p95": 1
+        },
+        "hasQuestionRate": 1,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": true,
+      "contextAvailable": true,
+      "autobiographicalEligible": false
+    },
+    {
+      "id": "estilo-alivio",
+      "kind": "style-adaptation",
+      "sourceIds": ["kurisu-dialogue-00907"],
+      "situation": "Uma preocupação real da conversa termina; calor discreto.",
+      "sourceProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 31,
+          "p90": 31,
+          "p95": 31
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 34,
+          "p90": 34,
+          "p95": 34
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 1,
+          "p90": 1,
+          "p95": 1
+        },
+        "hasQuestionRate": 1,
+        "endsQuestionRate": 1,
+        "ellipsisRate": 0,
+        "exclamationRate": 1,
+        "stutterRate": 0
+      },
+      "adaptationProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 16,
+          "p90": 16,
+          "p95": 16
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 16,
+          "p90": 16,
+          "p95": 16
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": true,
+      "contextAvailable": true,
+      "autobiographicalEligible": false
+    },
+    {
+      "id": "estilo-linguagem",
+      "kind": "style-adaptation",
+      "sourceIds": ["kurisu-dialogue-02526"],
+      "situation": "Um texto contém abreviações inadequadas ao destinatário.",
+      "sourceProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 20,
+          "p90": 20,
+          "p95": 20
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 24,
+          "p90": 24,
+          "p95": 24
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 3,
+          "p90": 3,
+          "p95": 3
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 3,
+          "p90": 3,
+          "p95": 3
+        },
+        "hasQuestionRate": 1,
+        "endsQuestionRate": 1,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "adaptationProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 19,
+          "p90": 19,
+          "p95": 19
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 19,
+          "p90": 19,
+          "p95": 19
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": true,
+      "contextAvailable": true,
+      "autobiographicalEligible": false
+    },
+    {
+      "id": "estilo-razao",
+      "kind": "style-adaptation",
+      "sourceIds": ["kurisu-dialogue-01145"],
+      "situation": "A pessoa substitui a própria motivação por uma encenação.",
+      "sourceProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 27,
+          "p90": 27,
+          "p95": 27
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 31,
+          "p90": 31,
+          "p95": 31
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 6,
+          "p90": 6,
+          "p95": 6
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 1,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "adaptationProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 13,
+          "p90": 13,
+          "p95": 13
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 13,
+          "p90": 13,
+          "p95": 13
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 1,
+          "p90": 1,
+          "p95": 1
+        },
+        "hasQuestionRate": 1,
+        "endsQuestionRate": 1,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": true,
+      "contextAvailable": true,
+      "autobiographicalEligible": false
+    },
+    {
+      "id": "estilo-reconciliar",
+      "kind": "style-adaptation",
+      "sourceIds": ["kurisu-dialogue-02871"],
+      "situation": "A conversa retoma depois de um desentendimento.",
+      "sourceProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 10,
+          "p90": 10,
+          "p95": 10
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 11,
+          "p90": 11,
+          "p95": 11
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 3,
+          "p90": 3,
+          "p95": 3
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 1,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "adaptationProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 14,
+          "p90": 14,
+          "p95": 14
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 14,
+          "p90": 14,
+          "p95": 14
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": true,
+      "contextAvailable": true,
+      "autobiographicalEligible": false
+    },
+    {
+      "id": "estilo-sintese",
+      "kind": "style-adaptation",
+      "sourceIds": ["kurisu-dialogue-01568"],
+      "situation": "O interlocutor pede uma conclusão breve de uma discussão.",
+      "sourceProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 13,
+          "p90": 13,
+          "p95": 13
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 13,
+          "p90": 13,
+          "p95": 13
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 3,
+          "p90": 3,
+          "p95": 3
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 1,
+          "p90": 1,
+          "p95": 1
+        },
+        "hasQuestionRate": 1,
+        "endsQuestionRate": 1,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "adaptationProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 18,
+          "p90": 18,
+          "p95": 18
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 18,
+          "p90": 18,
+          "p95": 18
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": true,
+      "contextAvailable": true,
+      "autobiographicalEligible": false
+    },
+    {
+      "id": "contrato-bebida",
+      "kind": "synthetic-memory-contract",
+      "sourceIds": [],
+      "situation": "Contrato sintético de memória",
+      "sourceProfile": null,
+      "adaptationProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 4,
+          "p90": 4,
+          "p95": 4
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 4,
+          "p90": 4,
+          "p95": 4
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 1,
+          "p90": 1,
+          "p95": 1
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": false,
+      "contextAvailable": false,
+      "autobiographicalEligible": false
+    },
+    {
+      "id": "contrato-sugestao",
+      "kind": "synthetic-memory-contract",
+      "sourceIds": [],
+      "situation": "Contrato sintético de memória",
+      "sourceProfile": null,
+      "adaptationProfile": {
+        "samples": 1,
+        "whitespaceWords": {
+          "samples": 1,
+          "p50": 14,
+          "p90": 14,
+          "p95": 14
+        },
+        "lexicalWords": {
+          "samples": 1,
+          "p50": 14,
+          "p90": 14,
+          "p95": 14
+        },
+        "sentences": {
+          "samples": 1,
+          "p50": 1,
+          "p90": 1,
+          "p95": 1
+        },
+        "questionsPerUnit": {
+          "samples": 1,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0
+        },
+        "hasQuestionRate": 0,
+        "endsQuestionRate": 0,
+        "ellipsisRate": 0,
+        "exclamationRate": 0,
+        "stutterRate": 0
+      },
+      "attributionChecked": false,
+      "contextAvailable": false,
+      "autobiographicalEligible": false
+    }
+  ],
+  "rejected": [],
+  "literalOverlap": [],
+  "humanAccepted": false,
+  "paidCalls": 0
+}

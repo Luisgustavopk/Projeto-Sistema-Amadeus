@@ -4,6 +4,10 @@ Análise em 06/10/2026 do [FrancescoCaracciolo/Amadeus](https://github.com/Franc
 
 ## Resultado da aquisição
 
+Atualização em 07/10/2026: o [índice contextual da persona](../architecture/Referencias_Contextuais_Persona.md) implementa a recuperação de exemplos curados e lore em tabelas SQLite separadas. Os números e propostas abaixo descrevem a aquisição original. A [avaliação textual da rodada 2](Resultados_Refinamento_Llama_Rodada_2.md) testou o uso dos exemplos; naturalidade e fidelidade continuam sem aprovação.
+
+Atualização de runtime: a aquisição ocorreu em `feat/interface`; na persona 0.4.16 desta branch, a curadoria alimenta [canon-conversation-v1.md](../../code/backend/assets/persona/canon-conversation-v1.md). O [refinamento atual](../architecture/Refinamento_Llama_Jev.md#correções-de-conversa-e-memória--persona-0416) descreve o uso efetivo, testes e limitações. As propostas de índice/lore e os dados de avatar abaixo registram a aquisição e não indicam implementação nova nesta branch.
+
 O snapshot completo de 15 arquivos foi salvo em `code/backend/assets/persona/external/francesco-amadeus/source/`: aproximadamente 5,17 MB, com licença e originais preservados. O inventário verificou tamanho e hash de cada blob contra a revisão Git; também registrou SHA-256 para comparação futura. [Manifesto](../../code/backend/assets/persona/external/francesco-amadeus/manifest.json).
 
 | Material             | Resultado conferido                                                                   | Aplicação no projeto                                                        |
@@ -16,7 +20,7 @@ O snapshot completo de 15 arquivos foi salvo em `code/backend/assets/persona/ext
 | `divergence.py`      | Extensão Python de Newelle/Gtk/WebKit, com consultas a um serviço externo             | Referência de interface diegética; não foi executada nem incorporada à API  |
 | `README.md`          | Guia de Nyarch, prompting, recuperação de documentos, avatar, TTS e recursos ligados  | Ideias de arquitetura, sem adotar comandos de instalação nem preços antigos |
 
-O preparador offline está em [prepare-kurisu-reference.mjs](../../code/backend/api/scripts/prepare-kurisu-reference.mjs). JSONL produzido fica em `prepared/`. A preparação não classifica emoções, verifica o cânone, transforma texto em treinamento ou cria embeddings. Registros mantêm `requiresCuration: true` e `autobiographicalEligible: false`.
+O preparador offline `code/backend/api/scripts/prepare-kurisu-reference.mjs` está preservado na branch `feat/interface`, junto da integração de avatar. JSONL produzido fica em `prepared/`. A preparação não classifica emoções, verifica o cânone, transforma texto em treinamento ou cria embeddings. Registros mantêm `requiresCuration: true` e `autobiographicalEligible: false`.
 
 ## O ganho principal para a persona
 

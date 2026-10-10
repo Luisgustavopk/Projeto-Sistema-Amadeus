@@ -8,6 +8,37 @@ const turnId = z.number().int().min(0).max(4294967295);
 const responseId = z.uuid();
 const segmentId = z.uuid();
 const event = z.discriminatedUnion('type', [
+  z.strictObject({
+    type: z.literal('presence.cancelled'),
+    offerId: z.uuid(),
+    turnId,
+  }),
+  z.strictObject({
+    type: z.literal('presence.offer'),
+    offerId: z.uuid(),
+    kind: z.enum(['greeting', 'initiative']),
+  }),
+  z.strictObject({
+    type: z.literal('audio.abort'),
+    turnId,
+    responseId,
+    segmentId,
+  }),
+  z.strictObject({
+    type: z.literal('audio.start'),
+    turnId,
+    responseId,
+    segmentId,
+    sampleRate: z.union([z.literal(16000), z.literal(24000)]),
+  }),
+  z.strictObject({
+    type: z.literal('audio.end'),
+    turnId,
+    responseId,
+    segmentId,
+    sampleCount: z.number().int().positive().max(2160000),
+    frameCount: z.number().int().positive().max(4500),
+  }),
   ExpressionSchema.extend({
     type: z.literal('reply.expression'),
     turnId,
@@ -17,7 +48,8 @@ const event = z.discriminatedUnion('type', [
     personaVersion: z.string().max(64),
     voiceProfileId: z.uuid().nullable(),
     metadataValid: z.boolean(),
-    deliveryApplied: z.literal(false),
+    phase: z.enum(['initial', 'update']).optional(),
+    deliveryApplied: z.boolean(),
     deliveryPresetId: DeliveryPresetSchema,
     avatarExpression: z.enum([
       'sorriso_discreto',

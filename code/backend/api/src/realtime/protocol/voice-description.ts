@@ -15,10 +15,25 @@ export const VOICE_PIPELINE_PROTOCOL = {
     expressionEvent: 'reply.expression',
     association:
       'Cache expression by responseId/segmentId; apply on actual segment playback, not event arrival',
-    stateScope: 'current voice session; reset on reconnect',
+    stateScope:
+      'segment expression within the session; bounded artistic PAD/energy and familiarity persist per owner/data class with decay',
     nativeDeliveryControlsApplied: false,
+    parallelExpression:
+      'Optional observer emits initial/update events for the same segment; audio never waits for expression classification. Personal observation requires explicit consent.',
+    authorSelection:
+      'Manual configured/Llama/DeepSeek selection before opening a call; semantic selection by Jev is not enabled.',
   },
   clientEventSchema: z.toJSONSchema(ClientEvent),
+  presence: {
+    handshake:
+      'presence.update -> presence.offer -> presence.accept/decline; client reserves the next shared turn ID',
+    greetingOnce: true,
+    silenceMs: 90000,
+    minimumIntervalMs: 180000,
+    maximumInitiativesPerSession: 2,
+    userPriority: true,
+    externalAutonomy: false,
+  },
   serverPayloadSchema: z.toJSONSchema(VoicePayload),
   serverEnvelope: {
     protocolVersion: '1.1',
@@ -31,7 +46,9 @@ export const VOICE_PIPELINE_PROTOCOL = {
     channels: 1,
     sampleRates: [16000, 24000],
     frameDurationMs: 20,
-    rateSource: 'audio.segment.sampleRate',
+    rateSource: 'audio.segment.sampleRate or audio.start.sampleRate',
+    progressiveAudio:
+      'audio.start precedes PCM; audio.end supplies final sampleCount/frameCount before the padded tail; audio.abort discards an unfinished stream',
   },
   binaryAudio: {
     frameBytes: 648, // Input; output is 8 + sampleRate / 50 * 2.
@@ -42,7 +59,7 @@ export const VOICE_PIPELINE_PROTOCOL = {
     pcmBytes: 640,
     padding: 'Final output frame zero padded; sampleCount excludes padding',
     segmentAssociation:
-      'audio.segment immediately precedes its contiguous binary frames',
+      'audio.segment or audio.start immediately precedes its contiguous binary frames',
   },
   inputLimits: {
     minimumSpeechMs: 100,

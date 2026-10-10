@@ -43,7 +43,12 @@ export function createVoiceSession(
     if (!(
       error instanceof ApplicationError && error.code === 'PROVIDER_BUSY'
     )) {
-      socket.close(1008, 'Invalid voice event');
+      socket.close(
+        1008,
+        error instanceof RateLimitedError
+          ? error.message
+          : 'Invalid voice event',
+      );
     }
   };
 
@@ -113,6 +118,7 @@ export function createVoiceSession(
               protocolVersion: '1.1',
               sessionId,
               stage: 'voice',
+              presenceAvailable: true,
               audio: event.audio,
               ...(event.type === 'session.resume'
                 ? {
@@ -155,6 +161,15 @@ export function createVoiceSession(
         }
 
         switch (event?.type) {
+          case 'presence.update':
+            runtime.presenceUpdate(event);
+            break;
+          case 'presence.accept':
+            runtime.presenceAccept(event.offerId, event.turnId);
+            break;
+          case 'presence.decline':
+            runtime.presenceDecline(event.offerId);
+            break;
           case 'speech.start':
             runtime.speechStart(event.turnId);
             break;

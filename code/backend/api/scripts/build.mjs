@@ -27,6 +27,60 @@ if (result.error) {
 process.exitCode = result.status ?? 1;
 
 if (process.exitCode === 0) {
+  for (const [directory, file] of [
+    ['quality-v2.1', 'core-card.md'],
+    ['quality-v2.1', 'turn-direction.md'],
+    ['quality-v3', 'presence-positive.md'],
+  ]) {
+    await copyFile(
+      new URL(`../../evals/persona/${directory}/${file}`, import.meta.url),
+      resolve(output, 'application/persona', file),
+    );
+  }
+  for (const file of [
+    'input-repair-v1.md',
+    'conversation-presence-v2.md',
+    'expressive-direction-v1.md',
+    'presence-turn-v2.md',
+  ]) {
+    await copyFile(
+      new URL('../src/application/persona/' + file, import.meta.url),
+      resolve(output, 'application/persona', file),
+    );
+  }
+  await copyFile(
+    new URL('../src/application/persona/presence-turn-v1.md', import.meta.url),
+    resolve(output, 'application/persona/presence-turn-v1.md'),
+  );
+  await copyFile(
+    new URL(
+      '../src/application/persona/conversation-presence-v1.md',
+      import.meta.url,
+    ),
+    resolve(output, 'application/persona/conversation-presence-v1.md'),
+  );
+  await copyFile(
+    new URL('../src/application/persona/voice-runtime-v1.md', import.meta.url),
+    resolve(output, 'application/persona/voice-runtime-v1.md'),
+  );
+  await copyFile(
+    new URL('../src/application/persona/jev-clarity-v1.md', import.meta.url),
+    resolve(output, 'application/persona/jev-clarity-v1.md'),
+  );
+  await copyFile(
+    new URL(
+      '../src/application/persona/jev-memory-review-v1.md',
+      import.meta.url,
+    ),
+    resolve(output, 'application/persona/jev-memory-review-v1.md'),
+  );
+  await copyFile(
+    new URL(
+      '../src/application/persona/jev-tone-rubric-v1.md',
+      import.meta.url,
+    ),
+    resolve(output, 'application/persona/jev-tone-rubric-v1.md'),
+  );
   await copyFile(
     new URL(
       '../src/application/voice/provider-wait-presets.json',
@@ -42,6 +96,7 @@ if (process.exitCode === 0) {
     'memory-answer-v1.md',
     'memory-speech-review-v1.md',
     'memory-answer-direction-v1.md',
+    'memory-use-v1.md',
   ]) {
     await copyFile(
       new URL('../src/application/memory/' + file, import.meta.url),
@@ -52,6 +107,9 @@ if (process.exitCode === 0) {
     'conversation-directions-v1.md',
     'reaction-catalog-v0.2.md',
     'reaction-repertoire-v0.2.md',
+    'canon-conversation-v1.md',
+    'corpus-examples-v1.md',
+    'corpus-examples-v1.json',
   ]) {
     await copyFile(
       new URL('../../assets/persona/' + file, import.meta.url),

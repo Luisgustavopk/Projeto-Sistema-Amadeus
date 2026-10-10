@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { LocalLlmSchema, LocalCompletionEndpointSchema } from './local.ts';
+import { OpenRouterPaidSchema, validOpenRouterPayment } from './openrouter.ts';
+import { JEV_ENDPOINT, JEV_MODEL } from '../persona/tone.ts';
 
 export const RoleSchema = z.enum(['llm', 'stt', 'tts']);
 export type Role = z.infer<typeof RoleSchema>;
@@ -99,6 +101,7 @@ const LlmFallbackSchema = z
 
 export const ProviderSchema = z
   .strictObject({
+    openRouterPaid: OpenRouterPaidSchema.optional(),
     adapter: z.enum([
       'disabled',
       'http-json',
@@ -116,6 +119,8 @@ export const ProviderSchema = z
     apiKeyEnv: ApiKeyEnvSchema.optional(),
     model: z.string().min(1).max(128).optional(),
     voiceId: z.uuid().optional(),
+    fallbackVoiceId: z.uuid().optional(),
+    fallbackVoiceApiKeyEnv: ApiKeyEnvSchema.optional(),
     speechFallback: LocalSpeechFallbackSchema.optional(),
     accountId: z
       .string()
@@ -137,6 +142,7 @@ export const ProviderSchema = z
     policyReference: z.string().url().optional(),
     limits: z
       .strictObject({
+        enforced: z.boolean().optional(),
         requestsPerDay: z.number().int().min(0).max(100000).default(0),
         tokensPerDay: z.number().int().min(0).max(100000000).default(0),
         source: z.enum(['operator', 'provider']).default('operator'),
@@ -144,6 +150,22 @@ export const ProviderSchema = z
       .default({ requestsPerDay: 0, tokensPerDay: 0, source: 'operator' }),
   })
   .superRefine((p, ctx) => {
+    if (
+      p.limits.enforced === false &&
+      !(p.adapter === 'openrouter' && p.openRouterPaid) &&
+      !(
+        p.adapter === 'http-json' &&
+        p.endpoint === JEV_ENDPOINT &&
+        p.model === JEV_MODEL
+      )
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          'Limites locais só podem ser desativados para modelos pagos aprovados ou contabilização Jev.',
+      });
+    }
+
     if (p.localRouting && !p.localProvider) {
       ctx.addIssue({
         code: 'custom',
@@ -232,10 +254,11 @@ export const ProviderSchema = z
       });
     }
 
-    if (p.adapter === 'openrouter' && !p.model?.endsWith(':free')) {
+    if (!validOpenRouterPayment(p)) {
       ctx.addIssue({
         code: 'custom',
-        message: 'OpenRouter exige um modelo explícito com sufixo :free.',
+        message:
+          'OpenRouter exige :free ou Llama 3.3 com autorização explícita e teto de preço.',
       });
     }
 
@@ -299,10 +322,27 @@ export const ProviderSchema = z
       });
     }
 
+    if (
+      p.fallbackVoiceId &&
+      (p.adapter !== 'cartesia' || p.fallbackVoiceId === p.voiceId)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Voz reserva exige Cartesia e deve diferir da principal.',
+      });
+    }
+
     if (p.speechFallback && !['deepgram', 'cartesia'].includes(p.adapter)) {
       ctx.addIssue({
         code: 'custom',
         message: 'Fallback local só se aplica aos provedores de fala remotos.',
+      });
+    }
+
+    if (p.fallbackVoiceApiKeyEnv && !p.fallbackVoiceId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Credencial da voz reserva exige fallbackVoiceId.',
       });
     }
 
@@ -377,6 +417,7 @@ export const ProvidersSchema = z
 
     for (const role of ['stt', 'tts'] as const) {
       if (
+        providers[role].openRouterPaid ||
         providers[role].fallbackModel ||
         providers[role].fallbackProviders?.length ||
         providers[role].localProvider ||

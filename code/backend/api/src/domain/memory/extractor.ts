@@ -19,6 +19,7 @@ export const MemoryExtractorProviderSchema = ProviderSchema.superRefine(
         'openai-local',
         'zai',
       ].includes(p.adapter) ||
+      p.openRouterPaid ||
       p.fallbackModel ||
       p.fallbackProviders?.length ||
       p.localProvider ||

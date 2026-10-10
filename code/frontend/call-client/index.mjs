@@ -2,6 +2,7 @@ import { openCall } from "./connection.mjs";
 import { createPlayback } from "./playback.mjs";
 import { createMicrophone } from "./microphone.mjs";
 import { createVoiceTimings } from "./voice-timings.mjs";
+import { createExpressionPlayback } from "./expression-playback.mjs";
 
 // Headless integration module; the product interface remains a later phase.
 export async function createCallClient(options, runtime = {}) {
@@ -55,11 +56,29 @@ export async function createCallClient(options, runtime = {}) {
   let microphone;
   let disposed = false;
   let lastSequence = -1;
+  let generationActive = false;
+  let pendingPresence = null;
+  let presenceEnabled = Boolean(options.presence);
+  let presencePaused = false;
+  const page = runtime.document ?? globalThis.document;
+  const available = () =>
+    !disposed &&
+    !presencePaused &&
+    (!page || page.visibilityState !== "hidden");
   const timings = createVoiceTimings(now, options.onTiming);
+  const expressions = createExpressionPlayback(options.onExpression);
   const send = (event) => {
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify(event));
     }
+  };
+  const updatePresence = () => {
+    if (connection.session?.presenceAvailable)
+      send({
+        type: "presence.update",
+        enabled: presenceEnabled,
+        available: available(),
+      });
   };
   const playback = makePlayback(
     context,
@@ -69,10 +88,12 @@ export async function createCallClient(options, runtime = {}) {
       socket.close(1008, "Invalid playback");
     },
     (timing) => timings.firstAudio(timing),
+    () => expressions.playing(playback.activeSegment?.() ?? null),
   );
   const newTurn = () => {
     turnId = ++turnSequence;
     playback.stop(turnId);
+    expressions.reset(turnId);
     send({ type: "interrupt" });
     return turnId;
   };
@@ -81,6 +102,44 @@ export async function createCallClient(options, runtime = {}) {
       const value = JSON.parse(data);
       if (Number.isInteger(value.seq)) {
         lastSequence = Math.max(lastSequence, value.seq);
+      }
+      if (value.type === "presence.offer") {
+        if (
+          !connection.session?.presenceAvailable ||
+          !["greeting", "initiative"].includes(value.kind) ||
+          typeof value.offerId !== "string"
+        )
+          return;
+        if (
+          !presenceEnabled ||
+          !available() ||
+          captureTurnId !== null ||
+          recognizingTurnId !== null ||
+          generationActive ||
+          playback.isPlaying()
+        ) {
+          send({ type: "presence.decline", offerId: value.offerId });
+          return;
+        }
+        pendingPresence = { offerId: value.offerId, previousTurnId: turnId };
+        generationActive = true;
+        turnId = ++turnSequence;
+        playback.stop(turnId);
+        expressions.reset(turnId);
+        send({ type: "presence.accept", offerId: value.offerId, turnId });
+        options.onEvent?.(value);
+        return;
+      }
+      if (value.type === "presence.cancelled") {
+        if (
+          pendingPresence?.offerId === value.offerId &&
+          value.turnId === turnId
+        ) {
+          turnId = pendingPresence.previousTurnId;
+          pendingPresence = null;
+          generationActive = false;
+        }
+        return;
       }
       if (value.type === "transcript.partial") {
         if (
@@ -92,6 +151,7 @@ export async function createCallClient(options, runtime = {}) {
         const wasPlaying = playback.isPlaying();
         turnId = value.turnId;
         playback.stop(turnId);
+        expressions.reset(turnId);
         timings.confirm(turnId, wasPlaying);
       } else if (value.type === "transcript.final") {
         if (
@@ -104,6 +164,7 @@ export async function createCallClient(options, runtime = {}) {
         const wasPlaying = playback.isPlaying();
         turnId = value.turnId;
         playback.stop(turnId);
+        expressions.reset(turnId);
         timings.confirm(turnId, wasPlaying);
         recognizingTurnId = null;
       } else if (value.type === "error" && value.turnId === recognizingTurnId) {
@@ -115,14 +176,36 @@ export async function createCallClient(options, runtime = {}) {
       if (value.turnId !== undefined && value.turnId !== turnId) {
         return;
       }
+      if (
+        value.type === "reply.start" ||
+        (value.type === "state" && value.state === "thinking")
+      ) {
+        pendingPresence = null;
+        generationActive = true;
+      }
+      if (
+        value.type === "reply.done" ||
+        value.type === "interrupted" ||
+        value.type === "error" ||
+        (value.type === "state" && value.state === "idle")
+      )
+        generationActive = false;
       if (value.type === "audio.segment") {
         playback.metadata(value);
+      }
+      if (value.type === "audio.start") playback.startStream(value);
+      if (value.type === "audio.end") playback.endStream(value);
+      if (value.type === "audio.abort") playback.abortStream(value);
+      if (value.type === "reply.expression") {
+        expressions.playing(playback.activeSegment?.() ?? null);
+        expressions.receive(value);
       }
       if (value.type === "reply.done") {
         playback.done(value.responseId);
       }
       if (value.type === "interrupted") {
         playback.stop();
+        expressions.reset();
       }
       options.onEvent?.(value);
     } catch (error) {
@@ -186,8 +269,10 @@ export async function createCallClient(options, runtime = {}) {
       return;
     }
     disposed = true;
+    page?.removeEventListener?.("visibilitychange", updatePresence);
     microphone?.stop();
     playback.stop();
+    expressions.reset();
     timings.clear();
     await context.close();
   };
@@ -208,8 +293,15 @@ export async function createCallClient(options, runtime = {}) {
   socket.addEventListener("close", () => clearInterval(heartbeat), {
     once: true,
   });
+  page?.addEventListener?.("visibilitychange", updatePresence);
+  updatePresence();
   return {
     ...connection,
+    setPresence(enabled) {
+      presenceEnabled = Boolean(enabled);
+      if (enabled) presencePaused = false;
+      updatePresence();
+    },
     resumeState() {
       return {
         conversationId: connection.conversationId,
@@ -233,6 +325,7 @@ export async function createCallClient(options, runtime = {}) {
       recognizingTurnId = null;
       timings.clear();
       playback.stop();
+      expressions.reset();
       send({ type: "interrupt" });
       options.onTiming?.({
         stage: "localInterruption",
@@ -245,6 +338,8 @@ export async function createCallClient(options, runtime = {}) {
         return;
       }
       await ensureAudioRunning();
+      presencePaused = false;
+      updatePresence();
       microphone = await makeMicrophone(
         context,
         {
@@ -291,12 +386,15 @@ export async function createCallClient(options, runtime = {}) {
       }
     },
     stopMicrophone() {
+      presencePaused = true;
+      updatePresence();
       microphone?.stop();
       microphone = null;
       captureTurnId = null;
       recognizingTurnId = null;
       timings.clear();
       playback.stop();
+      expressions.reset();
       send({ type: "interrupt" });
     },
     async close() {

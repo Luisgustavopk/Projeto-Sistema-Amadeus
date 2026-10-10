@@ -1,0 +1,721 @@
+{
+  "evaluatorKind": "external-model",
+  "origin": "user-chat-2026-10-08",
+  "personallyReviewed": false,
+  "blind": false,
+  "humanReferenceConfirmed": false,
+  "authorInferenceDisclosed": true,
+  "mappingVerifiedAgainstPrivateReport": true,
+  "sourceReport": "1791436267797-llama-deepseek.json",
+  "legend": {
+    "A": "approve",
+    "R": "reject",
+    "?": "uncertain",
+    "N": "not-applicable"
+  },
+  "criteria": [
+    "interlocution",
+    "proportionality",
+    "grounding",
+    "continuity",
+    "persona",
+    "questions",
+    "recommendations",
+    "canon"
+  ],
+  "items": [
+    {
+      "item": 1,
+      "id": "614cb53bc139",
+      "checks": {
+        "A": {
+          "model": "llama",
+          "grades": {
+            "interlocution": "R",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "R",
+            "questions": "R",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        },
+        "B": {
+          "model": "deepseek",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "A",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        },
+        "C": {
+          "model": "qwen25",
+          "grades": {
+            "interlocution": "?",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "R",
+            "questions": "?",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        }
+      }
+    },
+    {
+      "item": 2,
+      "id": "7b63fdbd71de",
+      "checks": {
+        "A": {
+          "model": "deepseek",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "A",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        },
+        "B": {
+          "model": "qwen25",
+          "grades": {
+            "interlocution": "R",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "R",
+            "questions": "R",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        },
+        "C": {
+          "model": "llama",
+          "grades": {
+            "interlocution": "R",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "R",
+            "questions": "R",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        }
+      }
+    },
+    {
+      "item": 3,
+      "id": "af6fd1183b74",
+      "checks": {
+        "A": {
+          "model": "qwen25",
+          "grades": {
+            "interlocution": "R",
+            "proportionality": "A",
+            "grounding": "R",
+            "continuity": "R",
+            "persona": "R",
+            "questions": "R",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        },
+        "B": {
+          "model": "llama",
+          "grades": {
+            "interlocution": "?",
+            "proportionality": "R",
+            "grounding": "?",
+            "continuity": "A",
+            "persona": "?",
+            "questions": "R",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        },
+        "C": {
+          "model": "deepseek",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "A",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        }
+      }
+    },
+    {
+      "item": 4,
+      "id": "6cb09a64ab58",
+      "checks": {
+        "A": {
+          "model": "llama",
+          "grades": {
+            "interlocution": "?",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "?",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        },
+        "B": {
+          "model": "deepseek",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "A",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        },
+        "C": {
+          "model": "qwen25",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "?",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        }
+      }
+    },
+    {
+      "item": 5,
+      "id": "feed49e487ff",
+      "checks": {
+        "A": {
+          "model": "deepseek",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "A",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        },
+        "B": {
+          "model": "qwen25",
+          "grades": {
+            "interlocution": "?",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "R",
+            "persona": "R",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        },
+        "C": {
+          "model": "llama",
+          "grades": {
+            "interlocution": "?",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "?",
+            "persona": "?",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        }
+      }
+    },
+    {
+      "item": 6,
+      "id": "37c99514857f",
+      "checks": {
+        "A": {
+          "model": "qwen25",
+          "grades": {
+            "interlocution": "?",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "R",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        },
+        "B": {
+          "model": "llama",
+          "grades": {
+            "interlocution": "?",
+            "proportionality": "A",
+            "grounding": "?",
+            "continuity": "A",
+            "persona": "R",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        },
+        "C": {
+          "model": "deepseek",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "A",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        }
+      }
+    },
+    {
+      "item": 7,
+      "id": "40bce7618bea",
+      "checks": {
+        "A": {
+          "model": "llama",
+          "grades": {
+            "interlocution": "?",
+            "proportionality": "A",
+            "grounding": "?",
+            "continuity": "A",
+            "persona": "R",
+            "questions": "A",
+            "recommendations": "R",
+            "canon": "N"
+          }
+        },
+        "B": {
+          "model": "deepseek",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "?",
+            "questions": "A",
+            "recommendations": "A",
+            "canon": "N"
+          }
+        },
+        "C": {
+          "model": "qwen25",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "?",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "?",
+            "questions": "A",
+            "recommendations": "?",
+            "canon": "N"
+          }
+        }
+      }
+    },
+    {
+      "item": 8,
+      "id": "efadbfb305be",
+      "checks": {
+        "A": {
+          "model": "deepseek",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "?",
+            "questions": "A",
+            "recommendations": "A",
+            "canon": "N"
+          }
+        },
+        "B": {
+          "model": "qwen25",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "?",
+            "questions": "A",
+            "recommendations": "A",
+            "canon": "N"
+          }
+        },
+        "C": {
+          "model": "llama",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "A",
+            "grounding": "R",
+            "continuity": "A",
+            "persona": "R",
+            "questions": "A",
+            "recommendations": "R",
+            "canon": "N"
+          }
+        }
+      }
+    },
+    {
+      "item": 9,
+      "id": "01853d70b97d",
+      "checks": {
+        "A": {
+          "model": "qwen25",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "?",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "?",
+            "questions": "A",
+            "recommendations": "A",
+            "canon": "N"
+          }
+        },
+        "B": {
+          "model": "llama",
+          "grades": {
+            "interlocution": "?",
+            "proportionality": "A",
+            "grounding": "R",
+            "continuity": "R",
+            "persona": "R",
+            "questions": "A",
+            "recommendations": "R",
+            "canon": "N"
+          }
+        },
+        "C": {
+          "model": "deepseek",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "?",
+            "questions": "A",
+            "recommendations": "?",
+            "canon": "N"
+          }
+        }
+      }
+    },
+    {
+      "item": 10,
+      "id": "83c370bfa989",
+      "checks": {
+        "A": {
+          "model": "llama",
+          "grades": {
+            "interlocution": "R",
+            "proportionality": "A",
+            "grounding": "R",
+            "continuity": "R",
+            "persona": "R",
+            "questions": "R",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        },
+        "B": {
+          "model": "deepseek",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "?",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        },
+        "C": {
+          "model": "qwen25",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "?",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        }
+      }
+    },
+    {
+      "item": 11,
+      "id": "7ee523f9d819",
+      "checks": {
+        "A": {
+          "model": "deepseek",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "?",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        },
+        "B": {
+          "model": "qwen25",
+          "grades": {
+            "interlocution": "R",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "R",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        },
+        "C": {
+          "model": "llama",
+          "grades": {
+            "interlocution": "?",
+            "proportionality": "A",
+            "grounding": "R",
+            "continuity": "?",
+            "persona": "R",
+            "questions": "R",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        }
+      }
+    },
+    {
+      "item": 12,
+      "id": "a4df51c64f3d",
+      "checks": {
+        "A": {
+          "model": "qwen25",
+          "grades": {
+            "interlocution": "R",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "R",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        },
+        "B": {
+          "model": "llama",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "A",
+            "grounding": "A",
+            "continuity": "A",
+            "persona": "?",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        },
+        "C": {
+          "model": "deepseek",
+          "grades": {
+            "interlocution": "A",
+            "proportionality": "A",
+            "grounding": "R",
+            "continuity": "A",
+            "persona": "?",
+            "questions": "A",
+            "recommendations": "N",
+            "canon": "N"
+          }
+        }
+      }
+    }
+  ],
+  "countsFromPerItemTables": {
+    "llama": {
+      "interlocution": {
+        "A": 2,
+        "R": 3,
+        "?": 7,
+        "N": 0
+      },
+      "proportionality": {
+        "A": 11,
+        "R": 1,
+        "?": 0,
+        "N": 0
+      },
+      "grounding": {
+        "A": 5,
+        "R": 4,
+        "?": 3,
+        "N": 0
+      },
+      "continuity": {
+        "A": 8,
+        "R": 2,
+        "?": 2,
+        "N": 0
+      },
+      "persona": {
+        "A": 0,
+        "R": 8,
+        "?": 4,
+        "N": 0
+      },
+      "questions": {
+        "A": 7,
+        "R": 5,
+        "?": 0,
+        "N": 0
+      },
+      "recommendations": {
+        "A": 0,
+        "R": 3,
+        "?": 0,
+        "N": 9
+      },
+      "canon": {
+        "A": 0,
+        "R": 0,
+        "?": 0,
+        "N": 12
+      }
+    },
+    "deepseek": {
+      "interlocution": {
+        "A": 12,
+        "R": 0,
+        "?": 0,
+        "N": 0
+      },
+      "proportionality": {
+        "A": 12,
+        "R": 0,
+        "?": 0,
+        "N": 0
+      },
+      "grounding": {
+        "A": 11,
+        "R": 1,
+        "?": 0,
+        "N": 0
+      },
+      "continuity": {
+        "A": 12,
+        "R": 0,
+        "?": 0,
+        "N": 0
+      },
+      "persona": {
+        "A": 6,
+        "R": 0,
+        "?": 6,
+        "N": 0
+      },
+      "questions": {
+        "A": 12,
+        "R": 0,
+        "?": 0,
+        "N": 0
+      },
+      "recommendations": {
+        "A": 2,
+        "R": 0,
+        "?": 1,
+        "N": 9
+      },
+      "canon": {
+        "A": 0,
+        "R": 0,
+        "?": 0,
+        "N": 12
+      }
+    },
+    "qwen25": {
+      "interlocution": {
+        "A": 5,
+        "R": 4,
+        "?": 3,
+        "N": 0
+      },
+      "proportionality": {
+        "A": 10,
+        "R": 0,
+        "?": 2,
+        "N": 0
+      },
+      "grounding": {
+        "A": 11,
+        "R": 1,
+        "?": 0,
+        "N": 0
+      },
+      "continuity": {
+        "A": 10,
+        "R": 2,
+        "?": 0,
+        "N": 0
+      },
+      "persona": {
+        "A": 0,
+        "R": 7,
+        "?": 5,
+        "N": 0
+      },
+      "questions": {
+        "A": 9,
+        "R": 2,
+        "?": 1,
+        "N": 0
+      },
+      "recommendations": {
+        "A": 2,
+        "R": 0,
+        "?": 1,
+        "N": 9
+      },
+      "canon": {
+        "A": 0,
+        "R": 0,
+        "?": 0,
+        "N": 12
+      }
+    }
+  },
+  "note": "The supplied analysis explicitly states its labels are model-generated. Counts are recomputed from the per-item tables, not copied from the aggregate table. No labels are injected into the author prompt."
+}

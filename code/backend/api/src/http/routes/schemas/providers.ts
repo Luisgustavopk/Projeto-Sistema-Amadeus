@@ -14,6 +14,7 @@ const usageSchema = z.object({
   reportedOutputTokens: z.number(),
   estimatedRequests: z.number(),
   limits: z.object({
+    enforced: z.boolean().optional(),
     requestsPerDay: z.number(),
     tokensPerDay: z.number(),
     source: z.enum(['operator', 'provider']),

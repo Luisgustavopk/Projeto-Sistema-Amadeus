@@ -2,7 +2,7 @@ import { ApplicationError } from './application-error.ts';
 
 export class QuotaExceededError extends ApplicationError {
   retryAfterMs?: number;
-  quotaScope?: 'account' | 'model';
+  quotaScope?: 'account' | 'model' | 'paid' | 'free';
   constructor(
     message = 'O orçamento configurado para o adaptador foi esgotado.',
   ) {

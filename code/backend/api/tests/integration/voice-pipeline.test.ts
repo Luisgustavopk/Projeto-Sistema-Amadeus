@@ -50,6 +50,7 @@ async function fixture(
     llmResponse?: string;
     llmResponses?: string[];
     ttsSampleRate?: 16000 | 24000;
+    memoryReview?: boolean;
   } = {},
 ) {
   const requests: { role: string; content: string }[] = [];
@@ -165,6 +166,26 @@ async function fixture(
   const app = await buildApp({
     token,
     database,
+    ...(options.memoryReview
+      ? {
+          personaDecisionClient: {
+            decide: async () => ({
+              tone: 'neutral' as const,
+              confidence: 1,
+              inputTokens: 1,
+              outputTokens: 0,
+              costUsd: 0,
+            }),
+            reviewMemory: async () => ({
+              verdict: 'supported' as const,
+              confidence: 1,
+              inputTokens: 1,
+              outputTokens: 0,
+              costUsd: 0,
+            }),
+          },
+        }
+      : {}),
     memoryEmbeddings: {
       key: 'test-voice-memory-embedding',
       embed: async (texts) =>
@@ -182,6 +203,20 @@ async function fixture(
     }),
   });
   cleanup.push(() => app.close());
+
+  if (options.memoryReview) {
+    expect(
+      (
+        await app.inject({
+          method: 'PUT',
+          url: '/v1/persona/analysis',
+          headers,
+          payload: { revision: 0, configuration: { enabled: true } },
+        })
+      ).statusCode,
+    ).toBe(200);
+  }
+
   const url = await app.listen({ port: 0, host: '127.0.0.1' });
   const config = Object.fromEntries(
     ['llm', 'stt', 'tts'].map((role) => [
@@ -293,8 +328,119 @@ async function fixture(
   };
 }
 
-it('recupera fatos confirmados entre conversas sem incluir memória local na nuvem', async () => {
+it('negocia saudação, preserva continuidade e não extrai evento da aplicação como fala pessoal', async () => {
+  const f = await fixture({
+    llmResponses: [
+      '<expression>{"memory":[],"intent":"conversar","emotion":"calor_discreto","intensity":0.2}</expression>Ah, oi.',
+      '<expression>{"memory":[],"intent":"conversar","emotion":"curiosidade","intensity":0.3}</expression>Vamos conversar.',
+    ],
+  });
+  f.send({ type: 'presence.update', enabled: true, available: true });
+  await vi.waitFor(
+    () => expect(f.events.some((e) => e.type === 'presence.offer')).toBe(true),
+    { timeout: 2500 },
+  );
+  expect(f.requests.filter((r) => r.role === 'llm')).toHaveLength(0);
+  const offer = f.events.find((e) => e.type === 'presence.offer')!;
+  f.send({ type: 'presence.accept', offerId: offer.offerId, turnId: 1 });
+  await vi.waitFor(() =>
+    expect(
+      f.events.some((e) => e.type === 'reply.done' && e.turnId === 1),
+    ).toBe(true),
+  );
+  const initiative = (
+    await f.database.client.execute(
+      'SELECT user_text, initiative_kind FROM call_turns',
+    )
+  ).rows[0]!;
+  expect(initiative).toMatchObject({
+    user_text: '',
+    initiative_kind: 'greeting',
+  });
+  const history = await createSqliteCallHistory(f.database.client).recent(
+    f.id,
+    'primary',
+    12,
+  );
+  expect(history[0]).toMatchObject({
+    userText: '',
+    initiativeKind: 'greeting',
+    sentText: 'Ah, oi.',
+  });
+  expect(f.requests.find((r) => r.role === 'llm')!.content).toContain(
+    'Tipo de iniciativa: greeting',
+  );
+  expect(
+    (
+      await f.app.inject({
+        url: '/v1/persona/state?dataClass=synthetic',
+        headers,
+      })
+    ).json().interactions,
+  ).toBe(0);
+  f.send({ type: 'text.send', turnId: 2, text: 'Oi, como está?' });
+  await vi.waitFor(() =>
+    expect(
+      f.events.some((e) => e.type === 'reply.done' && e.turnId === 2),
+    ).toBe(true),
+  );
+  const state = (
+    await f.app.inject({
+      url: '/v1/persona/state?dataClass=synthetic',
+      headers,
+    })
+  ).json();
+  expect(state.interactions).toBe(1);
+  expect(state).not.toHaveProperty('lastResponseIds');
+  expect((await f.app.inject({ url: '/v1/persona/state' })).statusCode).toBe(
+    401,
+  );
+  expect(
+    (
+      await f.app.inject({
+        method: 'DELETE',
+        url: '/v1/persona/state?dataClass=synthetic',
+        headers,
+      })
+    ).statusCode,
+  ).toBe(200);
+  expect(
+    (
+      await f.app.inject({
+        url: '/v1/persona/state?dataClass=synthetic',
+        headers,
+      })
+    ).json().interactions,
+  ).toBe(0);
+});
+
+it('descarta aceite atrasado quando a pessoa já começou um turno', async () => {
   const f = await fixture();
+  f.send({ type: 'presence.update', enabled: true, available: true });
+  await vi.waitFor(
+    () => expect(f.events.some((e) => e.type === 'presence.offer')).toBe(true),
+    { timeout: 2500 },
+  );
+  const offer = f.events.find((e) => e.type === 'presence.offer')!;
+  f.send({
+    type: 'text.send',
+    turnId: 1,
+    text: 'Minha pergunta tem prioridade.',
+  });
+  f.send({ type: 'presence.accept', offerId: offer.offerId, turnId: 2 });
+  await vi.waitFor(() =>
+    expect(f.events.some((e) => e.type === 'reply.done')).toBe(true),
+  );
+  expect(f.requests.filter((r) => r.role === 'llm')).toHaveLength(1);
+  expect(
+    f.events.some(
+      (e) => e.type === 'error' && e.code === 'INVALID_VOICE_EVENT',
+    ),
+  ).toBe(false);
+});
+
+it('recupera fatos confirmados entre conversas sem incluir memória local na nuvem', async () => {
+  const f = await fixture({ memoryReview: true });
   const created = await f.app.inject({
     method: 'POST',
     url: '/v1/facts',
@@ -323,16 +469,20 @@ it('recupera fatos confirmados entre conversas sem incluir memória local na nuv
     turnId: 1,
     text: 'Qual clone está na Cartesia?',
   });
-  await vi.waitFor(() =>
-    expect(f.events.some((event) => event.type === 'reply.done')).toBe(true),
+  await vi.waitFor(
+    () =>
+      expect(
+        f.events.some((event) => event.type === 'reply.done'),
+        JSON.stringify(f.events),
+      ).toBe(true),
+    { timeout: 3000 },
   );
   const request = f.requests.find((request) => request.role === 'llm')!.content;
   expect(request).toContain('O clone aprovado está na Cartesia.');
   expect(request).not.toContain('dado reservado localmente');
-  expect(request).toContain('Neste turno a API forneceu memórias autorizadas');
-  expect(f.requests.filter((request) => request.role === 'llm')).toHaveLength(
-    1,
-  );
+  expect(request).toContain('Neste turno há fatos autorizados no contexto');
+  const generations = f.requests.filter((request) => request.role === 'llm');
+  expect(generations).toHaveLength(1);
 });
 
 it('distingue falta de memória recuperada da ausência de memória persistente', async () => {
@@ -344,10 +494,10 @@ it('distingue falta de memória recuperada da ausência de memória persistente'
   const request = f.requests.find((request) => request.role === 'llm')!;
   expect(request.content).not.toContain('Memória persistente selecionada');
   expect(request.content).toContain(
-    'Neste turno a API não forneceu memórias relevantes autorizadas',
+    'Neste turno não há fatos persistentes selecionados',
   );
   expect(request.content).toContain(
-    'não conclua que o aplicativo não possui memória persistente',
+    'lembranças relevantes que o aplicativo fornecer',
   );
 });
 
@@ -458,7 +608,8 @@ it('retoma contexto com ticket novo sem repetir áudio ou fala interrompida', as
   const content = f.requests.filter((r) => r.role === 'llm')[1]!.content;
   expect(content).toContain('Minha hipótese sintética anterior.');
   expect(content).toContain('"partiallyPlayed":true');
-  expect(content).not.toContain('Resposta anterior parcialmente ouvida.');
+  expect(content).toContain('Resposta anterior parcialmente ouvida.');
+  expect(content).toContain('texto enviado não comprova leitura nem audição');
   expect(
     (await f.database.client.execute('SELECT * FROM memory_resumptions')).rows,
   ).toHaveLength(1);
@@ -499,10 +650,10 @@ it.each([16000, 24000] as const)(
     expect(directions.length).toBeGreaterThan(0);
     expect(directions[0]).toMatchObject({
       emotion: 'curiosidade',
-      intensity: 0.35,
+      intensity: 0.4,
       metadataValid: true,
       deliveryApplied: false,
-      personaVersion: 'kurisu-amadeus-0.4.13',
+      personaVersion: 'kurisu-amadeus-0.4.23',
     });
     expect(f.requests.filter((request) => request.role === 'llm')).toHaveLength(
       1,
@@ -558,10 +709,10 @@ it('aplica uma edição de persona no próximo turno da mesma conexão', async (
   const after = f.requests.filter((r) => r.role === 'llm')[1]!.content;
   expect(before).not.toContain('analogias de astronomia');
   expect(after).toContain('analogias de astronomia');
-  expect(after).toContain('FORMATO:');
+  expect(after).toContain('FORMATO OBRIGAT');
 });
 
-it('reconectar reinicia a expressão mesmo quando a chamada anterior já acumulou intensidade', async () => {
+it('reconectar preserva a intensidade proposta sem o antigo teto por sessão', async () => {
   const f = await fixture({
     llmResponse:
       '<expression>{"intent":"explorar","emotion":"curiosidade","intensity":0.7}</expression>Vamos testar.',
@@ -586,7 +737,7 @@ it('reconectar reinicia a expressão mesmo quando a chamada anterior já acumulo
     f.events.find(
       (event) => event.type === 'reply.expression' && event.turnId === 2,
     )?.intensity,
-  ).toBe(0.55);
+  ).toBe(0.7);
   const { ticket } = (
     await f.app.inject({
       method: 'POST',
@@ -641,7 +792,7 @@ it('reconectar reinicia a expressão mesmo quando a chamada anterior já acumulo
   );
   expect(
     events.find((event) => event.type === 'reply.expression')?.intensity,
-  ).toBe(0.35);
+  ).toBe(0.7);
 });
 
 it('uma palavra reconhecida cancela a resposta antes do fim da nova captura', async () => {
@@ -862,6 +1013,7 @@ it('percorre PCM → STT → LLM → voz personalizada e persiste reprodução c
     {
       userText: 'Olá, Amadeus.',
       generatedText: 'Olá. Estou ouvindo.',
+      sentText: 'Olá. Estou ouvindo.',
       dataClass: 'synthetic',
       responseStatus: 'completed',
       partiallyPlayed: false,
@@ -879,6 +1031,7 @@ it('percorre PCM → STT → LLM → voz personalizada e persiste reprodução c
     {
       userText: 'Olá, Amadeus.',
       generatedText: '',
+      sentText: 'Olá. Estou ouvindo.',
       dataClass: 'synthetic',
       responseStatus: 'interrupted',
       partiallyPlayed: true,
@@ -1179,8 +1332,13 @@ it('recupera cabeçalho incompleto antes da fala, sem duplicar áudio ou reinici
   );
   const attempts = f.requests.filter((r) => r.role === 'llm');
   expect(attempts).toHaveLength(2);
-  expect(attempts[1]?.content).toContain('somente a fala da personagem');
-  expect(attempts[1]?.content).not.toContain('<expression>');
+  expect(attempts[1]?.content).toContain(
+    'esta é uma reparação única de formato',
+  );
+  expect(attempts[1]?.content).toContain(
+    '<expression>{"memory":{"use":"none","facts":[]}}</expression>',
+  );
+  expect(attempts[1]?.content).toContain('reparação única de formato');
   expect(f.events.filter((e) => e.type === 'reply.start')).toHaveLength(1);
   expect(f.events.filter((e) => e.type === 'error')).toHaveLength(0);
   expect(

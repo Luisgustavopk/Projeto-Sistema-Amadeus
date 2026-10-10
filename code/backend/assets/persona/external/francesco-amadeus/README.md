@@ -10,11 +10,15 @@ Material obtido em 06/10/2026 por solicitação do usuário. [Repositório de or
 - `prepared/emails.jsonl`: 74 mensagens preservadas; 64 não informam remetente. Destinatário e apelido não comprovam autoria.
 - [Direção de curadoria em pt-BR](curadoria.pt-BR.md): análise de aproveitamento, exemplos novos de produto e limites de interpretação.
 
-`source/` e `prepared/` permanecem locais e ignorados pelo Git. O código da aplicação não importa a extensão Python ou esses documentos como instruções. Não houve tradução integral, fine-tuning, chamada de LLM, indexação vetorial nem inclusão no prompt ativo.
+`source/` e `prepared/` permanecem locais e ignorados pelo Git. O código da aplicação não importa a extensão Python nem o prompt externo como instruções. Não houve tradução integral, fine-tuning ou indexação vetorial desse corpus.
+
+Na persona **0.4.16**, a [compilação de atuação em pt-BR](../../canon-conversation-v1.md) entra no prompt vocal, na recuperação e na comparação. Ela combina as fontes existentes com funções de reação observadas no corpus e exemplos originais. A história ajuda a situar as cenas e delimitar cronologia; não se torna memória do usuário nem vivência da personagem. Não carregamos todas as falas inglesas em cada turno. A recuperação semântica de cenas/lore permanece uma proposta separada, ainda não implementada.
 
 ## Reproduzir a preparação
 
-Na pasta `code/backend/api`:
+Atualização de 07/10/2026: o [catálogo contextual](../../corpus-examples-v1.md) contém 33 adaptações de atuação e seis resumos de lore rastreáveis. O corpus preparado bruto continua como matéria-prima, com 40 trechos de história arquivados separadamente no SQLite e excluídos do prompt. A [integração contextual](../../../../../../docs/architecture/Referencias_Contextuais_Persona.md) implementa seleção BGE/Jina, orçamento configurável e mensagens de demonstração no fluxo vocal. A [avaliação textual da rodada 2](../../../../../../docs/analysis/Resultados_Refinamento_Llama_Rodada_2.md) não aprovou naturalidade e fidelidade. A proposta de recuperação mencionada acima registra o estado anterior à implementação.
+
+O preparador e sua integração com os assets de avatar estão preservados na branch `feat/interface`, onde a aquisição foi realizada. Nessa branch, na pasta `code/backend/api`:
 
 ```sh
 npm run prepare:kurisu-reference
@@ -23,7 +27,7 @@ npm run test:kurisu-reference
 
 O preparador exige o snapshot local e os dois pacotes de avatar inspecionados. Confere a revisão e os blobs Git, produz JSONL e manifestos, valida referências dos modelos e dimensões PNG. Não baixa arquivos, carrega SDK Live2D ou acessa o banco da produção. Falha se alguma fonte não corresponder à revisão fixada.
 
-Para recuperar o snapshot em outra máquina, baixar os arquivos listados no manifesto de `https://raw.githubusercontent.com/FrancescoCaracciolo/Amadeus/9d4726bd37dce9919af37904e442e49205f329b8/`, preservando os caminhos em `source/`; também salvar a árvore da API GitHub para essa revisão como `source/github-tree.json`. Os pacotes de avatar e seus hashes estão no [manifesto do frontend](../../../../../frontend/assets/avatar/kurisu-sources.manifest.json).
+Para recuperar o snapshot em outra máquina, baixar os arquivos listados no manifesto de `https://raw.githubusercontent.com/FrancescoCaracciolo/Amadeus/9d4726bd37dce9919af37904e442e49205f329b8/`, preservando os caminhos em `source/`; também salvar a árvore da API GitHub para essa revisão como `source/github-tree.json`. Os pacotes de avatar e seus hashes estão no manifesto do frontend da branch `feat/interface`.
 
 ## Procedência e distribuição
 

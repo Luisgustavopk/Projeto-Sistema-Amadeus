@@ -42,10 +42,20 @@ import {
 export function createMemoryService(
   repository: MemoryRepository,
   providers: Pick<ProviderServices, 'execute'> &
-    Partial<Pick<MemoryProvider, 'describeMemory'>>,
+    Partial<Pick<MemoryProvider, 'describeMemory' | 'canReviewMemory'>>,
   isBusy: () => boolean,
   embeddings?: MemoryEmbeddings,
   reranker?: MemoryReranker,
+  responseReviewer?: Pick<
+    import('../persona/analysis.ts').PersonaAnalysis,
+    'reviewMemory'
+  > &
+    Partial<
+      Pick<
+        import('../persona/analysis.ts').PersonaAnalysis,
+        'canReviewMemory' | 'reviewMode'
+      >
+    >,
 ) {
   const semantic = createSemanticMemorySearch(repository, embeddings);
   let rankingRetryAt = 0;
@@ -79,7 +89,11 @@ export function createMemoryService(
     queries: string[],
     dataClass: DataClass,
     budget = MEMORY_CONTEXT_CHARACTERS,
+    focused = false,
   ) {
+    // Query vectors are cached; background indexing handles ordinary updates.
+    // A cache miss still indexes missing passages to preserve cross-language
+    // recall immediately after an edit or restart.
     const semanticResults = await semantic.search(queries, dataClass);
     const query = queries.join(' ');
     let candidates = await repository.candidateFacts(
@@ -116,7 +130,9 @@ export function createMemoryService(
 
           // Relevance is not a calibrated truth probability. A very strong
           // generic match must not suppress a weaker complementary detail.
-          const cutoff = 0.05;
+          const cutoff = focused
+            ? Math.max(0.05, Math.max(...values) * 0.2)
+            : 0.05;
           const accepted = new Map(
             pool.flatMap((fact, index) =>
               values[index]! >= cutoff
@@ -163,6 +179,7 @@ export function createMemoryService(
         budget,
         scores,
         semantic.status().state === 'ready',
+        focused,
       ),
     };
   }
@@ -317,7 +334,64 @@ export function createMemoryService(
     }
   }
 
+  async function validateContext(
+    memories: string,
+    dataClass: DataClass,
+    signal: AbortSignal,
+  ) {
+    try {
+      signal.throwIfAborted();
+      const policy = await repository.policy();
+
+      if (
+        !policy.enabled ||
+        (dataClass !== 'synthetic' && !policy.personalEnabled)
+      ) {
+        return false;
+      }
+
+      const snapshot = JSON.parse(memories) as {
+        facts: { id: string; version: number; text: string }[];
+      };
+
+      if (!Array.isArray(snapshot.facts)) {
+        return false;
+      }
+
+      const current = await repository.candidateFacts(
+        [],
+        dataClass,
+        snapshot.facts.map((fact) => fact.id),
+      );
+      signal.throwIfAborted();
+      const active = await repository.policy();
+
+      return (
+        active.enabled &&
+        (dataClass === 'synthetic' || active.personalEnabled) &&
+        snapshot.facts.every((saved) =>
+          current.some(
+            (fact) =>
+              fact.id === saved.id &&
+              fact.version === saved.version &&
+              fact.text === saved.text &&
+              fact.status === 'confirmed' &&
+              memoryEligible(fact, dataClass) &&
+              (fact.expiresAt === null || fact.expiresAt > Date.now()),
+          ),
+        )
+      );
+    } catch {
+      signal.throwIfAborted();
+
+      return false;
+    }
+  }
+
   const service = {
+    validateContext,
+    reviewMode: async () =>
+      (await responseReviewer?.reviewMode?.()) ?? ('strict' as const),
     prepareForConfiguration: prepareMutation,
     async start() {
       await repository.recover();
@@ -355,57 +429,92 @@ export function createMemoryService(
       dataClass: DataClass,
       signal: AbortSignal,
       recent: { user: string; assistantConfirmed: string }[] = [],
+      preferredAddressName?: string,
     ) {
+      const ownerAddress =
+        dataClass !== 'synthetic'
+          ? preferredAddressName?.slice(0, 80)
+          : undefined;
+
       try {
         const policy = await repository.policy();
 
         if (
           !policy.enabled ||
-          policy.extraction !== 'llm' ||
           (dataClass !== 'synthetic' && !policy.personalEnabled)
         ) {
           return false;
         }
 
-        const snapshot = JSON.parse(memories) as {
-          facts: { id: string; version: number; text: string }[];
-        };
-
-        const permitted = async () => {
-          const current = await repository.candidateFacts(
-            [],
-            dataClass,
-            snapshot.facts.map((f) => f.id),
-          );
-
-          return snapshot.facts.every((s) =>
-            current.some(
-              (f) =>
-                f.id === s.id &&
-                f.version === s.version &&
-                f.text === s.text &&
-                f.status === 'confirmed' &&
-                memoryEligible(f, dataClass) &&
-                (f.expiresAt === null || f.expiresAt > Date.now()),
-            ),
-          );
-        };
+        const permitted = () => validateContext(memories, dataClass, signal);
 
         if (!(await permitted())) {
           return false;
         }
 
-        const supported = await verifyMemorySpeech(
-          providers,
-          memories,
-          question,
-          reply,
-          dataClass,
-          AbortSignal.any([signal, AbortSignal.timeout(8000)]),
-          recent,
-        );
+        // Optional semantic quality review must not hide confirmed memories
+        // when its quota/service is unavailable. Permission checks remain strict.
+        let supported: boolean | null = null;
 
-        return supported && (await permitted());
+        try {
+          const fastAvailable =
+            responseReviewer &&
+            (!responseReviewer.canReviewMemory ||
+              (await responseReviewer.canReviewMemory(dataClass)));
+          const fastReview = fastAvailable
+            ? await responseReviewer
+                .reviewMemory(
+                  {
+                    memories,
+                    question,
+                    reply,
+                    dataClass,
+                    recentConversation: JSON.stringify(
+                      ownerAddress
+                        ? {
+                            turns: recent.slice(-2),
+                            ownerAddress: {
+                              preferredAddressName: ownerAddress,
+                              purpose:
+                                'confirmed form of address, not biography',
+                            },
+                          }
+                        : recent.slice(-2),
+                    ),
+                  },
+                  signal,
+                )
+                .catch(() => {
+                  signal.throwIfAborted();
+
+                  return null;
+                })
+            : null;
+          supported = fastReview ?? null;
+
+          if (
+            supported === null &&
+            policy.extraction === 'llm' &&
+            (!providers.canReviewMemory ||
+              (await providers.canReviewMemory(dataClass)))
+          ) {
+            supported = await verifyMemorySpeech(
+              providers,
+              memories,
+              question,
+              reply,
+              dataClass,
+              AbortSignal.any([signal, AbortSignal.timeout(8000)]),
+              recent,
+              ownerAddress,
+            );
+          }
+        } catch {
+          signal.throwIfAborted();
+          supported = null;
+        }
+
+        return (await permitted()) ? supported : false;
       } catch {
         signal.throwIfAborted();
 
@@ -646,6 +755,8 @@ export function createMemoryService(
       const { selected: facts, candidates } = await relevantFacts(
         queries,
         dataClass,
+        MEMORY_CONTEXT_CHARACTERS,
+        true,
       );
       const sources = new Map<string, number[]>();
 

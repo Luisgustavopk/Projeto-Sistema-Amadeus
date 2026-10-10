@@ -9,6 +9,10 @@ export const providerKey = (role: Role, config: ProviderConfig) =>
       role,
       config.adapter,
       config.endpoint,
-      config.adapter === 'openrouter' ? config.apiKeyEnv : config.model,
+      config.adapter === 'openrouter'
+        ? config.openRouterPaid
+          ? [config.apiKeyEnv, config.model, 'paid']
+          : config.apiKeyEnv
+        : config.model,
     ]),
   );

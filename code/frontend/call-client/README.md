@@ -1,5 +1,9 @@
 # Cliente técnico de chamadas
 
+`createCallClient({ ...options, onExpression(event) { ... } })` notifica a proposta do segmento somente durante sua reprodução real; `null` indica ausência de segmento ativo ou interrupção. Atualizações `reply.expression` usam o mesmo `responseId`/`segmentId` e podem chegar depois do texto. O evento técnico continua disponível em `onEvent`, mas o avatar deve usar `onExpression` para evitar que uma expressão atrasada seja aplicada à fala seguinte. A classificação não aplica parâmetros emocionais ao TTS.
+
+Presença é opcional: `createCallClient({ ...options, presence: true })` e `client.setPresence(boolean)`. O padrão do módulo é desligado. Exige a capacidade `presenceAvailable` negociada pelo servidor. O cliente informa disponibilidade, recusa ofertas durante captura, reconhecimento, geração ou reprodução e reserva identificadores na mesma sequência dos turnos normais. Ocultar a página ou pausar o microfone suspende iniciativas; iniciar o microfone ou reativar a presença libera novamente. Um aceite cancelado pelo servidor não fecha a conexão. Fechar o cliente remove também o listener de visibilidade.
+
 Módulo JavaScript independente e sem interface visual. Não importa código do backend nem introduz um pacote `shared`. Requer navegador com AudioWorklet/Web Audio, localhost ou HTTPS, autorização do microfone e um gesto do usuário para iniciar áudio.
 
 `createCallClient` cria conversa/ticket, negocia protocolo 1.1 e disponibiliza `text`, `startMicrophone`, `stopMicrophone`, `interrupt` e `close`. A credencial da API é usada para obter o ticket; a chave Gemini permanece no backend. Trate a credencial da API como um segredo de uso pessoal e não a publique numa página distribuída.

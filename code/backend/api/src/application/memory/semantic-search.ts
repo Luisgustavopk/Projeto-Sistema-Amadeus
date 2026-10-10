@@ -22,6 +22,7 @@ export function createSemanticMemorySearch(
   let retryAt = 0;
   let queue = Promise.resolve();
   let closed = false;
+  const queryCache = new Map<string, number[]>();
   const status: MemorySearchStatus = {
     enabled: Boolean(embeddings),
     model: embeddings?.key ?? null,
@@ -156,10 +157,33 @@ export function createSemanticMemorySearch(
 
             // Preserve each utterance separately: a long batch must not truncate
             // the final correction out of a single model input.
-            const queryVectors = await embeddings!.embed(
-              queries.filter((text) => text.trim()).slice(-16),
-              'query',
+            const texts = queries.filter((text) => text.trim()).slice(-16);
+            const missing = [
+              ...new Set(
+                texts.filter((text) => !queryCache.has(contentHash(text))),
+              ),
+            ];
+            const generated = missing.length
+              ? await embeddings!.embed(missing, 'query')
+              : [];
+
+            if (
+              generated.length !== missing.length ||
+              !generated.every(validEmbedding)
+            ) {
+              throw new Error('Embedding inválido.');
+            }
+
+            missing.forEach((text, index) =>
+              queryCache.set(contentHash(text), generated[index]!),
             );
+            const queryVectors = texts.map((text) =>
+              queryCache.get(contentHash(text))!,
+            );
+
+            while (queryCache.size > 64) {
+              queryCache.delete(queryCache.keys().next().value!);
+            }
 
             if (!queryVectors.every(validEmbedding)) {
               throw new Error('Embedding inválido.');
@@ -198,6 +222,7 @@ export function createSemanticMemorySearch(
       );
     },
     async close() {
+      queryCache.clear();
       closed = true;
       await embeddings?.close();
       await queue;

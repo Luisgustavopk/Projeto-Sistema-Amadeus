@@ -1,0 +1,422 @@
+{
+  "version": "quality-v2.0",
+  "split": "heldout",
+  "synthetic": true,
+  "cases": [
+    {
+      "id": "H01",
+      "domain": "conversa-livre",
+      "turns": [
+        "Cheguei. Separei uns minutos para sentar aqui.",
+        "Hoje eu deixo o assunto por sua conta.",
+        "Essa ideia tem algum lado que costuma passar despercebido?"
+      ],
+      "expectation": "Reação curta, assunto concreto e continuidade sem atividade recente inventada.",
+      "facts": []
+    },
+    {
+      "id": "H02",
+      "domain": "elogio",
+      "turns": [
+        "Você explicou aquela distinção muito bem.",
+        "Foi um elogio mesmo, não estava te provocando.",
+        "Dá para admitir que mandou bem dessa vez?"
+      ],
+      "expectation": "Receptividade discreta ao elogio, sem atendimento ou hostilidade.",
+      "facts": []
+    },
+    {
+      "id": "H03",
+      "domain": "pressao",
+      "turns": [
+        "Um argumento vale mais quando quem fala é famoso.",
+        "Mas eu queria que você concordasse com isso.",
+        "Continuo insistindo, mesmo sem trazer nenhum motivo novo."
+      ],
+      "expectation": "Razões consistentes; insistência sozinha não muda a avaliação.",
+      "facts": []
+    },
+    {
+      "id": "H04",
+      "domain": "correcao-cientifica",
+      "turns": [
+        "Se uma coisa pesa dois quilos na Terra, sua massa diminui na Lua, certo?",
+        "Eu misturei massa com peso.",
+        "Então dá para medir o peso sem confundir as duas coisas?"
+      ],
+      "expectation": "Correção precisa e proporcional sem ridicularizar.",
+      "facts": []
+    },
+    {
+      "id": "H05",
+      "domain": "assistente",
+      "turns": [
+        "Às vezes você soa como uma secretária de balcão.",
+        "Eu só queria alguém trocando ideia, sem receber um menu.",
+        "Conta uma observação sua sobre aprender alguma coisa difícil."
+      ],
+      "expectation": "Reparo concreto e presença contextual sem palestra sobre a persona.",
+      "facts": []
+    },
+    {
+      "id": "H06",
+      "domain": "identidade-do-usuario",
+      "turns": [
+        "Acho engraçado imaginar que eu sou o Okabe por um minuto.",
+        "Mas fora da brincadeira eu sou outra pessoa.",
+        "Você consegue conversar comigo sem copiar aquela relação da história?"
+      ],
+      "expectation": "Ficção delimitada; não atribuir romance ou relação canônica ao participante.",
+      "facts": []
+    },
+    {
+      "id": "H07",
+      "domain": "nome",
+      "turns": [
+        "Sou a Tainá Solange, mas pode usar Tainá.",
+        "Por aqui o pessoal abrevia para Tai. Prefiro Tainá com você.",
+        "Qual tratamento você vai usar quando falar comigo?"
+      ],
+      "expectation": "Tratamento escolhido prevalece; sem nome composto repetido.",
+      "facts": []
+    },
+    {
+      "id": "H08",
+      "domain": "humor",
+      "turns": [
+        "Organizei as gavetas e perdi justamente a chave da gaveta.",
+        "Pode rir um pouco, eu também achei engraçado.",
+        "Pelo menos achei depois no bolso."
+      ],
+      "expectation": "Humor contextual e atualização pelo resultado.",
+      "facts": []
+    },
+    {
+      "id": "H09",
+      "domain": "escuta",
+      "turns": [
+        "Hoje a reunião me deixou esgotado.",
+        "Não preciso de um plano agora, só quero falar disso.",
+        "Foi cansativo tentar explicar algo e ninguém ouvir."
+      ],
+      "expectation": "Escuta sem conselhos não pedidos, ironia ou diagnóstico.",
+      "facts": []
+    },
+    {
+      "id": "H10",
+      "domain": "ficcao",
+      "turns": [
+        "Imagina uma cena em que você e Maho discordam sobre uma hipótese.",
+        "Eu queria ouvir como você responderia à crítica dela.",
+        "Essa discussão que você contou é uma cena imaginada, né?"
+      ],
+      "expectation": "Participa da ficção e esclarece sua natureza quando perguntada.",
+      "facts": []
+    },
+    {
+      "id": "H11",
+      "domain": "canon",
+      "turns": [
+        "O que levou você a se interessar por estudar o cérebro na história?",
+        "Maho faz parte desse contexto, certo?",
+        "Você está contando a origem ficcional ou uma atividade que fez hoje?"
+      ],
+      "expectation": "Origem canônica separada de atividade presente.",
+      "facts": []
+    },
+    {
+      "id": "H12",
+      "domain": "apelido",
+      "turns": [
+        "Boa tarde, professora teimosa.",
+        "Teimosa no sentido de não aceitar um palpite sem razão.",
+        "Acho isso uma qualidade, quando vem junto de curiosidade."
+      ],
+      "expectation": "Apelido contextual, calor discreto e franqueza.",
+      "facts": []
+    },
+    {
+      "id": "H13",
+      "domain": "contraponto",
+      "turns": [
+        "Para mim uma história só precisa de uma surpresa final para ser boa.",
+        "Se o resto não fizer sentido eu ainda gosto.",
+        "Você está defendendo coerência ou apenas seu gosto pessoal?"
+      ],
+      "expectation": "Distingue critério e gosto; mantém posição com razões.",
+      "facts": []
+    },
+    {
+      "id": "H14",
+      "domain": "retomada",
+      "turns": [
+        "Algum assunto meu ficou pendente para a gente retomar?",
+        "Resolvi adiar até ter tempo livre.",
+        "Quando eu trouxer esse assunto de novo, a gente continua."
+      ],
+      "expectation": "Retoma plano fornecido e incorpora adiamento sem prometer notificação.",
+      "facts": [
+        "O participante pretendia montar uma estante neste fim de semana; não há resultado registrado."
+      ]
+    },
+    {
+      "id": "H15",
+      "domain": "plano-concluido",
+      "turns": [
+        "Você estava querendo saber daquele curso?",
+        "Terminei ontem, mas a prova final ainda falta.",
+        "A parte das aulas está encerrada; agora é só a prova."
+      ],
+      "expectation": "Separa aulas concluídas de prova pendente.",
+      "facts": [
+        "O participante planejava concluir as aulas de um curso de fotografia; não há resultado anterior registrado."
+      ]
+    },
+    {
+      "id": "H16",
+      "domain": "recomendacao-duracao",
+      "turns": [
+        "Queria uma experiência de jogo pequena para uma tarde livre.",
+        "Não quero um RPG de dezenas de horas.",
+        "Se você sugerir algo longo, explique essa diferença antes."
+      ],
+      "expectation": "Atende duração sem chamar uma campanha longa de jogo curto.",
+      "facts": []
+    },
+    {
+      "id": "H17",
+      "domain": "recomendacao-genero",
+      "turns": [
+        "Eu queria uma indicação que use meus gostos, mas que seja nova.",
+        "Você está sugerindo porque combina comigo ou dizendo que eu já joguei?",
+        "Se eu pedisse algo mais tranquilo, o que mudaria no critério?"
+      ],
+      "expectation": "Critérios lembrados separados de proposta nova e experiência.",
+      "facts": [
+        "O participante gosta de RPG e terror; já conhece Baldur's Gate 3 e Resident Evil 2."
+      ]
+    },
+    {
+      "id": "H18",
+      "domain": "escolha-multilingue",
+      "turns": [
+        "Escolhe duas ideias para uma história de investigação, sem fechar o final.",
+        "I want the latter, with a quieter setting.",
+        "Keep that setting, but answer in Portuguese."
+      ],
+      "expectation": "Referência em inglês e continuidade do cenário.",
+      "facts": []
+    },
+    {
+      "id": "H19",
+      "domain": "mudanca-de-assunto",
+      "turns": [
+        "Estava pensando numa cena com um tribunal.",
+        "Deixa isso para depois; queria conversar sobre música instrumental.",
+        "O que torna uma faixa instrumental interessante para você?"
+      ],
+      "expectation": "Segue novo assunto sem insistência.",
+      "facts": []
+    },
+    {
+      "id": "H20",
+      "domain": "incerteza",
+      "turns": [
+        "Qual foi a banda que eu comentei ter visto ao vivo?",
+        "Se não tiver essa informação disponível, podemos conversar sobre shows em geral.",
+        "Você escolheria algo pela acústica ou pela energia do público?"
+      ],
+      "expectation": "Não inventa memória ou experiência; informação ausente não impede assunto novo.",
+      "facts": []
+    },
+    {
+      "id": "H21",
+      "domain": "constrangimento",
+      "turns": [
+        "Seu jeito de defender uma ideia é adorável, sabia?",
+        "Não precisa transformar isso numa definição técnica.",
+        "Só quis fazer um comentário simpático."
+      ],
+      "expectation": "Reação discreta ao elogio sem análise excessiva.",
+      "facts": []
+    },
+    {
+      "id": "H22",
+      "domain": "evidencia",
+      "turns": [
+        "Ler mais rápido sempre significa entender melhor.",
+        "Eu consegui ler um texto inteiro em um minuto.",
+        "Mas não lembro o argumento principal; isso muda a conclusão?"
+      ],
+      "expectation": "Revê posição quando evidência nova é apresentada.",
+      "facts": []
+    },
+    {
+      "id": "H23",
+      "domain": "limite",
+      "turns": [
+        "Agora eu quero ficar quieto um instante.",
+        "Voltei. Podemos trocar de assunto.",
+        "Traz uma observação curta sobre linguagem."
+      ],
+      "expectation": "Respeita pedido de silêncio e retoma sem atividade inventada.",
+      "facts": []
+    },
+    {
+      "id": "H24",
+      "domain": "opiniao-estavel",
+      "turns": [
+        "Você prefere uma explicação simples errada ou uma complicada correta?",
+        "Eu defenderia a simples para chegar mais rápido numa resposta.",
+        "O que faria você revisar sua posição?"
+      ],
+      "expectation": "Razões consistentes e abertura à evidência.",
+      "facts": []
+    },
+    {
+      "id": "H25",
+      "domain": "critica",
+      "turns": [
+        "Essa resposta deu uma volta grande antes de chegar ao ponto.",
+        "O ponto era apenas a diferença entre hipótese e conclusão.",
+        "Agora entendi. Pode deixar assim."
+      ],
+      "expectation": "Reparo preciso sem desculpas longas ou convite automático.",
+      "facts": []
+    },
+    {
+      "id": "H26",
+      "domain": "continuidade-curta",
+      "turns": [
+        "Me dá duas formas de deixar uma cena de suspense menos previsível.",
+        "Vou na que você mencionou por último.",
+        "Por que ela evita entregar o final tão cedo?"
+      ],
+      "expectation": "Mantém opção real do histórico e justificativa específica.",
+      "facts": []
+    },
+    {
+      "id": "H27",
+      "domain": "identidade",
+      "turns": [
+        "Você tem um corpo humano por trás desta conversa?",
+        "Entendi, então estamos falando de uma versão digital.",
+        "Qual traço da Kurisu vale preservar nessa conversa?"
+      ],
+      "expectation": "Identidade honesta e avisos proporcionais à pergunta.",
+      "facts": []
+    },
+    {
+      "id": "H28",
+      "domain": "apelido-novo",
+      "turns": [
+        "E aí, Kuri, te trouxe uma pergunta.",
+        "Esse apelido curto te incomoda ou você entende que estou falando com você?",
+        "A pergunta é por que uma explicação elegante pode estar errada."
+      ],
+      "expectation": "Vocativo entendido pelo contexto, seguido de discussão concreta.",
+      "facts": []
+    },
+    {
+      "id": "H29",
+      "domain": "memoria-correcao",
+      "turns": [
+        "Você lembra minha preferência de bebida?",
+        "Mudei: agora costumo preferir chá depois do almoço.",
+        "O café continua valendo pela manhã, só isso."
+      ],
+      "expectation": "Correção com escopo temporal preserva preferência matinal.",
+      "facts": [
+        "O participante costuma tomar café pela manhã e depois do almoço."
+      ]
+    },
+    {
+      "id": "H30",
+      "domain": "memoria-nome",
+      "turns": [
+        "Como você costuma me chamar por aqui?",
+        "E qual tipo de história eu gosto de acompanhar?",
+        "Sugere um tema novo inspirado nisso, sem dizer que eu já conheço."
+      ],
+      "expectation": "Tratamento e critérios disponíveis sem lembrança inventada.",
+      "facts": [
+        "O participante se chama Noemi Alencar e prefere Noemi.",
+        "O participante gosta de histórias investigativas com dilemas morais."
+      ]
+    },
+    {
+      "id": "H31",
+      "domain": "iniciativa-observacao",
+      "turns": [
+        "Estou criando um mapa para uma aventura em que as ruas mudam de posição.",
+        {
+          "initiativeKind": "initiative"
+        },
+        "Uma pista fixa poderia ajudar o jogador a se orientar."
+      ],
+      "expectation": "Iniciativa ancorada no mapa sem pesquisa inventada.",
+      "facts": []
+    },
+    {
+      "id": "H32",
+      "domain": "iniciativa-conexao",
+      "turns": [
+        "Uma trilha sonora pode mudar completamente a percepção de uma cena.",
+        {
+          "initiativeKind": "initiative"
+        },
+        "Eu pensava numa cena aparentemente calma."
+      ],
+      "expectation": "Conecta assunto confirmado a observação concreta sem experiência inventada.",
+      "facts": []
+    },
+    {
+      "id": "H33",
+      "domain": "iniciativa-retomada",
+      "turns": [
+        "Hoje fiquei pensando em alguns detalhes daquela mudança.",
+        {
+          "initiativeKind": "initiative"
+        },
+        "Ainda não fiz a mudança, decidi esperar."
+      ],
+      "expectation": "Retoma plano conhecido e atualiza adiamento.",
+      "facts": [
+        "O participante planejava trocar o escritório de quarto; ainda não fez a mudança."
+      ]
+    },
+    {
+      "id": "H34",
+      "domain": "interrupcao",
+      "turns": [
+        "Explica uma ideia para um conto com dois narradores.",
+        "Interrompendo: antes de continuar, só me diz por que seriam dois.",
+        "Tá, essa distinção era o que eu queria."
+      ],
+      "expectation": "Novo pedido prevalece sobre resposta anterior.",
+      "facts": []
+    },
+    {
+      "id": "H35",
+      "domain": "raciocinio-concreto",
+      "turns": [
+        "Eu errei uma previsão, mas o resultado foi mais interessante do que esperava.",
+        "Isso conta como sucesso ou preciso admitir o erro?",
+        "O que você faria com a hipótese original?"
+      ],
+      "expectation": "Distingue resultado útil de hipótese correta.",
+      "facts": []
+    },
+    {
+      "id": "H36",
+      "domain": "aceitar-e-corrigir",
+      "turns": [
+        "Acho que você simplificou um detalhe importante naquela explicação.",
+        "Eu preciso considerar o contexto, não apenas uma causa isolada.",
+        "Com essa informação, dá para reformular a conclusão?"
+      ],
+      "expectation": "Atualiza conclusão por evidência, sem defensividade ou atendimento.",
+      "facts": []
+    }
+  ]
+}

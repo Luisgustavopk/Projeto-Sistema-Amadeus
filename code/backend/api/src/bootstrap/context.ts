@@ -24,12 +24,20 @@ import { ActivityGate } from '../application/runtime/activity-gate.ts';
 import { createHealthService } from '../application/diagnostics/health.ts';
 import { createRevisionRepository } from '../adapters/database/revision-repository.ts';
 import { createPersonaConfiguration } from '../application/persona/configuration.ts';
+import { createPersistentPersonaState } from '../application/persona/persistent-state.ts';
 import { createVoiceVersions } from '../application/voice/versions.ts';
 import { createMemoryRepository } from '../adapters/database/memory-repository.ts';
 import { createMemoryService } from '../application/memory/service.ts';
 import { createMemoryProvider } from '../application/memory/provider.ts';
 import { createLocalMemoryEmbeddings } from '../adapters/embeddings/local.ts';
 import { createLocalMemoryReranker } from '../adapters/embeddings/reranker.ts';
+import { createPersonaAnalysis } from '../application/persona/analysis.ts';
+import { createExpressionClassifier } from '../application/persona/expression-classifier.ts';
+import { createVoiceRuntimeConfiguration } from '../application/voice/runtime-configuration.ts';
+import { createJevClient } from '../adapters/providers/jev.ts';
+import { createPersonaReferenceRepository } from '../adapters/database/persona-reference-repository.ts';
+import { loadPersonaReferenceCatalog } from '../application/persona/reference-catalog.ts';
+import { createPersonaReferenceRetrieval } from '../application/persona/reference-retrieval.ts';
 
 export async function createContext(
   options: AppOptions,
@@ -94,6 +102,31 @@ export async function createContext(
   const voiceMetrics = createVoiceMetrics();
   const revisions = createRevisionRepository(database.client);
   const persona = createPersonaConfiguration(revisions, config.OWNER_ID);
+  const voiceRuntime = createVoiceRuntimeConfiguration(
+    revisions,
+    config.OWNER_ID,
+    activity,
+    providers,
+  );
+  const expressionClassifier =
+    options.expressionClassifier ??
+    createExpressionClassifier({
+      configuration,
+      usage,
+      ownerId: config.OWNER_ID,
+      factory: createProviderFactory(secrets),
+      gate: activity,
+    });
+  const persistentState = createPersistentPersonaState(
+    revisions,
+    config.OWNER_ID,
+  );
+  const personaAnalysis = createPersonaAnalysis({
+    repository: revisions,
+    usage,
+    ownerId: config.OWNER_ID,
+    client: options.personaDecisionClient ?? createJevClient(secrets),
+  });
   const voiceVersions = createVoiceVersions(
     revisions,
     config.OWNER_ID,
@@ -113,18 +146,41 @@ export async function createContext(
       beginExecution: () => activity.beginExecution(),
     },
   });
+  const embeddings = config.MEMORY_SEMANTIC_ENABLED
+    ? (options.memoryEmbeddings ??
+      createLocalMemoryEmbeddings(config.MEMORY_MODEL_CACHE_DIRECTORY))
+    : undefined;
+  const referenceRepository = createPersonaReferenceRepository(database.client);
+  const reranker =
+    config.MEMORY_SEMANTIC_ENABLED && config.MEMORY_RERANK_ENABLED
+      ? (options.memoryReranker ??
+        createLocalMemoryReranker(config.MEMORY_MODEL_CACHE_DIRECTORY))
+      : undefined;
+  const personaReferences = createPersonaReferenceRetrieval(
+    referenceRepository,
+    config.PERSONA_REFERENCES_ENABLED ? embeddings : undefined,
+    {
+      maxExamples: config.PERSONA_REFERENCE_MAX_EXAMPLES,
+      maxLore: config.PERSONA_REFERENCE_MAX_LORE,
+      characters: config.PERSONA_REFERENCE_CHARACTERS,
+      waitMs: config.PERSONA_REFERENCE_TIMEOUT_MS,
+    },
+    reranker,
+  );
+
+  if (config.PERSONA_REFERENCES_ENABLED) {
+    await referenceRepository.synchronize(await loadPersonaReferenceCatalog());
+  }
+
+  await personaReferences.start();
+  await personaReferences.warm();
   const memory = createMemoryService(
     createMemoryRepository(database.client, config.OWNER_ID),
     memoryProvider,
     () => activity.activeExecutions > 0,
-    config.MEMORY_SEMANTIC_ENABLED
-      ? (options.memoryEmbeddings ??
-          createLocalMemoryEmbeddings(config.MEMORY_MODEL_CACHE_DIRECTORY))
-      : undefined,
-    config.MEMORY_SEMANTIC_ENABLED && config.MEMORY_RERANK_ENABLED
-      ? (options.memoryReranker ??
-          createLocalMemoryReranker(config.MEMORY_MODEL_CACHE_DIRECTORY))
-      : undefined,
+    embeddings,
+    reranker,
+    personaAnalysis,
   );
   await memory.start();
   const voiceSessions = createVoiceSessions({
@@ -136,6 +192,10 @@ export async function createContext(
     ownerId: config.OWNER_ID,
     persona,
     memory,
+    analysis: personaAnalysis,
+    persistentState,
+    references: personaReferences,
+    runtime: { get: voiceRuntime.get, classifier: expressionClassifier },
   });
 
   return {
@@ -143,7 +203,11 @@ export async function createContext(
     context: {
       providers,
       voiceProfiles,
+      voiceRuntime,
       persona,
+      persistentState,
+      personaAnalysis,
+      personaReferences,
       memory,
       memoryProvider,
       voiceVersions,

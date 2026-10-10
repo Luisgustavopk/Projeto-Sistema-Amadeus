@@ -41,3 +41,5 @@ code/backend/assets/persona/external/francesco-amadeus/prepared/
 code/frontend/assets/avatar/local/
 code/frontend/web/public/live2d/amadeus/*
 code/frontend/web/public/live2d/runtime/*
+# Local backend export includes environment credentials and personal data
+/code/backend.zip

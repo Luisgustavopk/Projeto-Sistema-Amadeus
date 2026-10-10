@@ -2,8 +2,11 @@ import type { SpeechSegment, TurnStatus } from '../domain/voice/model.ts';
 import type { DataClass } from '../domain/providers/model.ts';
 
 export type StoredTurn = {
+  initiativeKind?: 'greeting' | 'initiative';
   userText: string;
   generatedText: string;
+  /** Text sent to the client; this does not establish that it was read/heard. */
+  sentText?: string;
   dataClass: DataClass;
   responseStatus?: TurnStatus;
   partiallyPlayed?: boolean;
@@ -26,6 +29,7 @@ export interface CallHistoryRepository {
     state: 'closed' | 'disconnected',
   ): Promise<void>;
   beginTurn(input: {
+    initiativeKind?: 'greeting' | 'initiative';
     id: string;
     sessionId: string;
     conversationId: string;
@@ -43,6 +47,8 @@ export interface CallHistoryRepository {
     limit: number,
   ): Promise<StoredTurn[]>;
   addSegment(segment: SpeechSegment): Promise<void>;
+  markTextSent?(segmentId: string): Promise<void>;
+  familiarity?(ownerId: string, dataClass: DataClass): Promise<number>;
   setAudio(segmentId: string, sampleCount: number): Promise<void>;
   acknowledge(input: {
     sessionId: string;

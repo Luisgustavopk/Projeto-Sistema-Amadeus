@@ -22,18 +22,42 @@ export type ProviderFallbackNotice = {
 };
 export type NotifyProviderFallback = (notice: ProviderFallbackNotice) => void;
 
+export function localBudgetLimits(limits: ProviderConfig['limits']) {
+  const local = { ...limits };
+  delete local.enforced;
+
+  return local;
+}
+
 export function providerAttempts(
   role: Role,
   config: ProviderConfig,
 ): ProviderConfig[] {
-  const { fallbackModel, fallbackProviders, speechFallback, ...primary } =
-    config;
+  const {
+    fallbackModel,
+    fallbackProviders,
+    speechFallback,
+    fallbackVoiceId,
+    fallbackVoiceApiKeyEnv,
+    ...primary
+  } = config;
   delete primary.localProvider;
   delete primary.localRouting;
 
   if (role !== 'llm') {
     return [
       primary,
+      ...(role === 'tts' && fallbackVoiceId
+        ? [
+            {
+              ...primary,
+              voiceId: fallbackVoiceId,
+              ...(fallbackVoiceApiKeyEnv
+                ? { apiKeyEnv: fallbackVoiceApiKeyEnv }
+                : {}),
+            },
+          ]
+        : []),
       ...(speechFallback ? [{ ...speechFallback, limits: config.limits }] : []),
     ];
   }
@@ -52,7 +76,10 @@ export function providerAttempts(
   }
 
   for (const fallback of fallbackProviders ?? []) {
-    attempts.push({ ...fallback, limits: fallback.limits ?? config.limits });
+    attempts.push({
+      ...fallback,
+      limits: fallback.limits ?? localBudgetLimits(config.limits),
+    });
   }
 
   return attempts;

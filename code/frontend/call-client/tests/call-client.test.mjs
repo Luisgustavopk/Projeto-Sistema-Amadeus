@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createCallClient } from "../index.mjs";
 import { openCall } from "../connection.mjs";
 
-async function fixture(t) {
+async function fixture(t, options = {}) {
   let callbacks,
     started,
     clock = 0;
@@ -32,11 +32,18 @@ async function fixture(t) {
   }
   let playing = true;
   const client = await createCallClient(
-    { onTiming: (value) => timings.push(value) },
+    { onTiming: (value) => timings.push(value), ...options },
     {
       AudioContext,
       now: () => clock,
-      openCall: async () => ({ socket, conversationId: "conversation-fixture", session: { sessionId: "session-fixture" } }),
+      openCall: async () => ({
+        socket,
+        conversationId: "conversation-fixture",
+        session: {
+          sessionId: "session-fixture",
+          presenceAvailable: options.presence ?? false,
+        },
+      }),
       createPlayback: (_context, _send, _error, onStart) => {
         started = onStart;
         return {
@@ -114,8 +121,18 @@ test("exports only resumption identifiers and the last observed control sequence
     conversationId: "conversation-fixture",
     resume: { previousSessionId: "session-fixture", lastSeq: 12 },
   });
-  assert.equal(f.sent.some((event) => event.type === "text.send"), false);
-  await assert.rejects(openCall({ apiUrl: "http://127.0.0.1:3001", credential: "synthetic", resume: f.client.resumeState().resume }), /Retomada exige/);
+  assert.equal(
+    f.sent.some((event) => event.type === "text.send"),
+    false,
+  );
+  await assert.rejects(
+    openCall({
+      apiUrl: "http://127.0.0.1:3001",
+      credential: "synthetic",
+      resume: f.client.resumeState().resume,
+    }),
+    /Retomada exige/,
+  );
 });
 
 test("cuts playback on a recognized word before capture ends, preserving the full utterance", async (t) => {
@@ -222,4 +239,62 @@ test("a superseded transcript cannot stop or erase a newer pending recognition",
   assert.equal(f.stops.length, 0);
   f.receive({ type: "transcript.final", turnId: 2, text: "Atual" });
   assert.deepEqual(f.stops, [2]);
+});
+
+test("aceita presença somente ociosa e reserva o próximo turno sem sobrepor captura ou reprodução", async (t) => {
+  const f = await fixture(t, { presence: true });
+  const offer = { type: "presence.offer", offerId: "offer", kind: "greeting" };
+  f.receive(offer);
+  assert.equal(f.sent.at(-1).type, "presence.decline");
+  f.playing(false);
+  f.callbacks.start();
+  f.receive(offer);
+  assert.equal(f.sent.at(-1).type, "presence.decline");
+  f.callbacks.end({ silenceMs: 300 });
+  f.receive(offer);
+  assert.equal(f.sent.at(-1).type, "presence.decline");
+  f.receive({ type: "error", turnId: 1, code: "NO_SPEECH_DETECTED" });
+  f.receive(offer);
+  assert.deepEqual(f.sent.at(-1), {
+    type: "presence.accept",
+    offerId: "offer",
+    turnId: 2,
+  });
+  f.receive({ type: "reply.start", turnId: 2, responseId: "r" });
+  f.receive(offer);
+  assert.equal(f.sent.at(-1).type, "presence.decline");
+  f.client.text("Minha pergunta.");
+  assert.equal(f.sent.at(-1).turnId, 3);
+});
+
+test("pausar microfone e desligar presença suspendem ofertas sem gerar novos turnos", async (t) => {
+  const f = await fixture(t, { presence: true });
+  f.playing(false);
+  f.client.stopMicrophone();
+  f.receive({ type: "presence.offer", offerId: "offer", kind: "greeting" });
+  assert.equal(f.sent.at(-1).type, "presence.decline");
+  f.client.setPresence(false);
+  assert.deepEqual(f.sent.at(-1), {
+    type: "presence.update",
+    enabled: false,
+    available: false,
+  });
+  assert.equal(f.sent.filter((e) => e.type === "presence.accept").length, 0);
+});
+
+test("reserva uma oferta uma única vez e um aceite recusado libera outra iniciativa", async (t) => {
+  const f = await fixture(t, { presence: true });
+  f.playing(false);
+  const offer = { type: "presence.offer", offerId: "first", kind: "greeting" };
+  f.receive(offer);
+  f.receive(offer);
+  f.receive({ type: "pong" });
+  assert.equal(f.sent.filter((e) => e.type === "presence.accept").length, 1);
+  f.receive({ type: "presence.cancelled", offerId: "first", turnId: 1 });
+  f.receive({ ...offer, offerId: "next", kind: "initiative" });
+  assert.deepEqual(f.sent.at(-1), {
+    type: "presence.accept",
+    offerId: "next",
+    turnId: 2,
+  });
 });

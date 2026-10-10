@@ -407,6 +407,16 @@ Os IDs abaixo correspondem à lista de requisitos aprovada em Requisitos_API_Ama
 
 **RF-003** (administração completa de múltiplos clientes) e **RNF-016** (garantia de 95% de disponibilidade mensal) não entram em nenhuma fase de implementação desta versão. Continuam identificados na lista para rastreabilidade. Embeddings e banco vetorial também permanecem adiados, sem ID próprio na lista atual; a memória da fase 3 usa busca textual. Fine-tuning de LLM não é requisito comprometido: a fase 2 pode executar uma prova de conceito, e qualquer uso operacional de pesos ajustados fica condicionado aos gates de qualidade e à capacidade de treinamento/hospedagem.
 
+### 11.4 Ordem revisada pelo proprietário em 07/10/2026
+
+Refinamento atual das fases 2/3: atuação com diálogos encadeados e exemplos curados em Markdown; presença moderada durante a chamada, com controlador separado; PAD/energia persistentes e familiaridade entre sessões. A versão 0.4.19 implementa esses mecanismos, mas sua aceitação artística depende de avaliação com o Llama principal disponível. Depois da validação, otimizar latência com medidas do primeiro áudio e interrupção, sem sacrificar continuidade ou fidelidade.
+
+A fase 4 (texto completo e imagens) fica **adiada**, não concluída. A entrada mínima de texto e a exibição da resposta permanecem disponíveis para recuperação de falhas. Fluxos completos fora da chamada e cenários visuais continuam rastreados para retomada futura; não são pré-requisito para iniciar o avatar da fase 5. A sequência passa a refinamento/otimização → fase 5 (Live2D e interface) → fase 6 (desktop).
+
+Pesquisa e navegação autônomas, fontes atuais, memória própria de descobertas, acesso ao computador, integrações e iniciativa fora da chamada serão especificados como novas funcionalidades **depois da fase 6**. A iniciativa durante uma chamada aberta está autorizada e separada dessa extensão externa. O cliente desktop não concede acesso irrestrito ao computador por consequência.
+
+A fase 7 continua consolidando integração e entrega. Sua avaliação deve distinguir o escopo ativo dos requisitos adiados da fase 4, mantendo os critérios e a rastreabilidade; não declarar todos os requisitos originais concluídos enquanto houver esses adiamentos. Detalhes da implementação e pendências estão em [Presença e autonomia](../architecture/Presenca_e_Autonomia_Amadeus.md).
+
 ## 12. Riscos e decisões ainda dependentes de teste
 
 - Voz pouco expressiva: comparar presets e referências; trocar TTS se necessário, mantendo identidade.

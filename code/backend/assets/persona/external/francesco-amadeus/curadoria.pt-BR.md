@@ -1,6 +1,6 @@
 # Curadoria de comportamento em português brasileiro
 
-Análise de produto a partir dos diálogos disponíveis no snapshot. Este arquivo não é transcrição, tradução oficial, biografia nova nem instrução carregada em produção. A persona 0.4.13 e seu recorte de março de 2010 continuam sendo a referência de compatibilidade.
+Análise de produto a partir dos diálogos disponíveis no snapshot. Este arquivo não é transcrição, tradução oficial ou biografia nova. Na persona 0.4.16, suas direções alimentam a compilação `../../canon-conversation-v1.md`, carregada em produção. O recorte aprovado de março de 2010 continua sendo a referência de compatibilidade; o corpus bruto permanece fora do prompt.
 
 ## O que o corpus acrescenta
 

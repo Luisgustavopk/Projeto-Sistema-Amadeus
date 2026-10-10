@@ -4,7 +4,10 @@
   "inspectedAt": "2026-10-06",
   "declaredRepositoryLicense": "GPL-3.0 (see original LICENSE)",
   "thirdPartyFictionAndAudioRights": "not-independently-established",
-  "productionEnabled": false,
+  "productionEnabled": true,
+  "productionMode": "curated-style-only",
+  "runtimeReference": "../../canon-conversation-v1.md",
+  "rawCorpusInPrompt": false,
   "translated": false,
   "statistics": {
     "repositoryFiles": 15,

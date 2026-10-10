@@ -11,6 +11,8 @@ import {
 } from '../../domain/errors/providers.ts';
 import { NoSpeechDetectedError } from '../../domain/errors/voice.ts';
 import { NO_CAPABILITIES } from './http-json.ts';
+import { cartesiaStreaming } from './cartesia-stream.ts';
+import { cartesiaExpression } from './cartesia-expression.ts';
 
 const DeepgramResponse = z.object({
   results: z.object({
@@ -332,8 +334,9 @@ export function createCartesiaProvider(
 
   return {
     role,
-    transport: 'buffered-json',
-    nativeStreaming: false,
+    transport: 'websocket',
+    nativeStreaming: true,
+    ...cartesiaStreaming(key, voiceId, CARTESIA_VERSION, providerError),
     async health() {
       try {
         const response = await fetchResponse(
@@ -358,6 +361,8 @@ export function createCartesiaProvider(
           capabilities: {
             ...NO_CAPABILITIES,
             customVoice: true,
+            incrementalGeneration: true,
+            progressiveDelivery: true,
           },
         };
       } catch {
@@ -366,6 +371,7 @@ export function createCartesiaProvider(
     },
     async execute(input, signal): Promise<ProviderOutput> {
       const text = validateTtsText(input.content);
+      const delivery = cartesiaExpression(input.speechExpression);
       const response = await fetchResponse(
         'https://api.cartesia.ai/tts/bytes',
         {
@@ -377,6 +383,9 @@ export function createCartesiaProvider(
           },
           body: JSON.stringify({
             model_id: 'sonic-3.6',
+            ...(delivery
+              ? { generation_config: delivery.generation_config }
+              : {}),
             transcript: text,
             voice: { id: voiceId },
             language: 'pt',
@@ -411,6 +420,7 @@ export function createCartesiaProvider(
         content: '',
         inputTokens: null,
         outputTokens: null,
+        ...(delivery ? { speechExpressionApplied: delivery.expression } : {}),
         audio: {
           pcmBase64: pcm.toString('base64'),
           sampleRate: TTS_SAMPLE_RATE,

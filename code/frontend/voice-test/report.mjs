@@ -19,6 +19,18 @@ export function createTestReport() {
         code: event.code,
         role: event.role,
         turnId: event.turnId,
+        ...(event.type === "reply.expression"
+          ? {
+              responseId: event.responseId,
+              segmentId: event.segmentId,
+              phase: event.phase,
+              intent: event.intent,
+              emotion: event.emotion,
+              intensity: event.intensity,
+              metadataValid: event.metadataValid,
+              deliveryApplied: event.deliveryApplied,
+            }
+          : {}),
         wasClean: event.wasClean,
         recordedAt: new Date().toISOString(),
       });

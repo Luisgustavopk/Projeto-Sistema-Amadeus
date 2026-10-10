@@ -6,30 +6,14 @@ import type { CallHistoryRepository } from '../../src/ports/call-history-reposit
 import type { ProviderServices } from '../../src/application/providers/index.ts';
 import type { VoiceEvent } from '../../src/ports/voice-session.ts';
 
-it.each(['answerable', 'unknown', 'unavailable', 'unrelated'] as const)(
-  'integra plano %s no turno antes da geração e mantém metadados fora da fala',
+it.each(['recall', 'none', 'missing'] as const)(
+  'usa escopo %s no turno sem planejamento extra e mantém metadados fora da fala',
   async (status) => {
     const factId = randomUUID();
-    const plan: Awaited<
-      ReturnType<
-        import('../../src/application/memory/service.ts').MemoryService['planAnswer']
-      >
-    > =
-      status === 'unavailable'
-        ? { status: 'unavailable', claims: [] }
-        : {
-            status,
-            claims:
-              status === 'answerable'
-                ? [
-                    {
-                      text: 'O projeto Farol usa PostgreSQL.',
-                      factIds: [factId],
-                    },
-                  ]
-                : [],
-          };
-    const planner = vi.fn(async () => plan);
+    const planner = vi.fn(async () => ({
+      status: 'unavailable' as const,
+      claims: [],
+    }));
     const history: CallHistoryRepository = {
       startSession: async () => {},
       endSession: async () => {},
@@ -42,11 +26,26 @@ it.each(['answerable', 'unknown', 'unavailable', 'unrelated'] as const)(
     };
     const executeStream = vi.fn<ProviderServices['executeStream']>(
       async function* (input) {
-        expect(planner).toHaveBeenCalledTimes(1);
-        expect(input.content).toContain(JSON.stringify(plan));
-        expect(input.systemPrompt).toContain('PLANO FACTUAL');
+        expect(planner).not.toHaveBeenCalled();
+        expect(input.content).not.toContain('Plano factual');
+        expect(input.systemPrompt).toContain('CONTEXTO DE MEMÓRIA');
         yield {
-          content: 'Posso responder com os dados disponíveis.',
+          content:
+            '<expression>' +
+            JSON.stringify({
+              intent: 'conversar',
+              emotion: 'neutra',
+              intensity: 0.15,
+              ...(status === 'missing'
+                ? {}
+                : {
+                    memory: {
+                      use: status,
+                      facts: status === 'recall' ? [0] : [],
+                    },
+                  }),
+            }) +
+            '</expression>Posso responder com os dados disponíveis.',
           inputTokens: 1,
           outputTokens: 1,
         };
@@ -58,7 +57,7 @@ it.each(['answerable', 'unknown', 'unavailable', 'unrelated'] as const)(
     const verify = vi.fn(async () => {
       expect(events.filter((e) => e.type === 'reply.text')).toEqual([]);
 
-      return status === 'answerable';
+      return status !== 'missing';
     });
     const processor = createTurnProcessor(
       { execute: vi.fn(), executeStream },
@@ -96,13 +95,18 @@ it.each(['answerable', 'unknown', 'unavailable', 'unrelated'] as const)(
         .filter((e) => e.type === 'reply.text')
         .map((e) => e.text)
         .join(''),
-    ).toBe(
-      status === 'answerable' || status === 'unrelated'
-        ? 'Posso responder com os dados disponíveis.'
-        : 'Não consegui confirmar esse detalhe nas minhas lembranças agora. Pode me lembrar?',
-    );
-    expect(verify).toHaveBeenCalledTimes(status === 'unrelated' ? 0 : 1);
+    ).toBe('Posso responder com os dados disponíveis.');
+    expect(verify).toHaveBeenCalledTimes(1);
+    expect(executeStream).toHaveBeenCalledTimes(status === 'missing' ? 2 : 1);
+
+    if (status === 'missing') {
+      expect(executeStream.mock.calls[1]![0].content).not.toContain(
+        'PostgreSQL',
+      );
+    }
+
     expect(audio).not.toHaveBeenCalled();
-    expect(metrics.snapshot().stages.memoryPlan?.samples).toBe(1);
+    expect(metrics.snapshot().stages.memoryPlan).toBeUndefined();
+    expect(metrics.snapshot().stages.memoryRetrieve?.samples).toBe(1);
   },
 );

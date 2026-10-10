@@ -12,12 +12,22 @@ import { VoiceInputError } from '../../domain/errors/voice.ts';
 import type { VoiceMetrics } from './metrics.ts';
 
 export function createVoiceSessions(dependencies: {
-  providers: Pick<ProviderServices, 'execute' | 'executeStream'>;
+  providers: Pick<ProviderServices, 'execute' | 'executeStream'> &
+    Partial<
+      Pick<
+        ProviderServices,
+        'executeAudioStream' | 'closeSpeech' | 'speechVoiceId'
+      >
+    >;
   profiles: Pick<VoiceProfiles, 'active'>;
   history: CallHistoryRepository;
   gate: ExecutionGate;
   metrics: VoiceMetrics;
   ownerId: string;
+  persistentState?: import('../persona/persistent-state.ts').PersistentPersonaState;
+  references?: import('../../ports/persona-references.ts').PersonaReferenceRetriever;
+  analysis?: Pick<import('../persona/analysis.ts').PersonaAnalysis, 'analyze'>;
+  runtime?: Parameters<typeof createTurnProcessor>[8];
   memory?: Pick<
     import('../memory/service.ts').MemoryService,
     'retrieve' | 'interruptBackground'
@@ -115,9 +125,14 @@ export function createVoiceSessions(dependencies: {
             dependencies.metrics,
             dependencies.persona,
             dependencies.memory,
+            dependencies.analysis,
+            dependencies.persistentState,
+            dependencies.references,
+            dependencies.runtime,
           ),
           gate: dependencies.gate,
           metrics: dependencies.metrics,
+          resumed: Boolean(input.resume),
         });
         const close = runtime.close;
         let closing: Promise<void> | undefined;

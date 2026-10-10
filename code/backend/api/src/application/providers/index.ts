@@ -11,6 +11,7 @@ import { createProviderStreaming } from './streaming.ts';
 import { createProviderConfiguration } from './configuration.ts';
 import { createProviderExecution } from './execution.ts';
 import { createProviderQueries } from './queries.ts';
+import { createAudioStreaming } from './audio-streaming.ts';
 
 export function createProviderServices(dependencies: {
   configuration: ProviderConfigurationRepository;
@@ -26,6 +27,15 @@ export function createProviderServices(dependencies: {
   const cooldowns = createProviderCooldowns();
 
   return {
+    ...createAudioStreaming(
+      configuration,
+      usage,
+      ownerId,
+      factory,
+      gate,
+      onFallback,
+      cooldowns,
+    ),
     ...createProviderConfiguration(configuration, ownerId, factory, gate),
     ...createProviderExecution(
       configuration,

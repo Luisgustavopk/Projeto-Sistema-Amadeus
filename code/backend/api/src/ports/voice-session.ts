@@ -3,6 +3,29 @@ import type { Expression } from '../domain/persona/expression.ts';
 import type { describeDelivery } from '../domain/persona/expression.ts';
 
 export type VoiceEvent =
+  | { type: 'presence.offer'; offerId: string; kind: 'greeting' | 'initiative' }
+  | { type: 'presence.cancelled'; offerId: string; turnId: number }
+  | {
+      type: 'audio.abort';
+      turnId: number;
+      responseId: string;
+      segmentId: string;
+    }
+  | {
+      type: 'audio.start';
+      turnId: number;
+      responseId: string;
+      segmentId: string;
+      sampleRate: 16000 | 24000;
+    }
+  | {
+      type: 'audio.end';
+      turnId: number;
+      responseId: string;
+      segmentId: string;
+      sampleCount: number;
+      frameCount: number;
+    }
   | (Expression &
       ReturnType<typeof describeDelivery> & {
         type: 'reply.expression';
@@ -13,7 +36,8 @@ export type VoiceEvent =
         personaVersion: string;
         voiceProfileId: string | null;
         metadataValid: boolean;
-        deliveryApplied: false;
+        phase?: 'initial' | 'update';
+        deliveryApplied: boolean;
       })
   | { type: 'state'; turnId: number; state: CallState }
   | { type: 'transcript.final'; turnId: number; text: string }
@@ -63,4 +87,12 @@ export interface VoiceSink {
     sampleRate: 16000 | 24000;
     signal: AbortSignal;
   }): Promise<void>;
+  audioStream?(input: {
+    turnId: number;
+    responseId: string;
+    segmentId: string;
+    sampleRate: 16000 | 24000;
+    chunks: AsyncIterable<Uint8Array>;
+    signal: AbortSignal;
+  }): Promise<number>;
 }

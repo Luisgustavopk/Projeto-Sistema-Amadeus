@@ -181,6 +181,28 @@ async function fixture(reranker?: MemoryReranker) {
   return { db, repo, labels, embed, model, execute, service };
 }
 
+it('reutiliza vetores de consulta sem reutilizar fatos revogados nem sua permissão', async () => {
+  const f = await fixture();
+  const fact = await f.repo.createFact(
+    input('Cultivo cogumelos.', { relation: null }),
+  );
+  f.labels.set(fact.text, 0);
+  f.labels.set('What do I grow?', 0);
+  expect(
+    await f.service.retrieve(randomUUID(), 'What do I grow?', 'synthetic'),
+  ).toContain(fact.text);
+  expect(
+    await f.service.retrieve(randomUUID(), 'What do I grow?', 'synthetic'),
+  ).toContain(fact.text);
+  expect(
+    f.embed.mock.calls.filter(([, kind]) => kind === 'query'),
+  ).toHaveLength(1);
+  await f.service.forget(fact.id, fact.version, false);
+  expect(
+    await f.service.retrieve(randomUUID(), 'What do I grow?', 'synthetic'),
+  ).not.toContain(fact.text);
+});
+
 it('recupera sem palavras compartilhadas e reutiliza embeddings persistidos após recriar o serviço', async () => {
   const f = await fixture();
   const fact = await f.repo.createFact(

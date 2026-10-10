@@ -10,10 +10,10 @@ import { assertBudgetAvailable } from '../../domain/providers/usage-policy.ts';
 // failed/partial reports retain their conservative reservation.
 const budgetTokens =
   "CASE WHEN state = 'completed' AND input_tokens IS NOT NULL AND output_tokens IS NOT NULL THEN input_tokens + output_tokens ELSE MAX(reserved_tokens, COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)) END";
+const queues = new WeakMap<Client, Promise<void>>();
 
 export class SqliteProviderUsageRepository implements ProviderUsageRepository {
   private readonly client: Client;
-  private reservationQueue: Promise<void> = Promise.resolve();
 
   constructor(client: Client) {
     this.client = client;
@@ -24,6 +24,15 @@ export class SqliteProviderUsageRepository implements ProviderUsageRepository {
     role: Role,
     config: ProviderConfig,
     day = new Date().toISOString().slice(0, 10),
+  ) {
+    return this.write(() => this.readUsage(owner, role, config, day));
+  }
+
+  private async readUsage(
+    owner: string,
+    role: Role,
+    config: ProviderConfig,
+    day: string,
   ) {
     const result = await this.client.execute({
       sql: `SELECT COUNT(*) AS requests, COALESCE(SUM(${budgetTokens}), 0) AS budget_tokens, COALESCE(SUM(input_tokens), 0) AS reported_input, COALESCE(SUM(output_tokens), 0) AS reported_output, SUM(CASE WHEN input_tokens IS NULL OR output_tokens IS NULL THEN 1 ELSE 0 END) AS estimated_requests FROM foundation_usage WHERE owner_id = ? AND role = ? AND provider_key = ? AND day = ?`,
@@ -48,17 +57,26 @@ export class SqliteProviderUsageRepository implements ProviderUsageRepository {
     config: ProviderConfig,
     tokens: number,
   ) {
-    const previous = this.reservationQueue;
+    return this.write(() =>
+      this.reserveTransaction(owner, role, config, tokens),
+    );
+  }
+
+  private async write<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = queues.get(this.client) ?? Promise.resolve();
 
     let release: () => void = () => {};
 
-    this.reservationQueue = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    queues.set(
+      this.client,
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+    );
     await previous;
 
     try {
-      return await this.reserveTransaction(owner, role, config, tokens);
+      return await operation();
     } finally {
       release();
     }
@@ -108,14 +126,16 @@ export class SqliteProviderUsageRepository implements ProviderUsageRepository {
     id: string,
     outcome: { inputTokens: number | null; outputTokens: number | null } | null,
   ) {
-    await this.client.execute({
-      sql: "UPDATE foundation_usage SET state = ?, input_tokens = ?, output_tokens = ? WHERE id = ? AND state = 'pending'",
-      args: [
-        outcome ? 'completed' : 'failed',
-        outcome?.inputTokens ?? null,
-        outcome?.outputTokens ?? null,
-        id,
-      ],
-    });
+    await this.write(() =>
+      this.client.execute({
+        sql: "UPDATE foundation_usage SET state = ?, input_tokens = ?, output_tokens = ? WHERE id = ? AND state = 'pending'",
+        args: [
+          outcome ? 'completed' : 'failed',
+          outcome?.inputTokens ?? null,
+          outcome?.outputTokens ?? null,
+          id,
+        ],
+      }),
+    );
   }
 }

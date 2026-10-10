@@ -11,7 +11,7 @@ it('inclui o repertório no prompt normal e na recuperação sem ultrapassar o o
     expect(prompt).toContain(
       'Constrangimento é uma possibilidade contextual, não regra.',
     );
-    expect(prompt).toContain('kurisu-amadeus-0.4.13');
+    expect(prompt).toContain('kurisu-amadeus-0.4.23');
     expect(prompt.length).toBeLessThanOrEqual(32768);
   }
 });

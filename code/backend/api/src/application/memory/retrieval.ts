@@ -39,6 +39,7 @@ export function selectRelevantFacts(
   budget = 1800,
   semanticScores: ReadonlyMap<string, number> = new Map(),
   semanticAvailable = false,
+  focused = false,
 ) {
   const query = new Set(memoryTerms(text));
   const candidates = facts.filter(
@@ -94,11 +95,22 @@ export function selectRelevantFacts(
       : 0;
   };
 
-  const direct = candidates
+  const ranked = candidates
     .map((fact) => ({ fact, score: score(fact) }))
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score || b.fact.updatedAt - a.fact.updatedAt)
     .slice(0, 8);
+  const third = ranked[2];
+  const direct =
+    focused && third
+      ? ranked.filter(
+          (entry, index) =>
+            index < 3 ||
+            (semanticScores.get(entry.fact.id) ?? entry.score) >=
+              (semanticScores.get(third.fact.id) ?? third.score) * 0.9,
+        )
+      : ranked;
+  const maximumFacts = focused ? 8 : 12;
   const selectedIds = new Set(direct.map((entry) => entry.fact.id));
   const graph = [...direct];
   let frontier = direct.map((entry) => entry.fact);
@@ -111,24 +123,28 @@ export function selectRelevantFacts(
 
   // Sharing evidence means related context, not proof of a relationship.
   // Add only one hop from direct matches, never the raw source utterance.
+  let complements = 0;
+
   for (const fact of candidates) {
-    if (graph.length >= 12) {
+    if (graph.length >= maximumFacts) {
       break;
     }
 
     if (
       !selectedIds.has(fact.id) &&
+      (!focused || complements < 2) &&
       memoryContextSources(fact).some((source) =>
         directSources.has(source.turnId),
       )
     ) {
       graph.push({ fact, score: 0 });
       selectedIds.add(fact.id);
+      complements++;
     }
   }
 
   // At most two hops; generic subjects must not pull the user's entire graph.
-  for (let depth = 0; depth < 2 && graph.length < 12; depth++) {
+  for (let depth = 0; depth < 2 && graph.length < maximumFacts; depth++) {
     const entities = new Set(
       frontier
         .flatMap((fact) =>
@@ -144,7 +160,11 @@ export function selectRelevantFacts(
     frontier = [];
 
     for (const fact of candidates) {
-      if (selectedIds.has(fact.id) || !fact.relation) {
+      if (
+        selectedIds.has(fact.id) ||
+        !fact.relation ||
+        (focused && score(fact) <= 0)
+      ) {
         continue;
       }
 
@@ -157,7 +177,7 @@ export function selectRelevantFacts(
         selectedIds.add(fact.id);
       }
 
-      if (graph.length >= 12) {
+      if (graph.length >= maximumFacts) {
         break;
       }
     }
