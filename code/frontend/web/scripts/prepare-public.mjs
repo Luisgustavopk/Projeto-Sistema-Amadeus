@@ -1,4 +1,4 @@
-import { cp, mkdir, access } from 'node:fs/promises';
+import { cp, mkdir, access, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 const web = fileURLToPath(new URL('..', import.meta.url));
@@ -11,6 +11,20 @@ try {
     resolve(source, 'modern/Kurisu'),
     resolve(web, 'public/live2d/amadeus'),
     { recursive: true },
+  );
+  // Add parameter configurations in the public copy; never edit source binaries.
+  for (const directory of ['exp', 'motions'])
+    await cp(
+      resolve(web, '../assets/avatar/acting/generated', directory),
+      resolve(web, 'public/live2d/amadeus', directory),
+      { recursive: true },
+    );
+  await rm(
+    resolve(
+      web,
+      'public/live2d/amadeus/motions/amadeus/kz_risada_balanco.motion3.json',
+    ),
+    { force: true },
   );
   await mkdir(resolve(web, 'public/live2d/runtime'), { recursive: true });
   for (const file of [

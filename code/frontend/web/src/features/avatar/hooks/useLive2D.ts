@@ -1,4 +1,4 @@
-import type { AvatarRuntime, AvatarStatus } from '../types';
+import type { AvatarRuntime, AvatarStatus, ActingEvent } from '../types';
 import type { Preferences } from '../../settings/preferences';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createAvatar } from '../runtime/avatar.mjs';
@@ -57,6 +57,18 @@ export function useLive2D(active: boolean, preferences: Preferences) {
     (duration: number) => runtime.current?.speak(duration),
     [],
   );
+  const react = useCallback(
+    (event: ActingEvent) => runtime.current?.react(event) ?? false,
+    [],
+  );
+  const motion = useCallback(
+    (name: string) => runtime.current?.motion(name) ?? Promise.resolve(false),
+    [],
+  );
+  const setArms = useCallback(
+    (value: boolean) => runtime.current?.setArms(value),
+    [],
+  );
   const stopSpeaking = useCallback(() => runtime.current?.stopSpeaking(), []);
   return {
     canvasRef,
@@ -65,6 +77,9 @@ export function useLive2D(active: boolean, preferences: Preferences) {
     ready: status.state === 'ready',
     retry,
     expression,
+    react,
+    motion,
+    setArms,
     speak,
     stopSpeaking,
   };

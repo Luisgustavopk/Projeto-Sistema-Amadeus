@@ -1,11 +1,12 @@
 import { createAvatarClock } from './avatar-clock.mjs';
 import { createAvatarLayout } from './avatar-layout.mjs';
 import { createAvatarGaze } from './avatar-gaze.mjs';
-import { createAvatarExpressions } from './avatar-expressions.mjs';
+import { createAvatarActing } from './avatar-acting.mjs';
+import { ACTING_CATALOG } from '../../../../../assets/avatar/acting/generated/catalog.mjs';
 import { applyAnimePalette } from './avatar-palette.mjs';
 
 export function createAvatar({ canvas, host, onStatus }) {
-  let app, model, loading, clock, layout, gaze, applyExpression, palette;
+  let app, model, loading, clock, layout, gaze, acting, palette;
   let active = false;
   let disposed = false;
   const cancellation = new AbortController();
@@ -14,13 +15,14 @@ export function createAvatar({ canvas, host, onStatus }) {
   const isActive = () => active && !document.hidden;
   const updateActivity = () => clock?.setRunning(isActive());
   function release() {
+    acting?.destroy();
     gaze?.destroy();
     layout?.destroy();
     clock?.destroy();
     palette?.destroy();
     model?.destroy();
     app?.destroy(false);
-    model = app = clock = layout = gaze = applyExpression = palette = undefined;
+    model = app = clock = layout = gaze = acting = palette = undefined;
   }
   async function load() {
     if (disposed) return false;
@@ -56,10 +58,12 @@ export function createAvatar({ canvas, host, onStatus }) {
             delete motion.sound;
           }
         }
-        const available = new Set(
-          (settings.FileReferences.Expressions ?? []).map(
-            (entry) => entry.Name,
-          ),
+        settings.FileReferences.Motions.Amadeus = ACTING_CATALOG.motions.map(
+          ({ File, FadeInTime, FadeOutTime }) => ({
+            File,
+            FadeInTime,
+            FadeOutTime,
+          }),
         );
         app = new PIXI.Application({
           view: canvas,
@@ -84,20 +88,31 @@ export function createAvatar({ canvas, host, onStatus }) {
         palette = applyAnimePalette({ PIXI, app, model });
         model.anchor.set(0.5, 0.5);
         model.internalModel.on('beforeModelUpdate', () => {
+          const controls = acting?.update();
           const now = performance.now();
           const mouth =
             now < speakingUntil
               ? Math.abs(Math.sin(now / 92) * Math.sin(now / 163)) * 0.65
               : 0;
-          model.internalModel.coreModel.setParameterValueById(
-            'ParamMouthOpenY',
-            mouth,
-          );
+          if (now < speakingUntil || !controls?.mouth)
+            model.internalModel.coreModel.setParameterValueById(
+              'ParamMouthOpenY',
+              mouth,
+            );
         });
-        clock = createAvatarClock(app, model);
+        clock = createAvatarClock(app, model, () =>
+          acting?.updatePresentation(),
+        );
         layout = createAvatarLayout({ app, model, host });
         gaze = createAvatarGaze({ model, host, isActive });
-        applyExpression = createAvatarExpressions({ model, available, clock });
+        acting = createAvatarActing({
+          model,
+          settings,
+          clock,
+          signal: cancellation.signal,
+          gaze,
+          layout,
+        });
         layout.configure(preferences);
         layout.fit();
         gaze.configure(preferences);
@@ -123,7 +138,10 @@ export function createAvatar({ canvas, host, onStatus }) {
   return {
     load,
     expression: (name) =>
-      applyExpression ? applyExpression(name) : Promise.resolve(false),
+      acting ? acting.select(name) : Promise.resolve(false),
+    react: (event) => acting?.react(event) ?? false,
+    motion: (name) => (acting ? acting.motion(name) : Promise.resolve(false)),
+    setArms: (value) => acting?.setArms(value),
     get ready() {
       return Boolean(model);
     },

@@ -1,5 +1,10 @@
 import type { useLive2D } from './hooks/useLive2D';
 import type { useVoicePreview } from '../voice/hooks/useVoicePreview';
+export interface ActingEvent {
+  intent: string;
+  emotion: string;
+  intensity: number;
+}
 export interface AvatarStatus {
   state: 'loading' | 'ready' | 'error';
   message?: string;
@@ -9,6 +14,9 @@ export interface AvatarRuntime {
   configure(value: { zoom: number; tracking: boolean }): void;
   setActive(value: boolean): void;
   expression(name: string | null): Promise<boolean>;
+  react(event: ActingEvent): boolean;
+  motion(name: string): Promise<boolean>;
+  setArms(value: boolean): void;
   speak(duration: number): void;
   stopSpeaking(): void;
   destroy(): void;

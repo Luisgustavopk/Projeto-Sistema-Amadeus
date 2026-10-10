@@ -767,6 +767,25 @@ body[data-effects='false'] .panel::after {
   background: #020706c9;
   backdrop-filter: blur(6px);
 }
+/* Temporary review layout: keep the avatar visible beside the acting controls. */
+#avatar-dialog {
+  position: fixed;
+  inset: 16px 16px auto auto;
+  margin: 0;
+  width: min(420px, calc(100% - 32px));
+  max-height: calc(100svh - 32px);
+  box-shadow: 0 12px 32px #0004;
+}
+#avatar-dialog::backdrop {
+  background: transparent;
+  backdrop-filter: none;
+}
+@media (max-width: 600px) {
+  #avatar-dialog {
+    inset: auto 16px 16px auto;
+    max-height: 48svh;
+  }
+}
 .panel-header {
   display: flex;
   align-items: center;
@@ -899,6 +918,60 @@ body[data-effects='false'] .panel::after {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
+}
+.catalog-details {
+  margin-top: 22px;
+}
+#avatar-dialog > .panel-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.catalog-details summary {
+  color: var(--amber-bright);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 12px 0;
+}
+.arm-control {
+  margin-top: 12px;
+  width: 100%;
+}
+.catalog-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+.catalog-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.catalog-filters input,
+.catalog-filters select {
+  width: 100%;
+  min-width: 0;
+  background: #090f0b;
+  border: 1px solid #60644780;
+  color: var(--ink);
+  padding: 10px;
+  border-radius: 0;
+}
+.catalog-filters input[type='range'] {
+  padding: 0;
+  accent-color: var(--amber);
+}
+.catalog-grid {
+  max-height: 290px;
+  overflow-y: auto;
+  margin: 12px 0 22px;
+  scrollbar-color: #7b6946 #151b16;
+}
+.acting-catalog .section-label {
+  margin-top: 24px;
 }
 .reaction-button {
   display: flex;

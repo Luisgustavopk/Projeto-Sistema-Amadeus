@@ -6,6 +6,7 @@ import {
 } from '../../avatar/expressions';
 import { useAvatarStore } from '../../avatar/store';
 import type { AvatarController } from '../../avatar/types';
+import type { ActingEvent } from '../../avatar/types';
 import type { MessageRole } from '../../chat/types';
 import type { Notify } from '../../../types/ui';
 
@@ -13,16 +14,29 @@ export function useVoicePreview({
   active,
   ready,
   expression,
+  react,
+  motion,
+  setArms: applyArms,
   speak,
   stopSpeaking,
   append,
   notify,
-}: Pick<AvatarController, 'ready' | 'expression' | 'speak' | 'stopSpeaking'> & {
+}: Pick<
+  AvatarController,
+  | 'ready'
+  | 'expression'
+  | 'react'
+  | 'motion'
+  | 'setArms'
+  | 'speak'
+  | 'stopSpeaking'
+> & {
   active: boolean;
   append: (role: MessageRole, text: string) => void;
   notify: Notify;
 }) {
-  const { reaction, setReaction } = useAvatarStore();
+  const { reaction, setReaction, arms, setArms, actingEvent, setActingEvent } =
+    useAvatarStore();
   const [speaking, setSpeaking] = useState(false);
   const [pending, setPending] = useState(false);
   const busy = useRef(false);
@@ -56,8 +70,12 @@ export function useVoicePreview({
   }, [active, stop]);
   useEffect(() => {
     // Reapply the selected face after the route mounts a fresh rig.
-    if (ready) void expression(REACTIONS[reaction].expression);
-  }, [ready, reaction, expression]);
+    if (ready) {
+      if (actingEvent) react(actingEvent);
+      else void expression(REACTIONS[reaction].expression);
+      applyArms(arms);
+    }
+  }, [ready, reaction, expression, actingEvent, react, arms, applyArms]);
   async function select(key: ReactionKey) {
     if (busy.current || !ready) return false;
     busy.current = true;
@@ -72,9 +90,45 @@ export function useVoicePreview({
         return false;
       }
       setReaction(key);
+      setActingEvent(null);
       return true;
     } catch {
       if (mounted.current) notify('Não foi possível carregar essa expressão.');
+      return false;
+    } finally {
+      busy.current = false;
+      if (mounted.current) setPending(false);
+    }
+  }
+  function chooseActing(event: ActingEvent) {
+    if (!ready || busy.current) return false;
+    stop();
+    if (!react(event)) return false;
+    const tier =
+      event.intensity < 0.34
+        ? 'sutil'
+        : event.intensity < 0.67
+          ? 'media'
+          : 'forte';
+    setReaction(
+      event.emotion === 'neutra' ? 'kz_neutra' : `kz_${event.emotion}_${tier}`,
+    );
+    setActingEvent(event);
+    return true;
+  }
+  function toggleArms() {
+    if (!ready) return;
+    applyArms(!arms);
+    setArms(!arms);
+  }
+  async function playMotion(name: string) {
+    if (!ready || busy.current) return false;
+    busy.current = true;
+    setPending(true);
+    try {
+      return await motion(name);
+    } catch {
+      notify('Movimento indisponível neste modelo.');
       return false;
     } finally {
       busy.current = false;
@@ -93,7 +147,9 @@ export function useVoicePreview({
     try {
       const selected = REACTIONS[reaction];
       if (
-        !(await expression(selected.expression)) ||
+        !(actingEvent
+          ? react(actingEvent)
+          : await expression(selected.expression)) ||
         !mounted.current ||
         request !== revision.current
       )
@@ -117,6 +173,10 @@ export function useVoicePreview({
     speaking,
     pending,
     select,
+    chooseActing,
+    toggleArms,
+    arms,
+    playMotion,
     toggleSpeech,
     stop,
   };

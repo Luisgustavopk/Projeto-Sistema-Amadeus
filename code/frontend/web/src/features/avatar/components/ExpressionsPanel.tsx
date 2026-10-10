@@ -3,7 +3,8 @@ import type { VoicePreview } from '../types';
 import type { ReactionKey } from '../expressions';
 import { Button } from '../../../components/ui/Button';
 import { ConsolePanel } from '../../../components/hud/ConsolePanel';
-import { REACTIONS } from '../expressions';
+import { QUICK_REACTIONS } from '../expressions';
+import { ActingCatalog } from './ActingCatalog';
 export function ExpressionsPanel({
   open,
   onClose,
@@ -16,7 +17,7 @@ export function ExpressionsPanel({
       open={open}
       onClose={onClose}
       code="SUBJECT / EXPRESSION"
-      title="Uma reação de cada vez"
+      title="Expressões e movimentos"
       closeLabel="Fechar expressões"
     >
       {' '}
@@ -30,7 +31,7 @@ export function ExpressionsPanel({
           aria-label="Expressões disponíveis"
           aria-busy={performance.pending}
         >
-          {Object.entries(REACTIONS).map(([key, value], index) => (
+          {Object.entries(QUICK_REACTIONS).map(([key, value], index) => (
             <Button
               key={key}
               type="button"
@@ -46,6 +47,19 @@ export function ExpressionsPanel({
             </Button>
           ))}
         </div>
+        <Button
+          className="reaction-button arm-control"
+          disabled={!ready || performance.pending}
+          aria-pressed={performance.arms}
+          onClick={performance.toggleArms}
+        >
+          Mão no queixo / trocar braços
+          <span>{performance.arms ? 'ATIVO' : 'INATIVO'}</span>
+        </Button>
+        <details className="catalog-details">
+          <summary>Catálogo completo · 177 expressões e 12 movimentos</summary>
+          <ActingCatalog performance={performance} ready={ready} />
+        </details>
         <p className="panel-note">
           Falas e movimento da boca são uma prévia visual, sem IA ou áudio.
         </p>
