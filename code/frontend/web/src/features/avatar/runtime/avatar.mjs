@@ -2,9 +2,10 @@ import { createAvatarClock } from './avatar-clock.mjs';
 import { createAvatarLayout } from './avatar-layout.mjs';
 import { createAvatarGaze } from './avatar-gaze.mjs';
 import { createAvatarExpressions } from './avatar-expressions.mjs';
+import { applyAnimePalette } from './avatar-palette.mjs';
 
 export function createAvatar({ canvas, host, onStatus }) {
-  let app, model, loading, clock, layout, gaze, applyExpression;
+  let app, model, loading, clock, layout, gaze, applyExpression, palette;
   let active = false;
   let disposed = false;
   const cancellation = new AbortController();
@@ -16,9 +17,10 @@ export function createAvatar({ canvas, host, onStatus }) {
     gaze?.destroy();
     layout?.destroy();
     clock?.destroy();
+    palette?.destroy();
     model?.destroy();
     app?.destroy(false);
-    model = app = clock = layout = gaze = applyExpression = undefined;
+    model = app = clock = layout = gaze = applyExpression = palette = undefined;
   }
   async function load() {
     if (disposed) return false;
@@ -79,6 +81,7 @@ export function createAvatar({ canvas, host, onStatus }) {
           return false;
         }
         app.stage.addChild(model);
+        palette = applyAnimePalette({ PIXI, app, model });
         model.anchor.set(0.5, 0.5);
         model.internalModel.on('beforeModelUpdate', () => {
           const now = performance.now();

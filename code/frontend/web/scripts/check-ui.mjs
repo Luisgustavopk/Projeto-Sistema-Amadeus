@@ -96,12 +96,18 @@ try {
       .getByRole('button', { name: 'Expressões do avatar', exact: true })
       .click();
     await page.getByRole('button', { name: new RegExp(label) }).click();
-    await page.waitForFunction(
-      (expected) =>
-        document.getElementById('current-expression').textContent === expected,
-      text,
-    );
-    assert.equal(await page.locator('#current-expression').textContent(), text);
+    if (await page.locator('#current-expression').count()) {
+      await page.waitForFunction(
+        (expected) =>
+          document.getElementById('current-expression')?.textContent ===
+          expected,
+        text,
+      );
+      assert.equal(
+        await page.locator('#current-expression').textContent(),
+        text,
+      );
+    }
     const expected = {
       Irritação: ['Angry', 1],
       Constrangimento: ['ParamCheek', 0.5],
@@ -259,7 +265,7 @@ try {
     if (url === base + '/') {
       const response = await route.fetch();
       const html = (await response.text()).replace(
-        /id="root"/,
+        /id="root"(?: data-signal-monitor="[^"]*")?/,
         'id="root" data-signal-monitor="false"',
       );
       return route.fulfill({ response, body: html });

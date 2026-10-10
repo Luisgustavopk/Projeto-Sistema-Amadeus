@@ -93,6 +93,12 @@ Os tokens de cor mantêm os valores anteriores para preservar a aparência. O pr
 
 O Live2D usa `autoUpdate: false` e um ticker privado do renderer. O zoom altera somente escala/posição; não avança o tempo nem liga um segundo ticker. Trocar expressões também não cria listeners de animação. Essa separação evita a aceleração acumulada ao ajustar o slider ou selecionar reações repetidamente.
 
+### Paleta inspirada no anime
+
+`src/features/avatar/runtime/avatar-palette.mjs` aplica uma correção de cores somente ao avatar, usando um filtro Pixi/WebGL. `ANIME_PALETTE` concentra os ajustes de cabelo vermelho-acastanhado, íris azul-violeta, pele marfim, jaleco frio e gravata vermelho-escura. O cabelo varia entre sombras mais marrons e reflexos vermelhos; pele e jaleco preservam a luminosidade da textura, evitando clareamento que apague o volume. `enabled: false` restaura as cores originais; `strength` ajusta a intensidade entre 0 e 1.
+
+O atlas PNG e o rig permanecem intactos. O filtro preserva transparência e contornos, não adiciona um relógio de animação e é destruído com o renderer. A alteração aproxima a paleta da referência enviada; não transforma o traço/texturização do modelo no desenho do anime. O filtro acrescenta uma passagem de renderização WebGL; a conferência headless valida funcionamento, sem substituir a avaliação de fluidez no equipamento do usuário.
+
 Sem conexão com a API de conversa, autenticação, STT, TTS ou banco. O movimento da boca é demonstrativo, sem sincronização fonética. As expressões disponíveis demonstram o rig, sem validar a atuação canônica da persona ou todo o catálogo de movimentos.
 
 ## Verificar
