@@ -1,0 +1,42 @@
+{
+  "Type": "Live2D Expression",
+  "FadeInTime": 0.45,
+  "FadeOutTime": 0.45,
+  "Parameters": [
+    {
+      "Id": "ParamEyeLSmile",
+      "Value": 0.49,
+      "Blend": "Add"
+    },
+    {
+      "Id": "ParamEyeRSmile",
+      "Value": 0.49,
+      "Blend": "Add"
+    },
+    {
+      "Id": "ParamMouthForm",
+      "Value": 0.455,
+      "Blend": "Add"
+    },
+    {
+      "Id": "MouthX",
+      "Value": 0.14,
+      "Blend": "Add"
+    },
+    {
+      "Id": "ParamCheek",
+      "Value": 0.14,
+      "Blend": "Add"
+    },
+    {
+      "Id": "Smile",
+      "Value": 0.42,
+      "Blend": "Add"
+    },
+    {
+      "Id": "ParamAngleZ",
+      "Value": 3.5,
+      "Blend": "Add"
+    }
+  ]
+}

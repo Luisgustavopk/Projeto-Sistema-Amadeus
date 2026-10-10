@@ -1,0 +1,42 @@
+{
+  "Type": "Live2D Expression",
+  "FadeInTime": 0.45,
+  "FadeOutTime": 0.45,
+  "Parameters": [
+    {
+      "Id": "ParamBrowLY",
+      "Value": 0.22,
+      "Blend": "Add"
+    },
+    {
+      "Id": "ParamBrowRY",
+      "Value": 0.22,
+      "Blend": "Add"
+    },
+    {
+      "Id": "ParamBrowLAngle",
+      "Value": -0.2,
+      "Blend": "Add"
+    },
+    {
+      "Id": "ParamBrowRAngle",
+      "Value": -0.2,
+      "Blend": "Add"
+    },
+    {
+      "Id": "ParamMouthForm",
+      "Value": -0.12,
+      "Blend": "Add"
+    },
+    {
+      "Id": "Tears",
+      "Value": 0.04,
+      "Blend": "Add"
+    },
+    {
+      "Id": "Scared",
+      "Value": 0.36,
+      "Blend": "Add"
+    }
+  ]
+}
