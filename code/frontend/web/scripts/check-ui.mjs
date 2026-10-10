@@ -44,26 +44,27 @@ try {
   // Observe actual rig parameters during rendering, not just the UI label.
   // The probe exists only in this temporary browser context.
   await page.evaluate(() => {
-    const prototype = window.PIXI.live2d.Live2DModel.prototype;
-    const original = prototype.expression;
-    prototype.expression = function (...args) {
-      if (!window.__expressionProbe) {
-        window.__expressionProbe = {};
-        this.internalModel.on('beforeModelUpdate', () => {
-          for (const id of [
-            'Angry',
-            'ParamCheek',
-            'Surprissed',
-            'Smile',
-            'Sad',
-            'Scared',
-          ]) {
-            window.__expressionProbe[id] =
-              this.internalModel.coreModel.getParameterValueById(id);
-          }
-        });
-      }
-      return original.apply(this, args);
+    const Model = window.PIXI.live2d.Live2DModel;
+    const original = Model.from;
+    Model.from = async function (...args) {
+      const model = await original.apply(this, args);
+      const core = model.internalModel.coreModel;
+      const update = core.update.bind(core);
+      window.__expressionProbe = {};
+      core.update = () => {
+        for (const id of [
+          'Angry',
+          'ParamCheek',
+          'Surprissed',
+          'Smile',
+          'Sad',
+          'Scared',
+        ]) {
+          window.__expressionProbe[id] = core.getParameterValueById(id);
+        }
+        return update();
+      };
+      return model;
     };
   });
   await page.screenshot({ path: output + '/welcome.png' });

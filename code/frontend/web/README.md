@@ -20,7 +20,7 @@ As rotas são `/login` (entrada demonstrativa) e `/` (tela principal). A guarda 
 
 ## Controles
 
-- **Expressões:** neutra e sete reações faciais do rig; legenda demonstrativa para cada reação.
+- **Expressões:** oito atalhos, catálogo de 177 expressões com busca e filtros, composição de emoção/intenção e 12 movimentos. O botão **Mão no queixo / trocar braços** mantém a pose independente do rosto.
 - **Microfone:** ícone como no wireframe; inicia/encerra uma demonstração do movimento da boca, sem som ou acesso ao microfone.
 - **Canal de texto:** registro local das mensagens digitadas. Não gera respostas de IA.
 - **Histórico:** consulta, limpeza e exportação TXT da sessão; não persiste após recarregar a página.
@@ -99,7 +99,7 @@ O Live2D usa `autoUpdate: false` e um ticker privado do renderer. O zoom altera 
 
 O atlas PNG e o rig permanecem intactos. O filtro preserva transparência e contornos, não adiciona um relógio de animação e é destruído com o renderer. A alteração aproxima a paleta da referência enviada; não transforma o traço/texturização do modelo no desenho do anime. O filtro acrescenta uma passagem de renderização WebGL; a conferência headless valida funcionamento, sem substituir a avaliação de fluidez no equipamento do usuário.
 
-Sem conexão com a API de conversa, autenticação, STT, TTS ou banco. O movimento da boca é demonstrativo, sem sincronização fonética. As expressões disponíveis demonstram o rig, sem validar a atuação canônica da persona ou todo o catálogo de movimentos.
+Sem conexão com a API de conversa, autenticação, STT, TTS ou banco. O movimento da boca é demonstrativo, sem sincronização fonética. As expressões demonstram o rig; sua disponibilidade não equivale à aprovação canônica da atuação. O catálogo, a composição de gestos e sua proveniência estão documentados em [acting/README.md](../assets/avatar/acting/README.md).
 
 ## Verificar
 
@@ -107,8 +107,14 @@ Sem conexão com a API de conversa, autenticação, STT, TTS ou banco. O movimen
 npm test
 npm run typecheck
 npm run check:ui
+npm run check:acting
+npm run check:motions
 ```
 
 `npm test` não precisa dos binários privados. `check:ui` requer o modelo, os runtimes locais e Chrome instalado. Usa navegador headless com perfil temporário, bloqueia solicitações externas e grava imagens em `.cache/web-preview/`. Para Edge, configure `UI_BROWSER_CHANNEL=msedge`.
+
+`check:acting` percorre as 177 seleções no rig real, confere faixas e liberação de parâmetros, executa os 12 movimentos e valida a pose dos braços. Também verifica composição, responsividade e hashes dos arquivos originais. Imagens ficam em `.cache/acting-preview/`; esse teste não usa serviços de IA nem voz. `npm run avatar:generate` regenera o catálogo a partir das especificações locais.
+
+`check:motions` confere os movimentos ajustados após o feedback: virada emburrada com olhos fechados, inclinação com aproximação e piscadela, surpresa com recuo e gesto leve dos braços. Verifica parâmetros no rig real, prioridade sobre o cursor, retorno do enquadramento e preservação dos arquivos originais. As capturas ficam em `.cache/motion-preview/`. As poses de cintura, braços cruzados e dedo levantado precisam de novos controles no projeto Cubism; não fazem parte deste modelo compilado.
 
 A conferência cobre renderização, oito opções de reação, desktop, celular, paisagem, texto seguro, preferências, teclado, falha de carregamento e tentativa de recuperação. Inclui remoção do monitor, zoom alternado 41 vezes e trocas de expressão, verificando que o slider não avança o tempo da animação e que o ticker compartilhado permanece desligado. Resultados e limites em [Interface_Live2D_2026-10-09.md](../../../docs/analysis/Interface_Live2D_2026-10-09.md).
