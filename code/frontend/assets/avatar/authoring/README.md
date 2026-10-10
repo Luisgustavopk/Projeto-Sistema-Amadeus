@@ -49,7 +49,25 @@ V4 foi rejeitada por regressão: afinar a linha sobreposta tornou aparente o seg
 
 `npm run avatar:refine-contours` reproduz **v5** por padrão, usando `hair-contour-v5.json`, `reference-hair-outline.mjs` e o render original com hash conferido. O relatório local é `contour-provenance-v5.json`. Depois execute `npm run avatar:review-poses`; **Antes do contorno** mostra v4 → v5 e a legenda identifica a versão do PNG. As versões anteriores permanecem disponíveis. Amostrar o contorno original aproxima o traço, mas não implica identidade exata entre desenhos de poses distintas.
 
-Ainda falta separar as peças com áreas ocultas, preservar os controles faciais, construir as malhas/deformadores e exportar o modelo. Não há `.cmo3`, PSD original ou Cubism Editor disponível na instalação local inspecionada; será necessário obter o projeto de autoria ou montar outro a partir dessa base. `runtimeEnabled` continua `false`.
+Ainda falta completar as peças com áreas ocultas, preservar os controles faciais, construir as malhas/deformadores e exportar o modelo. Não há `.cmo3`, PSD original ou Cubism Editor disponível na instalação local inspecionada; será necessário obter o projeto de autoria ou montar outro a partir dessa base. `runtimeEnabled` continua `false`.
+
+## Separação das poses aprovadas
+
+O usuário aprovou v5 em 10/10/2026. O manifesto registra essa aprovação **somente dos desenhos**. `npm run avatar:prepare-layers`, em `code/frontend/web`, cria `../assets/avatar/local/pose-layers-v1/`, com quatro PSDs de **14 camadas visíveis por pose**, PNGs de cada peça, pontos de articulação, relatório de integridade e galeria offline. Os arquivos de desenho aprovados são lidos com SHA-256 conferido e não são sobrescritos.
+
+`pose-layer-selections-v1.json` contém seleções por polígonos, refinadas por cor nas mãos, pescoço, gravata e mechas. São recortes iniciais para autoria, não uma separação anatômica final aprovada. Cada pixel pertence a uma única camada; partes não selecionadas continuam na base do tronco. O exportador verifica a recomposição completa, inclusive RGB e alfa, contra o PNG aprovado. O leitor independente `psd-tools` confirmou os dados brutos das 56 camadas, sem conversão de perfil ICC, e a reconstrução exata dos desenhos. A prévia achatada do PSD usa RGB sobre branco com alfa, conforme o formato de transparência do PSD; sua quantização de 8 bits não altera os dados das camadas. O leitor confirmou a aparência dessa prévia dentro de 1,5 níveis de canal no fundo branco.
+
+A galeria em `pose-layers-v1/index.html` permite escolher uma pose, isolar/ampliar camadas, ocultar peças, ver os pontos de articulação e abrir o PSD correspondente. O navegador foi verificado nas quatro poses e em tamanho de celular. A legenda explicita as áreas ocultas pendentes; não simula uma animação que esconderia os vazios dos recortes.
+
+Próximas operações de autoria:
+
+1. Refinar os limites dos recortes de punhos, dedos, gola, mangas e mechas, conferindo a peça isolada e a composição.
+2. Completar o tronco sob os antebraços cruzados e a mão na cintura; desenhar extensões de ombros, cotovelos, punhos e gola. Manter os pixels visíveis aprovados numa referência bloqueada e pintar apenas as novas áreas ocultas em camadas próprias.
+3. Separar/reconstruir olhos, pálpebras, sobrancelhas, boca, rosto e cabelo a partir das peças originais. A camada de cabeça preservada ainda é um conjunto achatado, portanto não possui blinking ou lipsync independente.
+4. Importar os PSDs completos em um novo projeto Cubism, montar ArtMeshes, máscaras, deformadores e keyforms do `rig-blueprint.json` e gerar as transições.
+5. Exportar o modelo para uma pasta nova e validar os parâmetros reais, aparência e transições antes de ativá-lo na interface.
+
+O Editor não foi localizado nas pastas padrão inspecionadas. A [API externa documentada do Cubism](https://docs.live2d.com/en/cubism-editor-manual/external-application-integration-api-list/) permite consultar/alterar valores de parâmetros e receber notificações de exportação; a lista consultada não fornece operações para criar ArtMeshes, deformadores ou um novo rig. Portanto, não é uma alternativa de compilação dos PSDs por Node.js. A montagem e a [exportação para MOC3](https://docs.live2d.com/en/cubism-editor-manual/export-moc3-motion3-files/) continuam pendentes no Editor. Nenhum novo CMO3/MOC3 foi produzido nesta etapa.
 
 O usuário informou a origem: [FrancescoCaracciolo/Amadeus](https://github.com/FrancescoCaracciolo/Amadeus#avatar). O `Kurisu.zip` apontado pelo README foi baixado e conferido em 10/10/2026: SHA-256 `bd47f975a21b46e1755957aeede9b87d4e03baddbdc8f563eb3144b55b107051`, igual ao manifesto já existente. Seus 21 registros, incluindo diretórios, não contêm `.cmo3`, `.can3` ou PSD. O pacote antigo `kurisu.tar.gz` também não contém esses projetos. O link do repositório fornece o avatar exportado, não resolve a ausência da autoria editável.
 

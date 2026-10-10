@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Amadeus — revisão das camadas</title><link rel="stylesheet" href="review.css"><script defer src="review.js"></script></head>
+<body>
+  <header><p class="eyebrow">AMADEUS · AUTORIA DO RIG</p><h1>Camadas das poses aprovadas</h1><p>Recortes visíveis, mantendo o desenho aprovado. Inspecione a divisão das peças e os pontos de articulação.</p></header>
+  <nav id="poses" aria-label="Escolher pose"></nav>
+  <div class="tools"><label>Fundo <select id="background"><option value="checker">Quadriculado</option><option value="dark">Escuro</option><option value="light">Claro</option></select></label><label>Visualização <select id="mode"><option value="composite">Composição das camadas</option><option value="approved">Desenho aprovado</option><option value="solo">Camada selecionada</option></select></label><label><input id="fit-layer" type="checkbox" checked> Ampliar peça isolada</label><label><input id="guides" type="checkbox"> Mostrar articulações</label><a id="psd">Abrir PSD em camadas</a></div>
+  <main><section><h2 id="title"></h2><div id="stage" class="stage checker"><canvas id="preview" aria-label="Prévia das camadas"></canvas></div><p id="integrity"></p><p id="error" role="alert"></p></section><aside><h2>Peças visíveis</h2><div id="layers"></div><button id="restore" type="button">Mostrar todas as peças</button><p id="layer-info"></p><h2>Áreas a completar</h2><ul id="occlusions"></ul><p>Deslocar essas peças agora revelaria partes ainda sem desenho. A cabeça permanece em conjunto; olhos, boca e olhar ainda precisam dos controles faciais originais.</p></aside></main>
+  <details><summary>Estado da autoria</summary><ul id="limitations"></ul><p>Estes PSDs não são um projeto CMO3. O novo rig ainda não está no Live2D da interface.</p></details>
+  <script id="manifest" type="application/json">__LAYER_MANIFEST__</script>
+</body></html>

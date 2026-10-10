@@ -1,8 +1,18 @@
 {
-  "version": 1,
-  "status": "authoring-required",
+  "version": 2,
+  "status": "visible-artwork-prepared",
   "runtimeEnabled": false,
-  "identity": "Preservar os desenhos originais do rosto, cabelo, roupa, contornos e sombreamento; usar a paleta atual como referência de cor.",
+  "identity": "Preservar os quatro desenhos aprovados e o contorno v5. Reutilizar as peças originais para reconstruir controles faciais, sem alterar a aparência aprovada.",
+  "artwork": {
+    "approvalManifest": "pose-candidates-v1.json",
+    "approvalManifestVersion": 5,
+    "layerSelections": "pose-layer-selections-v1.json",
+    "localDirectory": "pose-layers-v1",
+    "stage": "visible-cutouts",
+    "hiddenArtworkComplete": false,
+    "facialControlsReady": false,
+    "cubismProjectReady": false
+  },
   "parameters": [
     {
       "id": "ParamArmPose",

@@ -1,0 +1,985 @@
+{
+  "version": 1,
+  "status": "visible-cutouts",
+  "runtimeEnabled": false,
+  "coordinates": "Pixels da imagem aprovada; esquerda/direita se referem à tela.",
+  "ownership": "Camadas exclusivas, sem sobreposição de pixels; a composição deve reproduzir exatamente o PNG aprovado.",
+  "limitations": [
+    "Recortes das partes visíveis, sem inventar pixels escondidos.",
+    "Completar áreas ocultas e sobreposições antes de mover as articulações.",
+    "Cabeça preservada como conjunto; controles faciais ainda devem ser reconstruídos a partir das peças originais.",
+    "Pontos de articulação são guias de autoria, não deformadores Cubism exportados."
+  ],
+  "poses": [
+    {
+      "id": "arms-crossed",
+      "size": [946, 1663],
+      "layers": [
+        {
+          "id": "torso-coat",
+          "label": "Jaleco e tronco",
+          "fallback": true
+        },
+        {
+          "id": "shirt-collar",
+          "label": "Camisa e gola",
+          "polygon": [
+            [420, 498],
+            [523, 496],
+            [570, 616],
+            [558, 670],
+            [553, 693],
+            [519, 822],
+            [470, 855],
+            [404, 745],
+            [393, 625]
+          ]
+        },
+        {
+          "id": "tie",
+          "label": "Gravata",
+          "polygon": [
+            [456, 516],
+            [489, 516],
+            [501, 558],
+            [499, 746],
+            [498, 802],
+            [472, 839],
+            [451, 806],
+            [451, 590],
+            [447, 548]
+          ],
+          "colourSelection": "tie"
+        },
+        {
+          "id": "arm-upper-left",
+          "label": "Braço superior esquerdo",
+          "polygon": [
+            [260, 608],
+            [311, 631],
+            [332, 719],
+            [328, 828],
+            [272, 843],
+            [246, 888],
+            [220, 926],
+            [208, 904],
+            [225, 741],
+            [243, 668]
+          ]
+        },
+        {
+          "id": "arm-upper-right",
+          "label": "Braço superior direito",
+          "polygon": [
+            [651, 610],
+            [694, 614],
+            [721, 718],
+            [740, 912],
+            [679, 931],
+            [633, 916],
+            [631, 873],
+            [634, 800]
+          ]
+        },
+        {
+          "id": "forearm-back",
+          "label": "Antebraço atrás",
+          "polygon": [
+            [622, 912],
+            [736, 905],
+            [738, 960],
+            [717, 1018],
+            [677, 1041],
+            [490, 1049],
+            [474, 1008],
+            [563, 1004],
+            [581, 937]
+          ]
+        },
+        {
+          "id": "hand-back",
+          "label": "Mão atrás",
+          "polygon": [
+            [245, 859],
+            [256, 848],
+            [258, 835],
+            [260, 826],
+            [280, 816],
+            [303, 820],
+            [324, 829],
+            [338, 847],
+            [351, 879],
+            [321, 891],
+            [296, 901],
+            [264, 890],
+            [242, 881]
+          ],
+          "colourSelection": "skin"
+        },
+        {
+          "id": "forearm-front",
+          "label": "Antebraço à frente",
+          "polygon": [
+            [329, 893],
+            [390, 885],
+            [554, 865],
+            [562, 1007],
+            [260, 1022],
+            [242, 1013],
+            [227, 964],
+            [217, 923]
+          ]
+        },
+        {
+          "id": "cuff-front",
+          "label": "Punho da manga à frente",
+          "polygon": [
+            [550, 865],
+            [568, 862],
+            [581, 899],
+            [582, 941],
+            [568, 988],
+            [562, 1007],
+            [553, 1008]
+          ]
+        },
+        {
+          "id": "hand-front",
+          "label": "Mão à frente",
+          "polygon": [
+            [570, 868],
+            [629, 879],
+            [639, 890],
+            [630, 914],
+            [584, 926],
+            [581, 895]
+          ],
+          "colourSelection": "skin"
+        },
+        {
+          "id": "head",
+          "label": "Cabeça preservada",
+          "polygon": [
+            [289, 100],
+            [651, 100],
+            [650, 602],
+            [577, 615],
+            [572, 548],
+            [522, 494],
+            [434, 497],
+            [414, 546],
+            [365, 573],
+            [309, 600]
+          ],
+          "hairOnlyBelowY": 507
+        },
+        {
+          "id": "neck",
+          "label": "Pescoço",
+          "polygon": [
+            [428, 483],
+            [441, 491],
+            [470, 505],
+            [481, 501],
+            [512, 486],
+            [521, 480],
+            [521, 497],
+            [503, 508],
+            [479, 517],
+            [469, 515],
+            [447, 505],
+            [430, 497]
+          ],
+          "colourSelection": "skin"
+        },
+        {
+          "id": "hair-front-left",
+          "label": "Mecha frontal esquerda",
+          "polygon": [
+            [342, 403],
+            [366, 422],
+            [385, 566],
+            [406, 688],
+            [420, 745],
+            [404, 713],
+            [385, 671],
+            [365, 610],
+            [351, 540]
+          ],
+          "colourSelection": "hair"
+        },
+        {
+          "id": "hair-front-right",
+          "label": "Mecha frontal direita",
+          "polygon": [
+            [578, 428],
+            [600, 468],
+            [630, 540],
+            [639, 588],
+            [626, 639],
+            [594, 693],
+            [587, 738],
+            [616, 779],
+            [589, 774],
+            [565, 756],
+            [545, 716],
+            [549, 667],
+            [568, 626],
+            [580, 579]
+          ],
+          "colourSelection": "hair"
+        }
+      ],
+      "joints": {
+        "neck": [476, 525],
+        "shoulder-left": [291, 673],
+        "elbow-left": [249, 977],
+        "wrist-left": [570, 922],
+        "shoulder-right": [672, 675],
+        "elbow-right": [704, 982],
+        "wrist-right": [326, 880]
+      },
+      "occlusions": [
+        "Tronco sob os dois antebraços",
+        "Manga atrás dos dedos da mão esquerda",
+        "Extensões de manga e punho nas articulações",
+        "Camisa e gola sob as mechas"
+      ]
+    },
+    {
+      "id": "hand-on-hip",
+      "size": [935, 1683],
+      "layers": [
+        {
+          "id": "torso-coat",
+          "label": "Jaleco e tronco",
+          "fallback": true
+        },
+        {
+          "id": "shirt-collar",
+          "label": "Camisa e gola",
+          "polygon": [
+            [420, 546],
+            [527, 549],
+            [571, 648],
+            [566, 713],
+            [539, 807],
+            [484, 901],
+            [403, 773],
+            [400, 650]
+          ]
+        },
+        {
+          "id": "tie",
+          "label": "Gravata",
+          "polygon": [
+            [454, 574],
+            [486, 573],
+            [500, 615],
+            [499, 798],
+            [499, 854],
+            [477, 891],
+            [455, 855],
+            [453, 635],
+            [447, 607]
+          ],
+          "colourSelection": "tie"
+        },
+        {
+          "id": "arm-left",
+          "label": "Manga esquerda",
+          "polygon": [
+            [270, 647],
+            [306, 665],
+            [330, 831],
+            [308, 1033],
+            [288, 1207],
+            [269, 1382],
+            [228, 1402],
+            [168, 1379],
+            [157, 1337],
+            [217, 980],
+            [242, 775]
+          ]
+        },
+        {
+          "id": "cuff-left",
+          "label": "Punho esquerdo",
+          "polygon": [
+            [166, 1348],
+            [221, 1380],
+            [271, 1374],
+            [267, 1399],
+            [228, 1415],
+            [181, 1401],
+            [165, 1383]
+          ]
+        },
+        {
+          "id": "hand-left",
+          "label": "Mão esquerda",
+          "polygon": [
+            [180, 1383],
+            [230, 1400],
+            [256, 1434],
+            [261, 1452],
+            [226, 1573],
+            [215, 1595],
+            [185, 1556],
+            [171, 1501]
+          ],
+          "colourSelection": "skin"
+        },
+        {
+          "id": "arm-upper-right",
+          "label": "Braço superior direito",
+          "polygon": [
+            [639, 648],
+            [674, 660],
+            [716, 740],
+            [778, 843],
+            [818, 906],
+            [793, 970],
+            [742, 952],
+            [689, 875],
+            [630, 789]
+          ]
+        },
+        {
+          "id": "forearm-right",
+          "label": "Antebraço direito",
+          "polygon": [
+            [801, 909],
+            [856, 925],
+            [854, 947],
+            [817, 1008],
+            [784, 1053],
+            [740, 1100],
+            [704, 1085],
+            [674, 1048],
+            [689, 1019],
+            [751, 951]
+          ]
+        },
+        {
+          "id": "cuff-right",
+          "label": "Punho direito",
+          "polygon": [
+            [675, 1039],
+            [695, 1047],
+            [721, 1067],
+            [742, 1105],
+            [725, 1136],
+            [698, 1138],
+            [682, 1105],
+            [662, 1075]
+          ]
+        },
+        {
+          "id": "hand-right",
+          "label": "Mão na cintura",
+          "polygon": [
+            [655, 1027],
+            [687, 1037],
+            [704, 1064],
+            [697, 1099],
+            [681, 1128],
+            [652, 1145],
+            [625, 1142],
+            [598, 1137],
+            [571, 1140],
+            [559, 1129],
+            [561, 1115],
+            [545, 1113],
+            [536, 1105],
+            [539, 1095],
+            [558, 1080],
+            [571, 1066],
+            [589, 1050],
+            [605, 1041],
+            [623, 1033],
+            [638, 1037]
+          ],
+          "colourSelection": "skin"
+        },
+        {
+          "id": "head",
+          "label": "Cabeça preservada",
+          "polygon": [
+            [280, 165],
+            [647, 165],
+            [647, 626],
+            [585, 649],
+            [570, 600],
+            [526, 548],
+            [421, 547],
+            [413, 581],
+            [374, 608],
+            [307, 632]
+          ],
+          "hairOnlyBelowY": 548
+        },
+        {
+          "id": "neck",
+          "label": "Pescoço",
+          "polygon": [
+            [432, 527],
+            [452, 536],
+            [475, 546],
+            [493, 541],
+            [520, 526],
+            [524, 541],
+            [506, 550],
+            [481, 558],
+            [472, 557],
+            [447, 548],
+            [431, 539]
+          ],
+          "colourSelection": "skin"
+        },
+        {
+          "id": "hair-front-left",
+          "label": "Mecha frontal esquerda",
+          "polygon": [
+            [344, 450],
+            [363, 469],
+            [374, 567],
+            [391, 664],
+            [411, 741],
+            [407, 730],
+            [386, 695],
+            [366, 632],
+            [351, 570]
+          ],
+          "colourSelection": "hair"
+        },
+        {
+          "id": "hair-front-right",
+          "label": "Mecha frontal direita",
+          "polygon": [
+            [577, 468],
+            [596, 508],
+            [621, 571],
+            [629, 624],
+            [610, 678],
+            [590, 721],
+            [583, 761],
+            [605, 796],
+            [578, 791],
+            [551, 769],
+            [540, 739],
+            [546, 693],
+            [567, 648],
+            [575, 603]
+          ],
+          "colourSelection": "hair"
+        }
+      ],
+      "joints": {
+        "neck": [474, 568],
+        "shoulder-left": [289, 719],
+        "elbow-left": [218, 1116],
+        "wrist-left": [219, 1393],
+        "shoulder-right": [660, 719],
+        "elbow-right": [815, 939],
+        "wrist-right": [683, 1085]
+      },
+      "occlusions": [
+        "Jaleco sob a mão na cintura",
+        "Continuidade da manga no cotovelo dobrado",
+        "Continuidade do punho sob a mão",
+        "Camisa e gola sob as mechas"
+      ]
+    },
+    {
+      "id": "idea-pointing",
+      "size": [935, 1683],
+      "layers": [
+        {
+          "id": "torso-coat",
+          "label": "Jaleco e tronco",
+          "fallback": true
+        },
+        {
+          "id": "shirt-collar",
+          "label": "Camisa e gola",
+          "polygon": [
+            [423, 596],
+            [528, 595],
+            [578, 702],
+            [563, 775],
+            [537, 858],
+            [480, 912],
+            [407, 805],
+            [399, 716]
+          ]
+        },
+        {
+          "id": "tie",
+          "label": "Gravata",
+          "polygon": [
+            [453, 625],
+            [486, 622],
+            [499, 665],
+            [500, 847],
+            [498, 875],
+            [475, 904],
+            [450, 871],
+            [450, 686],
+            [446, 655]
+          ],
+          "colourSelection": "tie"
+        },
+        {
+          "id": "arm-upper-left",
+          "label": "Braço superior esquerdo",
+          "polygon": [
+            [280, 695],
+            [324, 717],
+            [328, 858],
+            [328, 946],
+            [292, 1004],
+            [252, 1036],
+            [206, 994],
+            [206, 918],
+            [260, 805]
+          ]
+        },
+        {
+          "id": "forearm-left",
+          "label": "Antebraço levantado",
+          "polygon": [
+            [158, 799],
+            [186, 779],
+            [246, 760],
+            [268, 811],
+            [296, 902],
+            [315, 970],
+            [283, 1016],
+            [249, 1034],
+            [200, 989]
+          ]
+        },
+        {
+          "id": "cuff-left",
+          "label": "Punho levantado",
+          "polygon": [
+            [158, 803],
+            [177, 770],
+            [222, 744],
+            [252, 752],
+            [258, 775],
+            [224, 804],
+            [177, 820]
+          ]
+        },
+        {
+          "id": "hand-left",
+          "label": "Mão com indicador",
+          "polygon": [
+            [171, 701],
+            [180, 665],
+            [196, 649],
+            [203, 601],
+            [197, 570],
+            [202, 560],
+            [214, 563],
+            [224, 589],
+            [230, 636],
+            [239, 626],
+            [245, 630],
+            [252, 651],
+            [263, 670],
+            [263, 707],
+            [250, 754],
+            [223, 775],
+            [191, 775],
+            [189, 741]
+          ],
+          "colourSelection": "skin"
+        },
+        {
+          "id": "arm-right",
+          "label": "Manga direita",
+          "polygon": [
+            [638, 720],
+            [680, 730],
+            [702, 845],
+            [712, 1036],
+            [748, 1348],
+            [759, 1397],
+            [746, 1422],
+            [700, 1440],
+            [675, 1405],
+            [625, 1050],
+            [622, 870]
+          ]
+        },
+        {
+          "id": "cuff-right",
+          "label": "Punho direito",
+          "polygon": [
+            [674, 1384],
+            [714, 1404],
+            [757, 1391],
+            [758, 1419],
+            [731, 1438],
+            [685, 1432]
+          ]
+        },
+        {
+          "id": "hand-right",
+          "label": "Mão direita",
+          "polygon": [
+            [682, 1428],
+            [731, 1431],
+            [744, 1468],
+            [736, 1506],
+            [711, 1538],
+            [700, 1545],
+            [686, 1515]
+          ],
+          "colourSelection": "skin"
+        },
+        {
+          "id": "head",
+          "label": "Cabeça preservada",
+          "polygon": [
+            [302, 242],
+            [632, 242],
+            [633, 688],
+            [571, 719],
+            [566, 653],
+            [524, 596],
+            [427, 597],
+            [408, 642],
+            [365, 672],
+            [320, 688]
+          ],
+          "hairOnlyBelowY": 606
+        },
+        {
+          "id": "neck",
+          "label": "Pescoço",
+          "polygon": [
+            [430, 582],
+            [449, 592],
+            [474, 604],
+            [491, 599],
+            [520, 582],
+            [525, 595],
+            [506, 608],
+            [480, 618],
+            [470, 616],
+            [447, 607],
+            [430, 596]
+          ],
+          "colourSelection": "skin"
+        },
+        {
+          "id": "hair-front-left",
+          "label": "Mecha frontal esquerda",
+          "polygon": [
+            [350, 484],
+            [371, 499],
+            [386, 625],
+            [408, 732],
+            [422, 770],
+            [404, 742],
+            [382, 691],
+            [365, 637]
+          ],
+          "colourSelection": "hair"
+        },
+        {
+          "id": "hair-front-right",
+          "label": "Mecha frontal direita",
+          "polygon": [
+            [573, 513],
+            [591, 548],
+            [617, 608],
+            [624, 663],
+            [609, 713],
+            [581, 771],
+            [580, 813],
+            [601, 847],
+            [575, 840],
+            [552, 819],
+            [543, 787],
+            [547, 746],
+            [566, 694],
+            [573, 646]
+          ],
+          "colourSelection": "hair"
+        }
+      ],
+      "joints": {
+        "neck": [475, 619],
+        "shoulder-left": [309, 767],
+        "elbow-left": [260, 986],
+        "wrist-left": [214, 781],
+        "shoulder-right": [655, 786],
+        "elbow-right": [697, 1145],
+        "wrist-right": [719, 1423]
+      },
+      "occlusions": [
+        "Manga sob o punho levantado",
+        "Camisa e gola sob as mechas",
+        "Continuidade do cotovelo e dos ombros"
+      ]
+    },
+    {
+      "id": "lean-forward",
+      "size": [935, 1683],
+      "layers": [
+        {
+          "id": "torso-coat",
+          "label": "Jaleco e tronco",
+          "fallback": true
+        },
+        {
+          "id": "shirt-collar",
+          "label": "Camisa e gola em perspectiva",
+          "polygon": [
+            [313, 565],
+            [473, 553],
+            [552, 681],
+            [534, 770],
+            [503, 915],
+            [419, 967],
+            [335, 839],
+            [283, 649]
+          ]
+        },
+        {
+          "id": "tie",
+          "label": "Gravata em perspectiva",
+          "polygon": [
+            [375, 596],
+            [407, 593],
+            [425, 626],
+            [443, 854],
+            [448, 913],
+            [423, 954],
+            [396, 919],
+            [377, 654],
+            [368, 623]
+          ],
+          "colourSelection": "tie"
+        },
+        {
+          "id": "arm-left",
+          "label": "Manga esquerda",
+          "polygon": [
+            [118, 591],
+            [174, 613],
+            [210, 822],
+            [195, 968],
+            [168, 1186],
+            [188, 1380],
+            [177, 1443],
+            [133, 1445],
+            [108, 1404],
+            [99, 1142],
+            [96, 802]
+          ]
+        },
+        {
+          "id": "hand-left",
+          "label": "Mão esquerda",
+          "polygon": [
+            [115, 1430],
+            [171, 1445],
+            [196, 1475],
+            [219, 1562],
+            [219, 1594],
+            [202, 1588],
+            [172, 1546],
+            [142, 1530],
+            [109, 1481]
+          ],
+          "colourSelection": "skin"
+        },
+        {
+          "id": "cuff-left",
+          "label": "Punho esquerdo",
+          "polygon": [
+            [109, 1378],
+            [141, 1404],
+            [190, 1397],
+            [189, 1428],
+            [173, 1448],
+            [137, 1447],
+            [109, 1425]
+          ]
+        },
+        {
+          "id": "arm-upper-right",
+          "label": "Braço superior direito",
+          "polygon": [
+            [645, 551],
+            [685, 563],
+            [722, 624],
+            [833, 700],
+            [925, 769],
+            [921, 802],
+            [885, 839],
+            [806, 811],
+            [718, 749],
+            [675, 701],
+            [622, 638]
+          ]
+        },
+        {
+          "id": "forearm-right",
+          "label": "Antebraço direito",
+          "polygon": [
+            [877, 789],
+            [927, 792],
+            [901, 850],
+            [851, 914],
+            [793, 992],
+            [756, 1074],
+            [716, 1057],
+            [687, 1023],
+            [706, 986],
+            [783, 891]
+          ]
+        },
+        {
+          "id": "cuff-right",
+          "label": "Punho direito",
+          "polygon": [
+            [692, 987],
+            [716, 1001],
+            [735, 1027],
+            [758, 1072],
+            [738, 1090],
+            [708, 1087],
+            [691, 1043],
+            [676, 1016]
+          ]
+        },
+        {
+          "id": "hand-right",
+          "label": "Mão na cintura",
+          "polygon": [
+            [654, 951],
+            [676, 961],
+            [691, 984],
+            [715, 1013],
+            [714, 1041],
+            [696, 1064],
+            [670, 1083],
+            [642, 1094],
+            [615, 1101],
+            [595, 1098],
+            [573, 1104],
+            [560, 1094],
+            [559, 1082],
+            [550, 1077],
+            [555, 1060],
+            [576, 1043],
+            [594, 1025],
+            [616, 1002],
+            [641, 1003],
+            [650, 996],
+            [636, 981],
+            [629, 963],
+            [635, 956]
+          ],
+          "colourSelection": "skin"
+        },
+        {
+          "id": "head",
+          "label": "Cabeça preservada em perspectiva",
+          "polygon": [
+            [135, 72],
+            [620, 72],
+            [620, 529],
+            [545, 559],
+            [506, 591],
+            [461, 558],
+            [316, 558],
+            [292, 590],
+            [222, 610],
+            [158, 576]
+          ],
+          "hairOnlyBelowY": 579
+        },
+        {
+          "id": "neck",
+          "label": "Pescoço em perspectiva",
+          "polygon": [
+            [315, 546],
+            [343, 558],
+            [387, 575],
+            [405, 570],
+            [457, 543],
+            [459, 558],
+            [430, 579],
+            [398, 589],
+            [384, 587],
+            [349, 574],
+            [321, 560]
+          ],
+          "colourSelection": "skin"
+        },
+        {
+          "id": "hair-front-left",
+          "label": "Mecha frontal esquerda",
+          "polygon": [
+            [204, 423],
+            [228, 451],
+            [248, 565],
+            [277, 679],
+            [314, 770],
+            [302, 751],
+            [276, 710],
+            [249, 648],
+            [225, 578]
+          ],
+          "colourSelection": "hair"
+        },
+        {
+          "id": "hair-front-right",
+          "label": "Mecha frontal direita",
+          "polygon": [
+            [526, 440],
+            [557, 485],
+            [585, 531],
+            [608, 582],
+            [608, 637],
+            [584, 703],
+            [556, 756],
+            [552, 807],
+            [581, 846],
+            [552, 836],
+            [530, 817],
+            [515, 787],
+            [514, 746],
+            [533, 698],
+            [548, 650],
+            [548, 599]
+          ],
+          "colourSelection": "hair"
+        }
+      ],
+      "joints": {
+        "neck": [392, 595],
+        "shoulder-left": [154, 665],
+        "elbow-left": [132, 1116],
+        "wrist-left": [151, 1434],
+        "shoulder-right": [668, 635],
+        "elbow-right": [895, 802],
+        "wrist-right": [698, 1026]
+      },
+      "occlusions": [
+        "Jaleco sob a mão na cintura",
+        "Gola e ombros em perspectiva sob o cabelo",
+        "Extensões no cotovelo dobrado e nos punhos",
+        "Tronco completo para keyform intermediária da inclinação"
+      ]
+    }
+  ]
+}
