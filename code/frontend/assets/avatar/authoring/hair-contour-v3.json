@@ -1,0 +1,37 @@
+{
+  "version": 3,
+  "method": "local-pixel-edit",
+  "authorization": "Edição local do contorno autorizada pelo usuário; v3 responde ao feedback de que a linha v2 ficou insuficiente.",
+  "algorithm": "continuous-outline",
+  "alphaPolicy": "edge-only",
+  "colour": [23, 13, 14],
+  "alphaThreshold": 128,
+  "changes": [
+    {
+      "id": "hand-on-hip",
+      "source": "hand-on-hip-v2.png",
+      "sourceSha256": "f1c3bbae75c2c4452c39f45f67c8b54edaf34e58dcfdeeaa5aca3c89a5a11abe",
+      "output": "hand-on-hip-v3.png",
+      "region": [280, 165, 647, 615],
+      "seed": [465, 220],
+      "widthPixels": 3.5,
+      "endFadePixels": 24
+    },
+    {
+      "id": "lean-forward",
+      "source": "lean-forward-v2.png",
+      "sourceSha256": "4b2b7e94189ce0585107a87511180b35c130cc3d18876c69d6238629d9360da7",
+      "output": "lean-forward-v3.png",
+      "region": [135, 72, 620, 502],
+      "seed": [387, 130],
+      "widthPixels": 4,
+      "endFadePixels": 24
+    }
+  ],
+  "invariants": [
+    "Dimensões e enquadramento iguais à versão aprovada.",
+    "Pixels de rosto, olhos, fios internos, roupa e pose preservados.",
+    "Alterações somente no perímetro do cabelo e na franja semitransparente dessa região.",
+    "Sem expansão do desenho para pixels originalmente transparentes."
+  ]
+}

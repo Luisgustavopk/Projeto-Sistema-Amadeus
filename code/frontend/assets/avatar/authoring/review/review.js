@@ -7,7 +7,7 @@
   let current = manifest.poses[0];
   let revision = 0;
 
-  // Measured alpha bounds only frame the preview; PNG files are never rewritten.
+  // Fixed artwork bounds keep before/after aligned; PNG files are never rewritten.
   const bounds = new Map([['original-reference.png', manifest.referenceBounds], ...manifest.poses.map((p) => [p.file, p.bounds])]);
   for (const pose of manifest.poses) if (pose.previousFile) bounds.set(pose.previousFile, pose.bounds);
   function load(file) {
@@ -42,7 +42,7 @@
     try {
       const previous = byId('comparison-reference').value === 'previous' && current.previousFile;
       const reference = previous || 'original-reference.png';
-      byId('reference-caption').textContent = previous ? 'Versão aprovada · antes da correção do contorno' : 'Avatar original · render sem efeitos da interface';
+      byId('reference-caption').textContent = previous ? 'Revisão anterior · antes da nova correção do contorno' : 'Avatar original · render sem efeitos da interface';
       byId('reference-link').href = reference;
       const assets = await Promise.all([load(reference), load(current.file)]);
       if (token !== revision) return;
