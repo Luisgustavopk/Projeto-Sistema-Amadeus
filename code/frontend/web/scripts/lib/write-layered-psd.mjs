@@ -40,18 +40,35 @@ function mergedPreviewChannels(rgba) {
   return data;
 }
 
+// Inputs and PSD records are back-to-front. A folder has a bounding divider
+// below its children and its folder record above them.
+function folderRecords(layers) {
+  return layers.flatMap(layer => {
+    if (!Array.isArray(layer.layers)) return [layer];
+    if (!layer.layers.length) throw new Error('Empty PSD folder: ' + layer.id);
+    const marker = { left: 0, top: 0, width: 0, height: 0, blend: 'pass' };
+    return [
+      { ...marker, id: layer.id + '-end', sectionDivider: 3, visible: false },
+      ...folderRecords(layer.layers),
+      { ...marker, id: layer.id, sectionDivider: 1, visible: layer.visible },
+    ];
+  });
+}
+
 /** PSD v1, 8-bit RGBA, with named raster layers. This is not a Cubism project. */
 export function writeLayeredPsd({ width, height, layers, merged, icc }) {
   if (width > 30000 || height > 30000 || merged.length !== width * height * 4)
     throw new RangeError('Invalid PSD dimensions');
   const records = [],
     pixels = [];
-  // PSD records are ordered front to back; exports are back to front.
-  for (const layer of [...layers].reverse()) {
-    const raw = Buffer.from(layer.rgba, 'base64');
+  const flattened = folderRecords(layers);
+  if (!flattened.length || flattened.length > 32767)
+    throw new RangeError('Invalid PSD layer count');
+  for (const layer of flattened) {
+    const raw = layer.sectionDivider ? Buffer.alloc(0) : Buffer.from(layer.rgba, 'base64');
     if (raw.length !== layer.width * layer.height * 4)
       throw new RangeError(layer.id);
-    const streams = channels(raw).map((c) =>
+    const streams = layer.sectionDivider ? [] : channels(raw).map((c) =>
       Buffer.concat([u16(2), deflateSync(c)]),
     );
     const ascii = Buffer.from(layer.id, 'ascii').subarray(0, 255);
@@ -69,6 +86,10 @@ export function writeLayeredPsd({ width, height, layers, merged, icc }) {
       padded,
       Buffer.from('8BIMluni'),
       block(Buffer.concat([u32(layer.id.length), unicode])),
+      ...(layer.sectionDivider ? [
+        Buffer.from('8BIMlsct'),
+        block(Buffer.concat([u32(layer.sectionDivider), Buffer.from('8BIMpass')])),
+      ] : []),
     ]);
     records.push(
       Buffer.concat([
@@ -76,23 +97,25 @@ export function writeLayeredPsd({ width, height, layers, merged, icc }) {
         i32(layer.left),
         i32(layer.top + layer.height),
         i32(layer.left + layer.width),
-        u16(4),
+        u16(streams.length),
         ...streams.flatMap((s, c) => [i16(c === 3 ? -1 : c), u32(s.length)]),
         Buffer.from(
           '8BIM' +
-            (layer.blend === 'multiply'
+            (layer.blend === 'pass'
+              ? 'pass'
+              : layer.blend === 'multiply'
               ? 'mul '
               : layer.blend === 'add'
                 ? 'lddg'
                 : 'norm'),
         ),
-        Buffer.from([255, 0, 0, 0]),
+        Buffer.from([255, 0, layer.visible === false ? 2 : 0, 0]),
         block(extra),
       ]),
     );
     pixels.push(...streams);
   }
-  const info = Buffer.concat([i16(-layers.length), ...records, ...pixels]);
+  const info = Buffer.concat([i16(-flattened.length), ...records, ...pixels]);
   const layerInfo =
     info.length % 2 ? Buffer.concat([info, Buffer.alloc(1)]) : info;
   const resources = Buffer.concat([
