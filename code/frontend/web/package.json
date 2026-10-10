@@ -15,7 +15,8 @@
     "check:acting": "npm run build && node scripts/check-acting.mjs",
     "check:motions": "npm run build && node scripts/check-motions.mjs",
     "avatar:generate": "node ../assets/avatar/acting/generate.mjs",
-    "avatar:export-base": "npm run build && node scripts/export-authoring-base.mjs"
+    "avatar:export-base": "npm run build && node scripts/export-authoring-base.mjs",
+    "avatar:review-poses": "node scripts/prepare-pose-review.mjs"
   },
   "engines": {
     "node": ">=24 <25"

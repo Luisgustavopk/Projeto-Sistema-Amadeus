@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Amadeus — revisão dos novos desenhos</title>
+    <link rel="stylesheet" href="review.css" />
+    <script defer src="review.js"></script>
+  </head>
+  <body>
+    <header>
+      <p class="eyebrow">AMADEUS · AUTORIA LOCAL</p>
+      <h1>Novos desenhos de poses</h1>
+      <p>Compare o gesto e o traço com o avatar original. Estes desenhos aguardam revisão e ainda não estão no Live2D.</p>
+    </header>
+    <nav id="poses" aria-label="Escolher pose"></nav>
+    <div class="tools">
+      <div class="control"><label for="background">Fundo</label><select id="background"><option value="checker">Quadriculado</option><option value="dark">Escuro</option><option value="light">Claro</option></select></div>
+      <div class="control"><label for="framing">Enquadramento</label><select id="framing"><option value="full">Pose inteira</option><option value="face">Rosto e cabelo</option></select></div>
+      <button id="export" type="button">Exportar minhas notas</button>
+    </div>
+    <main>
+      <h2 id="pose-title"></h2>
+      <p id="check"></p>
+      <div class="comparison">
+        <figure><figcaption>Avatar original · render sem efeitos da interface</figcaption><div class="stage checker"><canvas id="original" aria-label="Avatar original"></canvas></div><a href="original-reference.png" target="_blank" rel="noopener">Abrir original</a></figure>
+        <figure><figcaption>Desenho candidato · precisa de revisão</figcaption><div class="stage checker"><canvas id="candidate" aria-label="Desenho candidato"></canvas></div><a id="candidate-link" target="_blank" rel="noopener">Abrir PNG candidato</a></figure>
+      </div>
+      <p id="observation"></p>
+      <section class="notes">
+        <h2>Minha revisão</h2>
+        <div class="control"><label for="verdict">Desenho</label><select id="verdict"><option value="pending">Ainda não avaliado</option><option value="revise">Precisa de ajustes</option><option value="reject">Rejeitado</option><option value="accept-artwork">Aprovado como desenho</option></select></div>
+        <label>O que manter ou corrigir<textarea id="notes" rows="4" placeholder="Ex.: mão correta, mas a dobra da manga está diferente do avatar."></textarea></label>
+        <p>As notas ficam nesta página até você exportar. Aprovar um desenho não ativa nem valida um rig.</p>
+      </section>
+      <details><summary>Limites desta entrega</summary><ul id="limitations"></ul></details>
+      <p id="error" role="alert"></p>
+    </main>
+    <script id="manifest" type="application/json">__POSE_MANIFEST__</script>
+  </body>
+</html>
