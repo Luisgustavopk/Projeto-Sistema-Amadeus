@@ -9,13 +9,15 @@
 
   // Fixed artwork bounds keep before/after aligned; PNG files are never rewritten.
   const bounds = new Map([['original-reference.png', manifest.referenceBounds], ...manifest.poses.map((p) => [p.file, p.bounds])]);
+  const hairBounds = new Map([['original-reference.png', manifest.referenceHairBounds], ...manifest.poses.map((p) => [p.file, p.hairBounds])]);
   for (const pose of manifest.poses) if (pose.previousFile) bounds.set(pose.previousFile, pose.bounds);
+  for (const pose of manifest.poses) if (pose.previousFile) hairBounds.set(pose.previousFile, pose.hairBounds);
   function load(file) {
     if (images.has(file)) return images.get(file);
     const promise = new Promise((resolve, reject) => {
       const image = new Image();
       image.onload = () => {
-        resolve({ image, bounds: bounds.get(file) || [0, 0, image.naturalWidth, image.naturalHeight] });
+        resolve({ image, bounds: bounds.get(file) || [0, 0, image.naturalWidth, image.naturalHeight], hairBounds: hairBounds.get(file) });
       };
       image.onerror = () => reject(new Error('Não foi possível abrir ' + file));
       image.src = file;
@@ -28,7 +30,7 @@
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.round(canvas.clientWidth * ratio);
     canvas.height = Math.round(canvas.clientHeight * ratio);
-    const [x, y, width, fullHeight] = asset.bounds;
+    const [x, y, width, fullHeight] = byId('framing').value === 'hair' && asset.hairBounds ? asset.hairBounds : asset.bounds;
     const height = byId('framing').value === 'face' ? fullHeight * .43 : fullHeight;
     const scale = Math.min((canvas.width - 24 * ratio) / width, (canvas.height - 24 * ratio) / height);
     const ctx = canvas.getContext('2d');
@@ -60,6 +62,8 @@
     byId('candidate-link').href = pose.file;
     byId('comparison-reference').options[1].disabled = !pose.previousFile;
     if (!pose.previousFile) byId('comparison-reference').value = 'original';
+    byId('framing').options[2].disabled = !pose.hairBounds;
+    if (!pose.hairBounds && byId('framing').value === 'hair') byId('framing').value = 'face';
     byId('verdict').value = review.verdict;
     byId('notes').value = review.notes;
     for (const button of byId('poses').children) button.setAttribute('aria-pressed', String(button.dataset.pose === pose.id));
