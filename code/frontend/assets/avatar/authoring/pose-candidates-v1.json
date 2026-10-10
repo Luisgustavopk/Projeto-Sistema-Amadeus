@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "date": "2026-10-10",
+  "status": "visual-review-required",
+  "runtimeEnabled": false,
+  "generationMode": "built-in-imagegen",
+  "artworkFormat": "flattened-transparent-png",
+  "identityVerified": false,
+  "reference": "authoring-v1/neutral/current-palette-reference.png",
+  "referenceBounds": [196, 396, 576, 1404],
+  "referenceSha256": "8618a57f32e12669785563a7ab6d4c7e73798350a25ee9103d836be9e126a080",
+  "limitations": [
+    "O desenho gerado não preserva os pixels originais do rosto e cabelo; não foi aprovado como idêntico ao avatar.",
+    "Os PNGs são candidatos de desenho, sem peças separadas, pintura oculta, malhas, deformadores ou keyforms.",
+    "Não há novo CMO3 ou MOC3; nenhuma dessas poses foi ativada no avatar atual."
+  ],
+  "poses": [
+    {
+      "id": "arms-crossed",
+      "label": "Braços cruzados",
+      "file": "arms-crossed-v1.png",
+      "bounds": [206, 115, 533, 1548],
+      "sha256": "1aa587681bfb22b9cbb6b660510ed674d14d72db9ad08282ccbae243d2b549e9",
+      "check": "Conferir cruzamento dos antebraços, mãos, punhos e dobras do jaleco.",
+      "observation": "O cruzamento está legível. Contornos e acabamento ainda precisam ser comparados com o original."
+    },
+    {
+      "id": "hand-on-hip",
+      "label": "Mão na cintura",
+      "file": "hand-on-hip-v1.png",
+      "bounds": [161, 181, 693, 1502],
+      "sha256": "00c1f824cfe1556bbc6be5aeefdbbea0a639cafb73aa1f63b2fcea706c911fe3",
+      "check": "Conferir contato da mão com a cintura, dedos e continuidade entre ombro, cotovelo e punho.",
+      "observation": "A mão está apoiada na cintura e o cotovelo está afastado. A manga e o contorno da mão precisam de revisão."
+    },
+    {
+      "id": "idea-pointing",
+      "label": "Indicador levantado",
+      "file": "idea-pointing-v1.png",
+      "bounds": [155, 252, 599, 1431],
+      "sha256": "b184b19e441c70226c063a7866569a44cb8a9851737476f958e655fcee966e1b",
+      "check": "Conferir anatomia da mão, dedo indicador e proporção da mão em relação ao rosto.",
+      "observation": "O indicador está levantado e os demais dedos estão dobrados. Conferir espessura do traço nos dedos."
+    },
+    {
+      "id": "lean-forward",
+      "label": "Inclinação com mão na cintura",
+      "file": "lean-forward-v1.png",
+      "bounds": [100, 87, 823, 1596],
+      "sha256": "860b675834e69bc5f14907be0cc343fadf979cc0e258fb0b02241a5ad8cf5766",
+      "check": "Conferir profundidade dos ombros, gola e tronco, mantendo a mão na cintura e a identidade original.",
+      "observation": "Há perspectiva do tronco e mão na cintura. O rosto gerado não deve substituir as peças faciais originais; piscadela e sorriso continuam independentes."
+    }
+  ]
+}
