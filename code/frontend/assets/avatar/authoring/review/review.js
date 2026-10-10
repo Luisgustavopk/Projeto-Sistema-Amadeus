@@ -9,6 +9,7 @@
 
   // Measured alpha bounds only frame the preview; PNG files are never rewritten.
   const bounds = new Map([['original-reference.png', manifest.referenceBounds], ...manifest.poses.map((p) => [p.file, p.bounds])]);
+  for (const pose of manifest.poses) if (pose.previousFile) bounds.set(pose.previousFile, pose.bounds);
   function load(file) {
     if (images.has(file)) return images.get(file);
     const promise = new Promise((resolve, reject) => {
@@ -39,7 +40,11 @@
     const token = ++revision;
     byId('error').textContent = '';
     try {
-      const assets = await Promise.all([load('original-reference.png'), load(current.file)]);
+      const previous = byId('comparison-reference').value === 'previous' && current.previousFile;
+      const reference = previous || 'original-reference.png';
+      byId('reference-caption').textContent = previous ? 'Versão aprovada · antes da correção do contorno' : 'Avatar original · render sem efeitos da interface';
+      byId('reference-link').href = reference;
+      const assets = await Promise.all([load(reference), load(current.file)]);
       if (token !== revision) return;
       paint(byId('original'), assets[0]);
       paint(byId('candidate'), assets[1]);
@@ -53,6 +58,8 @@
     byId('check').textContent = pose.check;
     byId('observation').textContent = pose.observation;
     byId('candidate-link').href = pose.file;
+    byId('comparison-reference').options[1].disabled = !pose.previousFile;
+    if (!pose.previousFile) byId('comparison-reference').value = 'original';
     byId('verdict').value = review.verdict;
     byId('notes').value = review.notes;
     for (const button of byId('poses').children) button.setAttribute('aria-pressed', String(button.dataset.pose === pose.id));
@@ -71,12 +78,13 @@
     for (const stage of document.querySelectorAll('.stage')) stage.className = 'stage ' + byId('background').value;
   });
   byId('framing').addEventListener('change', () => void render());
+  byId('comparison-reference').addEventListener('change', () => void render());
   byId('verdict').addEventListener('change', () => { reviews.get(current.id).verdict = byId('verdict').value; });
   byId('notes').addEventListener('input', () => { reviews.get(current.id).notes = byId('notes').value; });
   byId('export').addEventListener('click', () => {
     const data = { version: 1, manifestVersion: manifest.version, date: new Date().toISOString(), runtimeEnabled: false, reviews: manifest.poses.map((p) => ({ id: p.id, file: p.file, sha256: p.sha256, ...reviews.get(p.id) })) };
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2) + '\n'], { type: 'application/json' }));
-    const a = document.createElement('a'); a.href = url; a.download = 'revisao-poses-v1.json'; a.click();
+    const a = document.createElement('a'); a.href = url; a.download = 'revisao-poses-v' + manifest.version + '.json'; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
   new ResizeObserver(() => void render()).observe(byId('original').parentElement);
