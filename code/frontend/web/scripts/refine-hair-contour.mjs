@@ -5,12 +5,16 @@ import { refineContinuousHairOutline } from './lib/continuous-hair-outline.mjs';
 
 const authoring = new URL('../../assets/avatar/authoring/', import.meta.url);
 const local = new URL('../../assets/avatar/local/pose-candidates-v1/', import.meta.url);
-const version = process.argv[2] ?? '3';
-if (!['2', '3'].includes(version)) throw new Error('Supported contour revisions: 2, 3');
+const version = process.argv[2] ?? '4';
+if (!['2', '3', '4'].includes(version)) throw new Error('Supported contour revisions: 2, 3, 4');
 const spec = JSON.parse(await readFile(new URL('hair-contour-v' + version + '.json', authoring), 'utf8'));
 const hash = (buffer) => createHash('sha256').update(buffer).digest('hex');
 const clamp = (value) => Math.max(0, Math.min(1, value));
 const results = [];
+if (spec.reference) {
+  if (!/^[a-z-]+\.png$/.test(spec.reference)) throw new Error('Invalid reference file name');
+  if (hash(await readFile(new URL(spec.reference, local))) !== spec.referenceSha256) throw new Error('Reference changed');
+}
 
 for (const change of spec.changes) {
   for (const file of [change.source, change.output]) if (!/^[a-z-]+-v[1-9]\d*\.png$/.test(file)) throw new Error('Invalid file name');

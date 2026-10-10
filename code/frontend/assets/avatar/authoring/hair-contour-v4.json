@@ -1,0 +1,44 @@
+{
+  "version": 4,
+  "method": "local-pixel-edit",
+  "authorization": "Edição local apenas no contorno, autorizada pelo usuário. V4 ajusta a linha ao traço mais fino e suave do avatar original.",
+  "algorithm": "continuous-outline",
+  "alphaPolicy": "edge-only",
+  "colour": [44, 20, 16],
+  "strokeOpacity": 0.85,
+  "edgeAlphaFloor": 128,
+  "preserveNearEdgeAlpha": true,
+  "alphaThreshold": 128,
+  "reference": "original-reference.png",
+  "referenceSha256": "8618a57f32e12669785563a7ab6d4c7e73798350a25ee9103d836be9e126a080",
+  "referenceObservation": "Linha castanho-escura de aproximadamente 1–2 pixels no render original, com antialiasing de alfa. Espessura adaptada ao tamanho da cabeça em cada desenho, sem o reforço opaco da v3.",
+  "changes": [
+    {
+      "id": "hand-on-hip",
+      "source": "hand-on-hip-v1.png",
+      "sourceSha256": "00c1f824cfe1556bbc6be5aeefdbbea0a639cafb73aa1f63b2fcea706c911fe3",
+      "output": "hand-on-hip-v4.png",
+      "region": [280, 165, 647, 615],
+      "seed": [465, 220],
+      "widthPixels": 1.7,
+      "endFadePixels": 24
+    },
+    {
+      "id": "lean-forward",
+      "source": "lean-forward-v1.png",
+      "sourceSha256": "860b675834e69bc5f14907be0cc343fadf979cc0e258fb0b02241a5ad8cf5766",
+      "output": "lean-forward-v4.png",
+      "region": [135, 72, 620, 502],
+      "seed": [387, 130],
+      "widthPixels": 2.3,
+      "endFadePixels": 24
+    }
+  ],
+  "invariants": [
+    "Edição a partir dos desenhos v1 aprovados, sem acumular o traço grosso de v3.",
+    "Dimensões, posição e desenho interno intactos.",
+    "Somente borda externa do cabelo e franja semitransparente alteradas.",
+    "Antialiasing original preservado na borda próxima; sem aumentar a opacidade.",
+    "Sem expansão para pixels originalmente transparentes."
+  ]
+}

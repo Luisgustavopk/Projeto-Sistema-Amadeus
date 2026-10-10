@@ -1,17 +1,18 @@
 {
-  "version": 3,
+  "version": 4,
   "date": "2026-10-10",
   "status": "local-contour-refinement",
   "runtimeEnabled": false,
   "generationMode": "built-in-imagegen",
   "artworkFormat": "flattened-transparent-png",
   "identityVerified": false,
-  "userReview": "Desenhos aceitos pelo usuário. A correção v2 do cabelo ficou insuficiente; v3 reforça o contorno e limpa a franja semitransparente nas duas poses com mão na cintura.",
+  "userReview": "Desenhos aceitos pelo usuário. V2 ficou insuficiente e v3 deixou o contorno diferente do original. V4 usa linha mais fina, castanho-escura e com antialiasing preservado, mantendo a limpeza da franja externa.",
   "reference": "authoring-v1/neutral/current-palette-reference.png",
   "referenceBounds": [196, 396, 576, 1404],
+  "referenceHairBounds": [325, 390, 330, 440],
   "referenceSha256": "8618a57f32e12669785563a7ab6d4c7e73798350a25ee9103d836be9e126a080",
   "limitations": [
-    "A aprovação visual dos desenhos não significa identidade de pixels com o modelo original. A revisão v3 preserva os pixels fora do contorno corrigido; o alfa muda somente na borda e na franja semitransparente.",
+    "A aprovação visual dos desenhos não significa identidade de pixels com o modelo original. V4 preserva o interior do desenho e a transparência na borda próxima; o alfa só diminui na franja externa removida.",
     "Os PNGs são candidatos de desenho, sem peças separadas, pintura oculta, malhas, deformadores ou keyforms.",
     "Não há novo CMO3 ou MOC3; nenhuma dessas poses foi ativada no avatar atual."
   ],
@@ -28,13 +29,14 @@
     {
       "id": "hand-on-hip",
       "label": "Mão na cintura",
-      "file": "hand-on-hip-v3.png",
-      "previousFile": "hand-on-hip-v2.png",
-      "previousSha256": "f1c3bbae75c2c4452c39f45f67c8b54edaf34e58dcfdeeaa5aca3c89a5a11abe",
+      "file": "hand-on-hip-v4.png",
+      "previousFile": "hand-on-hip-v3.png",
+      "previousSha256": "40820b87c173dd566bdf6862c54a383a6c01f76a29639f8003b1e26b909662ca",
       "bounds": [161, 181, 693, 1502],
-      "sha256": "40820b87c173dd566bdf6862c54a383a6c01f76a29639f8003b1e26b909662ca",
-      "check": "Conferir o contorno escuro contínuo na curva superior direita do cabelo. Use Antes do contorno para comparar.",
-      "observation": "Correção local v3: linha contínua de 3,5 pixels e limpeza da borda avermelhada. 7.639 pixels ajustados, incluindo alfa em 3.725 pixels externos; rosto, roupa e interior do cabelo preservados. A comparação mostra v2 → v3."
+      "hairBounds": [300, 175, 337, 449],
+      "sha256": "f505ce621babdbe65e3d133aada4fa9471bb29f4af3febe2e5b9843a55927303",
+      "check": "Use Contorno em detalhe + Avatar original para comparar espessura, cor e suavidade com cabeças em escala semelhante. Antes do contorno compara v3 → v4.",
+      "observation": "V4 parte do desenho v1: linha castanho-escura de 1,7 pixels, mesclada ao traço existente, sem reforçar a opacidade. 4.448 pixels ajustados, incluindo redução de alfa na franja externa em 2.916 pixels. Rosto, roupa e interior do cabelo preservados."
     },
     {
       "id": "idea-pointing",
@@ -48,13 +50,14 @@
     {
       "id": "lean-forward",
       "label": "Inclinação com mão na cintura",
-      "file": "lean-forward-v3.png",
-      "previousFile": "lean-forward-v2.png",
-      "previousSha256": "4b2b7e94189ce0585107a87511180b35c130cc3d18876c69d6238629d9360da7",
+      "file": "lean-forward-v4.png",
+      "previousFile": "lean-forward-v3.png",
+      "previousSha256": "27c77f2ffe0add469e9edaf485f1d3d2b2515129d7861ec17501070bd5df1a56",
       "bounds": [100, 87, 823, 1596],
-      "sha256": "27c77f2ffe0add469e9edaf485f1d3d2b2515129d7861ec17501070bd5df1a56",
-      "check": "Conferir o contorno escuro contínuo na curva superior direita do cabelo. Use Antes do contorno para comparar.",
-      "observation": "Correção local v3: linha contínua de 4 pixels e limpeza da borda avermelhada, com reforço na curva superior. 9.361 pixels ajustados, incluindo alfa em 3.657 pixels externos; rosto, roupa e interior do cabelo preservados. A comparação mostra v2 → v3."
+      "hairBounds": [165, 78, 450, 600],
+      "sha256": "47aaf3d2f0e5be31db1fd9d9ab536f679158bf9d0964d98ea822016f2359f9a1",
+      "check": "Use Contorno em detalhe + Avatar original para comparar espessura, cor e suavidade com cabeças em escala semelhante. Antes do contorno compara v3 → v4.",
+      "observation": "V4 parte do desenho v1: linha castanho-escura de 2,3 pixels, proporcional à cabeça maior da inclinação, sem reforçar a opacidade. 5.060 pixels ajustados, incluindo redução de alfa na franja externa em 2.752 pixels. Rosto, roupa e interior do cabelo preservados."
     }
   ]
 }

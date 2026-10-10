@@ -43,14 +43,14 @@ export function refineContinuousHairOutline(image, original, spec, change) {
         }
         continue;
       }
-      const strength = (inside ? clamp(change.widthPixels + .5 - distance) : 1) * fade;
+      const strength = (inside ? clamp(change.widthPixels + .5 - distance) : 1) * fade * (spec.strokeOpacity ?? 1);
       if (!strength) continue;
       for (let c = 0; c < 3; c++) image.rgba[i + c] = Math.round(original[i + c] + (Math.min(original[i + c], spec.colour[c]) - original[i + c]) * strength);
       if (inside && distance <= 1) {
-        const target = Math.max(alpha, 224);
+        const target = Math.max(alpha, spec.edgeAlphaFloor ?? 224);
         image.rgba[i + 3] = Math.round(alpha + (target - alpha) * fade);
       } else if (!inside) {
-        const target = Math.round(alpha * clamp((1.75 - distance) / .75));
+        const target = spec.preserveNearEdgeAlpha ? alpha : Math.round(alpha * clamp((1.75 - distance) / .75));
         image.rgba[i + 3] = Math.round(alpha + (target - alpha) * fade);
       }
     }
