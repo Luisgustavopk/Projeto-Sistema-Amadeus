@@ -28,6 +28,18 @@ function channels(rgba) {
   return data;
 }
 
+// PSD's merged transparency preview uses RGB composited over white. Layer
+// channels stay unassociated and lossless; only this 8-bit preview is matted.
+function mergedPreviewChannels(rgba) {
+  const data = channels(rgba);
+  for (let i = 0; i < data[3].length; i++) {
+    const alpha = data[3][i];
+    for (let c = 0; c < 3; c++)
+      data[c][i] = Math.round(data[c][i] * alpha / 255 + 255 - alpha);
+  }
+  return data;
+}
+
 /** PSD v1, 8-bit RGBA, with named raster layers. This is not a Cubism project. */
 export function writeLayeredPsd({ width, height, layers, merged, icc }) {
   if (width > 30000 || height > 30000 || merged.length !== width * height * 4)
@@ -108,6 +120,6 @@ export function writeLayeredPsd({ width, height, layers, merged, icc }) {
     block(resources),
     block(Buffer.concat([block(layerInfo), u32(0)])),
     u16(2),
-    deflateSync(Buffer.concat(channels(merged))),
+    deflateSync(Buffer.concat(mergedPreviewChannels(merged))),
   ]);
 }
