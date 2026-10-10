@@ -60,6 +60,7 @@
     byId('check').textContent = pose.check;
     byId('observation').textContent = pose.observation;
     byId('candidate-link').href = pose.file;
+    byId('candidate-caption').textContent = 'Desenho candidato · ' + pose.file.match(/v\d+(?=\.png$)/)[0];
     byId('comparison-reference').options[1].disabled = !pose.previousFile;
     if (!pose.previousFile) byId('comparison-reference').value = 'original';
     byId('framing').options[2].disabled = !pose.hairBounds;
