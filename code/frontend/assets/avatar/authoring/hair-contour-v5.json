@@ -1,0 +1,42 @@
+{
+  "version": 5,
+  "method": "local-pixel-edit",
+  "authorization": "Edição local apenas no contorno autorizada pelo usuário; v5 corrige a borda dupla apontada na v4.",
+  "algorithm": "reference-profile",
+  "alphaPolicy": "edge-only",
+  "alphaThreshold": 128,
+  "reference": "original-reference.png",
+  "referenceSha256": "8618a57f32e12669785563a7ab6d4c7e73798350a25ee9103d836be9e126a080",
+  "referenceRegion": [325, 385, 655, 850],
+  "referenceCentre": [490, 625],
+  "profileDepth": 6,
+  "innerFadePixels": 2,
+  "changes": [
+    {
+      "id": "hand-on-hip",
+      "source": "hand-on-hip-v1.png",
+      "sourceSha256": "00c1f824cfe1556bbc6be5aeefdbbea0a639cafb73aa1f63b2fcea706c911fe3",
+      "output": "hand-on-hip-v5.png",
+      "region": [280, 165, 647, 615],
+      "alignmentCentre": [470, 410],
+      "referenceScale": 1,
+      "endFadePixels": 24
+    },
+    {
+      "id": "lean-forward",
+      "source": "lean-forward-v1.png",
+      "sourceSha256": "860b675834e69bc5f14907be0cc343fadf979cc0e258fb0b02241a5ad8cf5766",
+      "output": "lean-forward-v5.png",
+      "region": [135, 72, 620, 502],
+      "alignmentCentre": [390, 410],
+      "referenceScale": 0.71,
+      "endFadePixels": 24
+    }
+  ],
+  "invariants": [
+    "Perfil RGBA do contorno amostrado diretamente do render original, não uma linha uniforme sobreposta.",
+    "Pixels fora da faixa estreita do contorno preservados.",
+    "Dimensões, rosto, roupa e desenho interno intactos.",
+    "Sem expansão para pixels transparentes; alfa ajustado somente na borda próxima e na franja externa."
+  ]
+}

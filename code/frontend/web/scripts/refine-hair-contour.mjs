@@ -2,18 +2,21 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { decodeRgbaPng, encodeRgbaPng } from './lib/png-rgba.mjs';
 import { refineContinuousHairOutline } from './lib/continuous-hair-outline.mjs';
+import { refineReferenceHairOutline } from './lib/reference-hair-outline.mjs';
 
 const authoring = new URL('../../assets/avatar/authoring/', import.meta.url);
 const local = new URL('../../assets/avatar/local/pose-candidates-v1/', import.meta.url);
-const version = process.argv[2] ?? '4';
-if (!['2', '3', '4'].includes(version)) throw new Error('Supported contour revisions: 2, 3, 4');
+const version = process.argv[2] ?? '5';
+if (!['2', '3', '4', '5'].includes(version)) throw new Error('Supported contour revisions: 2, 3, 4, 5');
 const spec = JSON.parse(await readFile(new URL('hair-contour-v' + version + '.json', authoring), 'utf8'));
 const hash = (buffer) => createHash('sha256').update(buffer).digest('hex');
 const clamp = (value) => Math.max(0, Math.min(1, value));
 const results = [];
+let reference;
 if (spec.reference) {
   if (!/^[a-z-]+\.png$/.test(spec.reference)) throw new Error('Invalid reference file name');
   if (hash(await readFile(new URL(spec.reference, local))) !== spec.referenceSha256) throw new Error('Reference changed');
+  reference = decodeRgbaPng(await readFile(new URL(spec.reference, local)));
 }
 
 for (const change of spec.changes) {
@@ -27,7 +30,9 @@ for (const change of spec.changes) {
   const opaque = (x, y) => x >= 0 && y >= 0 && x < width && y < height && original[(y * width + x) * 4 + 3] >= spec.alphaThreshold;
   let changedPixels = 0;
   const changedBounds = [width, height, -1, -1];
-  if (spec.algorithm === 'continuous-outline') {
+  if (spec.algorithm === 'reference-profile') {
+    refineReferenceHairOutline(image, original, reference, spec, change);
+  } else if (spec.algorithm === 'continuous-outline') {
     refineContinuousHairOutline(image, original, spec, change);
   } else for (let y = top; y < bottom; y++) {
     for (let x = left; x < right; x++) {
@@ -60,7 +65,7 @@ for (const change of spec.changes) {
       }
     }
   }
-  if (spec.algorithm === 'continuous-outline') {
+  if (['continuous-outline', 'reference-profile'].includes(spec.algorithm)) {
     for (let i = 0; i < original.length; i += 4) {
       if (image.rgba.subarray(i, i + 4).equals(original.subarray(i, i + 4))) continue;
       const x = (i / 4) % width, y = Math.floor(i / 4 / width);
