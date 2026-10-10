@@ -1,0 +1,113 @@
+import { deflateSync } from 'node:zlib';
+
+const u16 = (n) => {
+  const b = Buffer.alloc(2);
+  b.writeUInt16BE(n);
+  return b;
+};
+const i16 = (n) => {
+  const b = Buffer.alloc(2);
+  b.writeInt16BE(n);
+  return b;
+};
+const u32 = (n) => {
+  const b = Buffer.alloc(4);
+  b.writeUInt32BE(n);
+  return b;
+};
+const i32 = (n) => {
+  const b = Buffer.alloc(4);
+  b.writeInt32BE(n);
+  return b;
+};
+const block = (b) => Buffer.concat([u32(b.length), b]);
+function channels(rgba) {
+  const data = Array.from({ length: 4 }, () => Buffer.alloc(rgba.length / 4));
+  for (let i = 0; i < rgba.length / 4; i++)
+    for (let c = 0; c < 4; c++) data[c][i] = rgba[i * 4 + c];
+  return data;
+}
+
+/** PSD v1, 8-bit RGBA, with named raster layers. This is not a Cubism project. */
+export function writeLayeredPsd({ width, height, layers, merged, icc }) {
+  if (width > 30000 || height > 30000 || merged.length !== width * height * 4)
+    throw new RangeError('Invalid PSD dimensions');
+  const records = [],
+    pixels = [];
+  // PSD records are ordered front to back; exports are back to front.
+  for (const layer of [...layers].reverse()) {
+    const raw = Buffer.from(layer.rgba, 'base64');
+    if (raw.length !== layer.width * layer.height * 4)
+      throw new RangeError(layer.id);
+    const streams = channels(raw).map((c) =>
+      Buffer.concat([u16(2), deflateSync(c)]),
+    );
+    const ascii = Buffer.from(layer.id, 'ascii').subarray(0, 255);
+    const pascal = Buffer.concat([Buffer.from([ascii.length]), ascii]);
+    const padded = Buffer.concat([
+      pascal,
+      Buffer.alloc((4 - (pascal.length % 4)) % 4),
+    ]);
+    const unicode = Buffer.alloc(layer.id.length * 2);
+    for (let i = 0; i < layer.id.length; i++)
+      unicode.writeUInt16BE(layer.id.charCodeAt(i), i * 2);
+    const extra = Buffer.concat([
+      u32(0),
+      u32(0),
+      padded,
+      Buffer.from('8BIMluni'),
+      block(Buffer.concat([u32(layer.id.length), unicode])),
+    ]);
+    records.push(
+      Buffer.concat([
+        i32(layer.top),
+        i32(layer.left),
+        i32(layer.top + layer.height),
+        i32(layer.left + layer.width),
+        u16(4),
+        ...streams.flatMap((s, c) => [i16(c === 3 ? -1 : c), u32(s.length)]),
+        Buffer.from(
+          '8BIM' +
+            (layer.blend === 'multiply'
+              ? 'mul '
+              : layer.blend === 'add'
+                ? 'lddg'
+                : 'norm'),
+        ),
+        Buffer.from([255, 0, 0, 0]),
+        block(extra),
+      ]),
+    );
+    pixels.push(...streams);
+  }
+  const info = Buffer.concat([i16(-layers.length), ...records, ...pixels]);
+  const layerInfo =
+    info.length % 2 ? Buffer.concat([info, Buffer.alloc(1)]) : info;
+  const resources = Buffer.concat([
+    // Explicit sRGB IEC61966-2.1, supplied by the OS; no color conversion.
+    ...(icc
+      ? [
+          Buffer.from('8BIM'),
+          u16(1039),
+          Buffer.alloc(2),
+          block(icc),
+          ...(icc.length % 2 ? [Buffer.alloc(1)] : []),
+        ]
+      : []),
+  ]);
+  return Buffer.concat([
+    Buffer.from('8BPS'),
+    u16(1),
+    Buffer.alloc(6),
+    u16(4),
+    u32(height),
+    u32(width),
+    u16(8),
+    u16(3),
+    u32(0),
+    block(resources),
+    block(Buffer.concat([block(layerInfo), u32(0)])),
+    u16(2),
+    deflateSync(Buffer.concat(channels(merged))),
+  ]);
+}

@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "status": "authoring-required",
+  "runtimeEnabled": false,
+  "identity": "Preservar os desenhos originais do rosto, cabelo, roupa, contornos e sombreamento; usar a paleta atual como referência de cor.",
+  "parameters": [
+    {
+      "id": "ParamArmPose",
+      "min": 0,
+      "max": 3,
+      "default": 0,
+      "keys": [0, 1, 2, 3],
+      "interpolation": "pose-switch",
+      "purpose": "0: braços originais; 1: cruzados; 2: mão na cintura; 3: indicador levantado"
+    },
+    {
+      "id": "ParamLeanForward",
+      "min": 0,
+      "max": 1,
+      "default": 0,
+      "keys": [0, 0.5, 1],
+      "interpolation": "deformed-art",
+      "purpose": "Perspectiva real de tronco, ombros e gola; não zoom nem giro lateral do avatar inteiro"
+    }
+  ],
+  "poses": [
+    {
+      "id": "arms-crossed",
+      "label": "Braços cruzados",
+      "parameters": { "ParamArmPose": 1, "ParamLeanForward": 0 },
+      "reference": "CRS_JLE_40000100.png",
+      "newParts": [
+        "manga superior direita",
+        "antebraço direito",
+        "mão direita",
+        "manga superior esquerda",
+        "antebraço esquerdo",
+        "mão esquerda",
+        "dobras de contato no jaleco"
+      ],
+      "validation": "Antebraços cruzam na frente do tronco; mãos e cotovelos permanecem legíveis; não confundir com mão no queixo."
+    },
+    {
+      "id": "hand-on-hip",
+      "label": "Mão na cintura",
+      "parameters": { "ParamArmPose": 2, "ParamLeanForward": 0 },
+      "reference": "Imagem de pose enviada pelo usuário; manter o jaleco branco do avatar, não a jaqueta da referência.",
+      "newParts": [
+        "manga com cotovelo afastado",
+        "antebraço dobrado",
+        "mão apoiada na cintura",
+        "jaleco atrás da mão"
+      ],
+      "validation": "Mão encosta na cintura; ombro, cotovelo e punho formam uma cadeia anatômica contínua."
+    },
+    {
+      "id": "idea-pointing",
+      "label": "Indicador levantado",
+      "parameters": { "ParamArmPose": 3, "ParamLeanForward": 0 },
+      "reference": "Imagem do indicador levantado enviada pelo usuário.",
+      "newParts": [
+        "manga com cotovelo dobrado",
+        "antebraço vertical",
+        "mão com indicador levantado",
+        "demais dedos dobrados"
+      ],
+      "validation": "Indicador legível e anatomia natural; não ampliar mão ou inventar acessórios."
+    },
+    {
+      "id": "lean-forward",
+      "label": "Inclinar para frente com mão na cintura",
+      "parameters": { "ParamArmPose": 2, "ParamLeanForward": 1 },
+      "reference": "1771593912520_image.png, pose de anime enviada pelo usuário; mão na cintura.",
+      "newParts": [
+        "torso em perspectiva",
+        "ombros e gola vistos de cima",
+        "lapelas em perspectiva",
+        "gravata em perspectiva",
+        "manga com cotovelo afastado",
+        "antebraço dobrado",
+        "mão na cintura"
+      ],
+      "validation": "Tronco inclina em direção ao observador, mão permanece na cintura e ombros expressam profundidade. Preservar rosto e cabelo; piscadela e sorriso usam controles faciais existentes."
+    }
+  ],
+  "hierarchy": [
+    { "id": "root", "parent": null },
+    {
+      "id": "torso-perspective",
+      "parent": "root",
+      "type": "warp",
+      "parameter": "ParamLeanForward"
+    },
+    {
+      "id": "head",
+      "parent": "torso-perspective",
+      "reuse": "desenhos originais; manter controles de rosto e olhar"
+    },
+    {
+      "id": "arm-left-shoulder",
+      "parent": "torso-perspective",
+      "type": "rotation"
+    },
+    {
+      "id": "arm-left-elbow",
+      "parent": "arm-left-shoulder",
+      "type": "rotation"
+    },
+    { "id": "arm-left-hand", "parent": "arm-left-elbow", "type": "warp" },
+    {
+      "id": "arm-right-shoulder",
+      "parent": "torso-perspective",
+      "type": "rotation"
+    },
+    {
+      "id": "arm-right-elbow",
+      "parent": "arm-right-shoulder",
+      "type": "rotation"
+    },
+    { "id": "arm-right-hand", "parent": "arm-right-elbow", "type": "warp" }
+  ],
+  "ownership": {
+    "newArmPose": "Quando ParamArmPose > 0, HandChange e a física dos braços antigos cedem prioridade; ao sair, restaurar a pose anterior.",
+    "face": "Expressão facial é independente da pose dos braços; não embutir wink/sorriso obrigatório na textura do corpo.",
+    "gaze": "Reduzir tracking durante a transição da inclinação; restabelecer após estabilizar.",
+    "clock": "Usar o relógio existente; não criar ticker nem alterar a velocidade ao aplicar escala."
+  },
+  "releaseRequirements": [
+    "Desenhos novos revisados pelo usuário contra o avatar original",
+    "Separação real das peças em PSD, com pintura das áreas ocultas e sobreposição nas articulações",
+    "ArtMeshes, máscaras, deformadores e keyforms montados no projeto CMO3",
+    "Exportação de novo MOC3 com os parâmetros declarados",
+    "Teste visual de entrada, permanência e saída de cada pose; sem vazios, rasgos, distorção ou sobreposição indevida"
+  ]
+}
