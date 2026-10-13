@@ -1,0 +1,32 @@
+{
+  "version": 16,
+  "integrationDate": "2026-10-13",
+  "status": "integrated-manual-poses",
+  "runtimeEnabled": true,
+  "sourceProject": "Amadeus-rig-v16.cmo3",
+  "sourceProjectSha256AtReview": "8ef138c91367971e6f4cd6526320afd80411cb605c7b384e6e045836c19f7ed6",
+  "model": "extra-rig/v16/Amadeus-rig-v16.model3.json",
+  "mocSha256": "dab66c496f88f10b97938ce53f78a97206c77fc7a5013235d568b17ccee54b06",
+  "atlasSha256": "99abbd61eb07704ef219740185edf6b61a4673279f083122130fa1a6ad0d4856",
+  "counts": { "parameters": 29, "drawables": 121, "offscreenGroups": 4 },
+  "sdk": {
+    "version": "Cubism SDK for Web 5 R5",
+    "source": "https://cubism.live2d.com/sdk-web/bin/CubismSdkForWeb-5-r.5.zip",
+    "archiveSha256": "67064a7fb1812cf502f5c4a03bfe12cc638c75a621bb4acf06bb28763df06ba0",
+    "coreSha256": "8741f739779b5d5210872bd3d7d99f0f1e56e6c87409e7d26d6bb4b80aa1ef47",
+    "isolatedFromPrimary": true,
+    "requiresWebGL2": true
+  },
+  "parameters": { "ParamArmPose": [0, 3], "ParamLeanForward": [0, 1] },
+  "controlsWithMeasuredResponse": ["ParamAngleZ", "ParamEyeLOpen", "ParamEyeROpen", "ParamEyeBallX", "ParamEyeBallY", "ParamBreath", "ParamMouthOpenY"],
+  "conditionalResponse": { "ParamAngleX": "Responds at ArmPose 1, 2 and 3 with LeanForward 0", "ParamAngleY": "Responds at ArmPose 1, 2 and 3 with LeanForward 0" },
+  "controlsWithoutMeasuredResponse": ["ParamEyeLSmile", "ParamEyeRSmile", "ParamBrowLY", "ParamBrowRY", "ParamBrowLX", "ParamBrowRX", "ParamBrowLAngle", "ParamBrowRAngle", "ParamBrowLForm", "ParamBrowRForm", "ParamMouthForm", "ParamCheek", "ParamBodyAngleX", "ParamBodyAngleY", "ParamBodyAngleZ", "ParamHairFront", "ParamHairSide", "ParamHairBack"],
+  "limitations": [
+    "Parameter presence does not imply a completed facial rig.",
+    "MouthOpen changes one drawable opacity, not mouth vertex geometry.",
+    "Cutout seams and underlap gaps remain visible with some head movements in the supplied export.",
+    "The SDK 5.0 compatibility export was rejected because it discarded offscreen opacity and overlaid poses.",
+    "Manual pose selection only; no new automatic LLM or voice routing.",
+    "CMO3 cannot be loaded directly in the browser. The integration uses the accompanying SDK 5.3 export."
+  ]
+}

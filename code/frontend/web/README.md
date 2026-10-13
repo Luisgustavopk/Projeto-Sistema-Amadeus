@@ -115,9 +115,27 @@ npm run check:motions
 
 `check:acting` percorre as 177 seleções no rig real, confere faixas e liberação de parâmetros, executa os 10 movimentos e valida a pose dos braços. Também verifica composição, responsividade e hashes dos arquivos originais. Imagens ficam em `.cache/acting-preview/`; esse teste não usa serviços de IA nem voz. `npm run avatar:generate` regenera o catálogo a partir das especificações locais.
 
-`check:motions` confere a virada emburrada com olhos fechados e a surpresa com recuo. A inclinação aproximada e o gesto leve dos braços foram removidos após rejeição visual. Verifica parâmetros no rig real, prioridade sobre o cursor, retorno do enquadramento e preservação dos arquivos originais. As capturas ficam em `.cache/motion-preview/`. As poses de cintura, braços cruzados e dedo levantado precisam de novos controles no projeto Cubism; não fazem parte deste modelo compilado.
+`check:motions` confere a virada emburrada com olhos fechados e a surpresa com recuo. A inclinação aproximada e o gesto leve dos braços foram removidos após rejeição visual. Verifica parâmetros no rig real, prioridade sobre o cursor, retorno do enquadramento e preservação dos arquivos originais. As capturas ficam em `.cache/motion-preview/`. As poses novas usam o rig extra v16 descrito abaixo, separado do modelo original.
 
 A conferência cobre renderização, oito opções de reação, desktop, celular, paisagem, texto seguro, preferências, teclado, falha de carregamento e tentativa de recuperação. Inclui remoção do monitor, zoom alternado 41 vezes e trocas de expressão, verificando que o slider não avança o tempo da animação e que o ticker compartilhado permanece desligado. Resultados e limites em [Interface_Live2D_2026-10-09.md](../../../docs/analysis/Interface_Live2D_2026-10-09.md).
 
 
 Para exportar uma base de desenhos originais em camadas, execute `npm run avatar:export-base`. A ferramenta grava PSDs e PNGs locais em `../assets/avatar/local/authoring-v1/`, com inspeção offline em `index.html`. Ela não recupera o projeto Cubism. O plano de peças e controles fica em [authoring/README.md](../assets/avatar/authoring/README.md).
+
+## Rig extra v16
+
+No painel **Expressões e movimentos → Poses do rig extra**, escolha braços cruzados, mão na cintura, indicador levantado ou inclinação. **Avatar original** restaura o modelo anterior e suas expressões. O controle de mão no queixo também retorna ao original. A seleção de pose permanece no store durante a sessão, sem autenticação ou chamadas de IA.
+
+A exportação SDK 5.3 usa opacidade de grupos offscreen; convertê-la para SDK 5.0 sobrepõe os corpos das poses. Por isso o renderer adicional usa o SDK oficial **Cubism Web R5**, WebGL2 e um iframe de mesma origem. Core e shaders ficam isolados do Pixi/Core original. Não há segundo ticker: o relógio existente atualiza o modelo original, transmite seus parâmetros comuns e desenha o extra. O renderer original deixa de desenhar enquanto o extra está visível; seus controles permanecem ativos. Escala, enquadramento e apresentação de movimentos acompanham as preferências. A pose dos braços troca por chave exata, enquanto a inclinação interpola durante 450 ms de simulação. Nenhum parâmetro físico inexistente é criado.
+
+Assets locais, ignorados pelo Git:
+
+- `../assets/avatar/local/extra-rig/v16/`: `Amadeus-rig-v16.model3.json`, `.moc3`, `.cdi3.json` e `Amadeus-rig-v16.4096/texture_00.png`, copiados da exportação fornecida com o CMO3.
+- `../assets/avatar/local/extra-rig/sdk/CubismSdkForWeb-5-r.5/`: pacote oficial do [SDK Web](https://www.live2d.com/en/sdk/download/web/). Preservar licenças do SDK/Core.
+- `../assets/avatar/local/extra-rig/runtime/`: bundle do renderer, Core, shaders e HTML/CSS de isolamento.
+
+`npm run avatar:build-extra` gera o bundle do SDK local. `predev`/`prebuild` também o regeneram quando o pacote está presente. Se houver apenas o bundle já preparado, a cópia pública continua funcionando. Sem os arquivos privados, a interface mantém o avatar original e avisa ao tentar carregar uma pose extra. O servidor não expõe CMO3/PSD nem aceita arquivos arbitrários pelo mount adicional.
+
+`npm run check:extra-rig` verifica as quatro poses no navegador, geometria finita, transparência, retorno ao original, seleção facial, celular, desmontagem e preservação dos hashes originais. Bloqueia rede externa e não usa serviços de voz. Imagens e resultados ficam em `.cache/extra-rig-preview/`. A chamada de inspeção faz readback apenas na análise/testes, não em cada frame. A fluidez real deve ser conferida no equipamento do usuário; os testes com SwiftShader não medem desempenho de GPU física.
+
+O v16 **não tem todos os controles faciais concluídos**: sobrancelhas, blush e formato da boca não apresentaram mudança de geometria/opacidade na análise. MouthOpen altera opacidade de uma peça. XY da cabeça responde nas poses de braço 1/2/3 sem inclinação, mas não no extremo inclinado. Há emendas de recortes/áreas ocultas visíveis com certos movimentos. Essas limitações pertencem à exportação fornecida; não foram escondidas com alteração das texturas. A integração preserva as cores authored do extra, sem aplicar novamente o filtro de paleta do original. Proveniência e controles medidos em [extra-rig-v16.json](../assets/avatar/authoring/extra-rig-v16.json).
