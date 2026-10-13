@@ -73,7 +73,12 @@ export function ExpressionsPanel({
             </Button>
           ))}
         </div>
-        <p className="panel-note">As poses usam o rig v16. Os controles faciais disponíveis nele podem diferir do avatar original.</p>
+        <p className="panel-note">
+          O catálogo de expressões foi criado para o avatar original. No rig v16,
+          apenas os controles já desenhados nele respondem; sorriso, sobrancelhas
+          e blush ainda precisam de autoria no modelo. A cabeça não gira em XY
+          no extremo da inclinação.
+        </p>
         <details className="catalog-details">
           <summary>
             Catálogo completo · {ACTING_CATALOG.expressions.length} expressões e{' '}
