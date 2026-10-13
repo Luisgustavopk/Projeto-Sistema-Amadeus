@@ -70,6 +70,7 @@ export function useLive2D(active: boolean, preferences: Preferences) {
     [],
   );
   const stopSpeaking = useCallback(() => runtime.current?.stopSpeaking(), []);
+  const rigPose = useCallback((pose: string) => runtime.current?.rigPose(pose) ?? Promise.resolve(false), []);
   return {
     canvasRef,
     hostRef,
@@ -80,6 +81,7 @@ export function useLive2D(active: boolean, preferences: Preferences) {
     react,
     motion,
     setArms,
+    rigPose,
     speak,
     stopSpeaking,
   };

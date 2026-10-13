@@ -56,6 +56,10 @@ test('the preview serves only public UI assets and keeps file mounts inside thei
     '/live2d/amadeus/..%2Fpackage.json',
     '/live2d/runtime/manifest.json',
     '/live2d/amadeus/missing.moc3',
+    '/live2d/extra-rig/v16/Amadeus-rig-v16.cmo3',
+    '/live2d/extra-runtime/LICENSE.md',
+    '/live2d/extra-runtime/..%5Cpackage.json',
+    '/live2d/extra-rig/v16/..%5Cpackage.json',
     '/%ZZ',
   ]) {
     const response = await fetch(base + path);

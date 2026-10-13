@@ -4,9 +4,10 @@ import { createAvatarGaze } from './avatar-gaze.mjs';
 import { createAvatarActing } from './avatar-acting.mjs';
 import { ACTING_CATALOG } from '../../../../../assets/avatar/acting/generated/catalog.mjs';
 import { applyAnimePalette } from './avatar-palette.mjs';
+import { createExtraRig } from './extra-rig.mjs';
 
 export function createAvatar({ canvas, host, onStatus }) {
-  let app, model, loading, clock, layout, gaze, acting, palette;
+  let app, model, loading, clock, layout, gaze, acting, palette, extraRig;
   let active = false;
   let disposed = false;
   const cancellation = new AbortController();
@@ -15,6 +16,7 @@ export function createAvatar({ canvas, host, onStatus }) {
   const isActive = () => active && !document.hidden;
   const updateActivity = () => clock?.setRunning(isActive());
   function release() {
+    extraRig?.destroy(); extraRig = undefined;
     acting?.destroy();
     gaze?.destroy();
     layout?.destroy();
@@ -102,6 +104,7 @@ export function createAvatar({ canvas, host, onStatus }) {
         });
         clock = createAvatarClock(app, model, () =>
           acting?.updatePresentation(),
+          () => extraRig?.update(),
         );
         layout = createAvatarLayout({ app, model, host });
         gaze = createAvatarGaze({ model, host, isActive });
@@ -116,6 +119,8 @@ export function createAvatar({ canvas, host, onStatus }) {
         layout.configure(preferences);
         layout.fit();
         gaze.configure(preferences);
+        extraRig = createExtraRig({ host, primaryCanvas: canvas, model, clock, layout });
+        extraRig.configure(preferences);
         updateActivity();
         clock.drawStill();
         onStatus({ state: 'ready' });
@@ -142,6 +147,7 @@ export function createAvatar({ canvas, host, onStatus }) {
     react: (event) => acting?.react(event) ?? false,
     motion: (name) => (acting ? acting.motion(name) : Promise.resolve(false)),
     setArms: (value) => acting?.setArms(value),
+    rigPose: (pose) => extraRig ? extraRig.select(pose) : Promise.resolve(false),
     get ready() {
       return Boolean(model);
     },
@@ -155,6 +161,7 @@ export function createAvatar({ canvas, host, onStatus }) {
       preferences = { ...preferences, ...value };
       layout?.configure(preferences);
       gaze?.configure(preferences);
+      extraRig?.configure(preferences);
       clock?.drawStill();
     },
     speak(duration) {

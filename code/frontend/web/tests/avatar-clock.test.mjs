@@ -40,3 +40,22 @@ test('repeated activation keeps one clock; redraws cannot advance an active anim
   clock.destroy();
   assert.equal(listeners.size, 0);
 });
+
+test('the extra renderer samples the primary model after its update on the same clock', () => {
+  let advance;
+  const calls = [];
+  const app = {
+    ticker: { deltaMS: 33, add(callback) { advance = callback; }, remove() {}, start() {}, stop() {} },
+    renderer: { render() { calls.push('render'); } }, stage: {},
+  };
+  const clock = createAvatarClock(app,
+    { update() { calls.push('primary'); } },
+    () => calls.push('presentation'),
+    () => calls.push('extra'));
+  clock.setRunning(true); advance();
+  assert.deepEqual(calls, ['presentation', 'primary', 'extra']);
+  calls.length = 0; clock.drawStill(); assert.deepEqual(calls, []);
+  clock.setRunning(false);
+  assert.deepEqual(calls, ['presentation', 'primary', 'extra', 'render']);
+  clock.destroy();
+});

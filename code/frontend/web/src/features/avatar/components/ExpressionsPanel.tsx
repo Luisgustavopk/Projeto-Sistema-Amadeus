@@ -56,6 +56,24 @@ export function ExpressionsPanel({
           Mão no queixo / trocar braços
           <span>{performance.arms ? 'ATIVO' : 'INATIVO'}</span>
         </Button>
+        <h3 className="section-label">Poses do rig extra</h3>
+        <div className="reaction-grid" aria-label="Poses do rig extra">
+          {[
+            ['original', 'Avatar original'],
+            ['arms-crossed', 'Braços cruzados'],
+            ['hand-on-hip', 'Mão na cintura'],
+            ['idea-pointing', 'Indicador levantado'],
+            ['lean-forward', 'Inclinar com mão na cintura'],
+          ].map(([pose, label]) => (
+            <Button key={pose} className="reaction-button" data-rig-pose={pose}
+              disabled={!ready || performance.pending}
+              aria-pressed={performance.rigPose === pose}
+              onClick={() => void performance.chooseRigPose(pose)}>
+              {label}
+            </Button>
+          ))}
+        </div>
+        <p className="panel-note">As poses usam o rig v16. Os controles faciais disponíveis nele podem diferir do avatar original.</p>
         <details className="catalog-details">
           <summary>
             Catálogo completo · {ACTING_CATALOG.expressions.length} expressões e{' '}

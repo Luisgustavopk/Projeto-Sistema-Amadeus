@@ -35,6 +35,7 @@ export function createAvatarLayout({ app, model, host }) {
   observer.observe(host);
   return {
     fit,
+    get presentation() { return { ...presentation }; },
     setPresentation(value) {
       presentation = value;
       applyPresentation();

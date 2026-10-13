@@ -20,6 +20,8 @@ const mime = {
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
   '.moc3': 'application/octet-stream',
+  '.vert': 'text/plain; charset=utf-8',
+  '.frag': 'text/plain; charset=utf-8',
 };
 
 /** Only UI files and the selected local rig are public. No API or proxy. */
@@ -44,7 +46,13 @@ export function createWebServer({
       let path = ['/', '/login', '/index.html'].includes(pathname)
         ? 'index.html'
         : pathname.slice(1);
-      if (pathname.startsWith('/live2d/amadeus/')) {
+      if (/^\/live2d\/extra-rig\/v16\/[\w./-]+\.(?:json|png|moc3)$/u.test(pathname)) {
+        directory = resolve(root, 'live2d/extra-rig/v16');
+        path = pathname.slice('/live2d/extra-rig/v16/'.length);
+      } else if (/^\/live2d\/extra-runtime\/(?:index\.html|stage\.css|extra-renderer\.js|live2dcubismcore\.min\.js|shaders\/[\w.-]+\.(?:vert|frag))$/u.test(pathname)) {
+        directory = resolve(root, 'live2d/extra-runtime');
+        path = pathname.slice('/live2d/extra-runtime/'.length);
+      } else if (pathname.startsWith('/live2d/amadeus/')) {
         directory = models;
         path = pathname.slice('/live2d/amadeus/'.length);
         if (!['.json', '.png', '.moc3'].includes(extname(path))) {
@@ -86,7 +94,7 @@ export function createWebServer({
         'X-Content-Type-Options': 'nosniff',
         'Referrer-Policy': 'no-referrer',
         'Content-Security-Policy':
-          "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; media-src 'none'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+          "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; media-src 'none'; object-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
       });
       if (request.method === 'HEAD') response.end();
       else {

@@ -17,6 +17,7 @@ export interface AvatarRuntime {
   react(event: ActingEvent): boolean;
   motion(name: string): Promise<boolean>;
   setArms(value: boolean): void;
+  rigPose(pose: string): Promise<boolean>;
   speak(duration: number): void;
   stopSpeaking(): void;
   destroy(): void;

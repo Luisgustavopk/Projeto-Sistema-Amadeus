@@ -19,7 +19,9 @@
     "avatar:review-poses": "node scripts/prepare-pose-review.mjs",
     "avatar:refine-contours": "node scripts/refine-hair-contour.mjs",
     "avatar:prepare-layers": "node scripts/prepare-pose-layers.mjs",
-    "avatar:prepare-library": "node scripts/prepare-pose-library.mjs"
+    "avatar:prepare-library": "node scripts/prepare-pose-library.mjs",
+    "avatar:build-extra": "node scripts/build-extra-runtime.mjs",
+    "check:extra-rig": "npm run build && node scripts/check-extra-rig.mjs"
   },
   "engines": {
     "node": ">=24 <25"

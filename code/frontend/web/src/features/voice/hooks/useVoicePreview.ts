@@ -17,6 +17,7 @@ export function useVoicePreview({
   react,
   motion,
   setArms: applyArms,
+  rigPose: applyRigPose,
   speak,
   stopSpeaking,
   append,
@@ -28,6 +29,7 @@ export function useVoicePreview({
   | 'react'
   | 'motion'
   | 'setArms'
+  | 'rigPose'
   | 'speak'
   | 'stopSpeaking'
 > & {
@@ -35,7 +37,7 @@ export function useVoicePreview({
   append: (role: MessageRole, text: string) => void;
   notify: Notify;
 }) {
-  const { reaction, setReaction, arms, setArms, actingEvent, setActingEvent } =
+  const { reaction, setReaction, arms, setArms, actingEvent, setActingEvent, rigPose, setRigPose } =
     useAvatarStore();
   const [speaking, setSpeaking] = useState(false);
   const [pending, setPending] = useState(false);
@@ -76,6 +78,16 @@ export function useVoicePreview({
       applyArms(arms);
     }
   }, [ready, reaction, expression, actingEvent, react, arms, applyArms]);
+  useEffect(() => {
+    let cancelled = false;
+    if (ready) void applyRigPose(rigPose).catch(() => {
+      if (!cancelled) {
+        setRigPose('original');
+        notify('Rig extra indisponível; usando o avatar original.');
+      }
+    });
+    return () => { cancelled = true; };
+  }, [ready, rigPose, applyRigPose, notify, setRigPose]);
   async function select(key: ReactionKey) {
     if (busy.current || !ready) return false;
     busy.current = true;
@@ -118,8 +130,23 @@ export function useVoicePreview({
   }
   function toggleArms() {
     if (!ready) return;
+    setRigPose('original');
     applyArms(!arms);
     setArms(!arms);
+  }
+  async function chooseRigPose(pose: string) {
+    if (!ready || busy.current) return false;
+    busy.current = true; setPending(true);
+    try {
+      const accepted = await applyRigPose(pose);
+      if (accepted && mounted.current) setRigPose(pose);
+      return accepted;
+    } catch {
+      notify('Não foi possível carregar o rig extra; o avatar original continua ativo.');
+      return false;
+    } finally {
+      busy.current = false; if (mounted.current) setPending(false);
+    }
   }
   async function playMotion(name: string) {
     if (!ready || busy.current) return false;
@@ -176,6 +203,8 @@ export function useVoicePreview({
     chooseActing,
     toggleArms,
     arms,
+    rigPose,
+    chooseRigPose,
     playMotion,
     toggleSpeech,
     stop,

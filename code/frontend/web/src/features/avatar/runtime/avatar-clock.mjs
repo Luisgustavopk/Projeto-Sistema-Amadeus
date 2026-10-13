@@ -1,6 +1,6 @@
 // One private ticker owns simulation time and drawing. Never enable the
 // Live2D shared ticker: its setter adds listeners on every assignment.
-export function createAvatarClock(app, model, beforeRender = () => {}) {
+export function createAvatarClock(app, model, beforeRender = () => {}, afterUpdate = () => {}) {
   let running = false;
   let elapsed = 0;
   function advance() {
@@ -8,6 +8,7 @@ export function createAvatarClock(app, model, beforeRender = () => {}) {
     elapsed += delta;
     beforeRender();
     model.update(delta);
+    afterUpdate();
   }
   app.ticker.add(advance, undefined, 25);
   function drawStill() {
@@ -15,6 +16,7 @@ export function createAvatarClock(app, model, beforeRender = () => {}) {
     elapsed += 1;
     beforeRender();
     model.update(1);
+    afterUpdate();
     app.renderer.render(app.stage);
   }
   return {

@@ -11,6 +11,8 @@ const Context = createContext<{
   reaction: ReactionKey;
   setReaction: Dispatch<SetStateAction<ReactionKey>>;
   arms: boolean;
+  rigPose: string;
+  setRigPose: Dispatch<SetStateAction<string>>;
   setArms: Dispatch<SetStateAction<boolean>>;
   actingEvent: { intent: string; emotion: string; intensity: number } | null;
   setActingEvent: Dispatch<
@@ -24,6 +26,7 @@ const Context = createContext<{
 export function AvatarProvider({ children }: PropsWithChildren) {
   const [reaction, setReaction] = useState<ReactionKey>('neutral');
   const [arms, setArms] = useState(false);
+  const [rigPose, setRigPose] = useState('original');
   const [actingEvent, setActingEvent] = useState<{
     intent: string;
     emotion: string;
@@ -35,6 +38,8 @@ export function AvatarProvider({ children }: PropsWithChildren) {
         reaction,
         setReaction,
         arms,
+        rigPose,
+        setRigPose,
         setArms,
         actingEvent,
         setActingEvent,

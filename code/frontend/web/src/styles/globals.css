@@ -339,6 +339,15 @@ button:focus:not(:focus-visible) {
   height: 100%;
   touch-action: pan-y;
 }
+.avatar-extra-rig {
+  color-scheme: dark;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  pointer-events: none;
+}
 .avatar-placeholder {
   position: absolute;
   inset: 0;

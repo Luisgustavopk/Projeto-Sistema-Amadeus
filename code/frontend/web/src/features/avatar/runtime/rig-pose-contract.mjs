@@ -1,4 +1,4 @@
-/** Future authoring contract. Not bound to the current compiled avatar. */
+/** Physical parameter contract for the separately authored extra rig. */
 export const RIG_POSES = Object.freeze({
   'arms-crossed': Object.freeze({ ParamArmPose: 1, ParamLeanForward: 0 }),
   'hand-on-hip': Object.freeze({ ParamArmPose: 2, ParamLeanForward: 0 }),

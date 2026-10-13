@@ -48,3 +48,21 @@ try {
     'Live2D local ausente: restaure o modelo e os runtimes conforme README.',
   );
 }
+
+// Optional authored rig. Only runtime files are public, never CMO3/PSD sources.
+try {
+  const extra = resolve(source, 'extra-rig');
+  await access(resolve(extra, 'v16/Amadeus-rig-v16.model3.json'));
+  try {
+    await access(resolve(extra, 'sdk/CubismSdkForWeb-5-r.5/Framework/src/live2dcubismframework.ts'));
+    await import('./build-extra-runtime.mjs');
+  } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  await access(resolve(extra, 'runtime/extra-renderer.js'));
+  await mkdir(resolve(web, 'public/live2d/extra-rig/v16'), { recursive: true });
+  for (const name of ['Amadeus-rig-v16.model3.json', 'Amadeus-rig-v16.moc3', 'Amadeus-rig-v16.cdi3.json', 'Amadeus-rig-v16.4096'])
+    await cp(resolve(extra, 'v16', name), resolve(web, 'public/live2d/extra-rig/v16', name), { recursive: true });
+  await cp(resolve(extra, 'runtime'), resolve(web, 'public/live2d/extra-runtime'), { recursive: true });
+} catch (error) {
+  if (error.code !== 'ENOENT') throw error;
+  console.warn('Rig extra local ausente; o avatar original continua disponível.');
+}
