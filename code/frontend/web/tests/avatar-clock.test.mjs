@@ -59,3 +59,18 @@ test('the extra renderer samples the primary model after its update on the same 
   assert.deepEqual(calls, ['presentation', 'primary', 'extra', 'render']);
   clock.destroy();
 });
+
+test('a hidden Pixi model advances the core once and leaves no pending render delta', () => {
+  let tick, updates = 0;
+  const model = {
+    visible: false, deltaTime: 0, elapsedTime: 0,
+    update(dt) { this.deltaTime += dt; this.elapsedTime += dt; },
+    internalModel: { update(dt) { assert.equal(dt,33); updates++; } },
+  };
+  const app = { ticker: { deltaMS:33,add(fn){tick=fn;},remove(){},start(){},stop(){} }, renderer:{render(){}},stage:{} };
+  const clock = createAvatarClock(app,model,()=>{},()=>assert.equal(model.deltaTime,0));
+  clock.setRunning(true);
+  for(let i=0;i<10;i++) tick();
+  assert.equal(updates,10); assert.equal(model.elapsedTime,330); assert.equal(model.deltaTime,0);
+  clock.destroy();
+});

@@ -6,6 +6,7 @@ import { CubismMatrix44 } from '@cubism-sdk/math/cubismmatrix44';
 import { CubismRenderer_WebGL } from '@cubism-sdk/rendering/cubismrenderer_webgl';
 import { CubismShaderManager_WebGL } from '@cubism-sdk/rendering/cubismshader_webgl';
 import { CubismRenderTarget_WebGL } from '@cubism-sdk/rendering/cubismrendertarget_webgl';
+import { meshReference, calibratedProjection } from './rig-framing.mjs';
 
 // R5 calls destroyRenderTarget during first allocation, before assigning _gl.
 // Seed the context only on first allocation; later cleanup remains unchanged.
@@ -16,7 +17,7 @@ CubismRenderTarget_WebGL.prototype.createRenderTarget = function(context, ...arg
 };
 
 const canvas = document.getElementById('stage');
-let moc, model, renderer, gl, destroyed = false;
+let moc, model, renderer, gl, reference, projection, destroyed = false;
 const textures = [];
 const signal = new AbortController();
 async function fetchAsset(url, type = 'arrayBuffer') {
@@ -35,6 +36,12 @@ async function load() {
   moc = CubismMoc.create(await fetchAsset(new URL(settings.FileReferences.Moc, base)), true);
   if (!moc) throw new Error('MOC3 do rig extra incompatível ou inválido.');
   model = moc.createModel();
+  const raw = model.getModel();
+  raw.parameters.values.set(raw.parameters.defaultValues);
+  model.setParameterValueById(CubismFramework.getIdManager().getId('ParamArmPose'), 2);
+  model.update();
+  reference = meshReference(raw, 'ArtMesh104');
+  raw.parameters.values.set(raw.parameters.defaultValues);
   renderer = new CubismRenderer_WebGL();
   renderer.initialize(model);
   renderer.gl = gl;
@@ -65,7 +72,7 @@ async function load() {
   }
   return inspect();
 }
-function draw({ parameters = {}, zoom = 100, framing = 1.4, top = .12, presentation = {} }) {
+function draw({ parameters = {}, zoom = 100, framing = 1.4, top = .12, presentation = {}, alignment }) {
   if (!model || destroyed) return;
   const raw = model.getModel(), p = raw.parameters;
   p.values.set(p.defaultValues);
@@ -87,6 +94,12 @@ function draw({ parameters = {}, zoom = 100, framing = 1.4, top = .12, presentat
   values[0] = scaleY * h / w; values[5] = scaleY;
   values[12] = (presentation.x ?? 0) * 2 * h / w;
   values[13] = 1 - 2 * top - targetHeight - (presentation.y ?? 0) * 2;
+  if (alignment) {
+    const projection = calibratedProjection({ ...alignment, extra: reference, width: w, height: h, framing, top, zoom, presentation });
+    values[0] = projection.xScale; values[5] = projection.yScale;
+    values[12] = projection.x; values[13] = projection.y;
+  }
+  projection = { xScale: values[0], yScale: values[5], x: values[12], y: values[13] };
   renderer.setMvpMatrix(matrix);
   renderer.setRenderState(null, [0, 0, w, h]);
   renderer.drawModel('/live2d/extra-runtime/shaders/');
@@ -105,6 +118,8 @@ function inspect() {
     parts: { ids: raw.parts.ids, opacities: Array.from(raw.parts.opacities) },
     offscreens: { count: raw.offscreens.count, opacities: Array.from(raw.offscreens.opacities) },
     backgroundPixel: Array.from(background),
+    reference,
+    projection,
   };
 }
 function destroy() {

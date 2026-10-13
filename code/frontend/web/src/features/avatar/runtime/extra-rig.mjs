@@ -1,12 +1,28 @@
 import { planRigPose } from './rig-pose-contract.mjs';
+import { meshReference } from './rig-framing.mjs';
 
 /** The 5.3 SDK has its own realm and context; the parent owns all frame timing. */
 export function createExtraRig({ host, primaryCanvas, model, clock, layout }) {
+  const rawModel = model.internalModel.coreModel.getModel();
+  const alignment = {
+    native: meshReference(rawModel, 'ArtMesh104'),
+    nativeHeight: rawModel.canvasinfo.CanvasHeight / rawModel.canvasinfo.PixelsPerUnit,
+  };
   let frame, loading, api, disposed = false, selected = 'original', request = 0;
+  let parameters = {};
+  // Pixi restores its saved motion parameters at the end of internalModel.update.
+  // Capture after the registered acting/mouth layers, before that restoration,
+  // so gaze, blink, physics and expressions reach the extra model as drawn.
+  const captureParameters = () => {
+    if (selected === 'original') return;
+    const p = rawModel.parameters;
+    parameters = Object.fromEntries(p.ids.map((id, i) => [id, p.values[i]]));
+  };
+  model.internalModel.on('beforeModelUpdate', captureParameters);
   let cancelLoad;
   let target = {}, lean = 0, fromLean = 0, leanStarted = 0;
   const restore = () => {
-    selected = 'original'; target = {}; lean = 0;
+    selected = 'original'; target = {}; lean = 0; parameters = {};
     primaryCanvas.style.visibility = '';
     model.visible = true;
     if (frame) frame.style.visibility = 'hidden';
@@ -64,18 +80,16 @@ export function createExtraRig({ host, primaryCanvas, model, clock, layout }) {
     if (!api || disposed || selected === 'original') return;
     const t = clock.running ? Math.min(1, (clock.elapsed - leanStarted) / 450) : 1;
     lean = fromLean + (target.ParamLeanForward - fromLean) * t * t * (3 - 2*t);
-    const core = model.internalModel.coreModel, raw = core.getModel().parameters;
-    const parameters = Object.fromEntries(raw.ids.map(id => [id, core.getParameterValueById(id)]));
     const style = getComputedStyle(host);
     api.draw({ parameters: { ...parameters, ...target, ParamLeanForward: lean },
       zoom: preferences.zoom, framing: parseFloat(style.getPropertyValue('--avatar-framing')) || 1.4,
       top: parseFloat(style.getPropertyValue('--avatar-top')) || .12,
-      presentation: layout.presentation });
+      presentation: layout.presentation, alignment });
   }
   let preferences = { zoom: 100 };
   return {
     select, update, get selected() { return selected; },
     configure(value) { preferences = { ...preferences, ...value }; update(); },
-    destroy() { disposed = true; request++; cancelLoad?.(); restore(); api?.destroy(); frame?.remove(); },
+    destroy() { disposed = true; request++; cancelLoad?.(); restore(); model.internalModel.off('beforeModelUpdate', captureParameters); api?.destroy(); frame?.remove(); },
   };
 }
